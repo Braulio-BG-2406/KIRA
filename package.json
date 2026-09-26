@@ -1,0 +1,9 @@
+{
+  "name": "kira",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Kira — assistente pessoal no Telegram (n8n + Google Gemini)",
+  "scripts": {
+    "test": "node scripts/testar-codigo.mjs"
+  }
+}

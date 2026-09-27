@@ -89,7 +89,11 @@ No workflow: **Save → Publish** (ou o interruptor **Active**). O n8n registra 
 1. Com o workflow publicado, mande **oi** para o bot.
 2. A Kira responde: *🔧 Kira em modo de configuração — Seu ID do Telegram é: `123456789`*.
 3. No n8n, abra o nó **Configuração da Kira** e cole esse número no campo **ids_autorizados** (para liberar mais de uma pessoa, separe os IDs por vírgula).
+   - O nó fica logo depois do **Telegram Trigger**, dentro do grupo **Entrada e segurança**. Se o grupo aparecer como uma caixa fechada, clique nele para expandir.
+   - Dê dois cliques no nó. Na lista de campos (*Fields to Set*), procure a linha com o nome `ids_autorizados` e cole o número na caixa de valor ao lado.
 4. Salve e **publique de novo**.
+
+> No **Telegram Trigger**, o campo *Trigger On / Updates* deve ficar só com **Message**. Outros tipos (mensagens editadas, canais, enquetes) não são tratados pela Kira 1.0 e fazem a execução dar erro.
 
 A partir daí a Kira só conversa com você, e só no chat privado. Qualquer outra pessoa recebe: *🔒 Olá! Eu sou a Kira, uma assistente particular. Não estou autorizada a conversar com você.*
 

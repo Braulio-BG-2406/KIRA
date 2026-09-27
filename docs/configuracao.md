@@ -18,7 +18,7 @@ Prefere rodar na VPS? Veja [Rodar na VPS](#rodar-na-vps-opcional) no fim.
 4. [Publicar o workflow](#4-publicar)
 5. [Liberar o seu ID do Telegram](#5-liberar-o-seu-id)
 6. [Fazer o primeiro teste](#6-primeiro-teste-)
-7. Opcionais: [Outlook](#7-outlook-e-mails-agenda-e-rascunhos-de-resposta), [Resumo da manhã às 7h](#8-resumo-da-manhã-às-7h), [Google Drive](#9-google-drive-só-leitura), [LinkedIn](#10-linkedin-rascunhos-e-publicar), [Imagens](#11-imagens-com-ia), [Teams](#12-microsoft-teams) e [Pedidos](#13-pedidos-planilha-do-erp)
+7. Opcionais: [Outlook](#7-outlook-e-mails-agenda-e-rascunhos-de-resposta), [Resumo da manhã às 7h](#8-resumo-da-manhã-às-7h), [Google Drive](#9-google-drive-só-leitura), [LinkedIn](#10-linkedin-rascunhos-e-publicar), [Imagens](#11-imagens-com-ia), [Teams](#12-microsoft-teams), [Pedidos](#13-pedidos-planilha-do-erp), [Ambientes](#14-ambientes-kira-20) e [Rascunhos automáticos](#15-rascunhos-automáticos-de-e-mails-sobre-pedidos)
 
 ---
 
@@ -192,6 +192,42 @@ Com isso, "Kira, qual o status do pedido 12345?" ou "deixe pronta a resposta par
 
 > Os dados da empresa passam pelo Gemini. No plano gratuito, o Google pode usar o conteúdo para melhorar os produtos dele; o plano pago não usa.
 
+## 14. Ambientes (Kira 2.0)
+
+A Kira trabalha em um ambiente por vez: **Trabalho**, **Negócios** ou **Pessoal**. Cada ambiente tem suas memórias, seu histórico de conversa, suas tarefas e seus contatos, e a Kira não mistura informações entre eles sem você autorizar. As memórias marcadas como GERAL valem para todos.
+
+- **Trocar:** mande "modo pessoal", "/negocios" ou "Kira, mude para o ambiente trabalho". Ela responde "🗂️ Modo Pessoal ativado." e o ambiente fica salvo até a próxima troca. O `/status` mostra o ambiente ativo.
+- **Se você pedir algo de outro ambiente**, ela diz de qual ambiente é e pede para trocar (ou para você autorizar naquela mensagem).
+- **Tarefas e contatos:** "Kira, anota: ligar para o fornecedor amanhã", "quais são minhas tarefas?", "guarda o contato do Pedro, da loja X". Tudo fica no ambiente ativo.
+- **Conversas antigas:** "o que combinamos com aquele cliente?" faz a Kira procurar no histórico do ambiente.
+
+Para configurar:
+
+1. Crie as tabelas `kira_config` (`user_id`, `contexto`), `kira_tarefas` (`user_id`, `contexto`, `titulo`, `detalhes`, `prazo`, `status`) e `kira_contatos` (`user_id`, `contexto`, `nome`, `empresa`, `telefone`, `email`, `notas`), todas com colunas de texto, e acrescente a coluna `contexto` (texto) em `kira_memoria` e `kira_logs`.
+2. No nó **Ambientes da Kira**, ajuste o campo `ambientes` (JSON com `codigo`, `nome`, `apelidos` e `descricao` de cada ambiente) e o `ambiente_padrao`. A descrição diz à Kira o que pertence a cada ambiente (por exemplo, Outlook, Teams e pedidos no Trabalho).
+
+As memórias antigas, sem ambiente, são distribuídas pela categoria (`pessoal`, `negocios`, `trabalho`…); as que não se encaixam ficam como GERAL.
+
+## 15. Rascunhos automáticos de e-mails sobre pedidos
+
+Workflow separado: **Kira — rascunhos automáticos (Outlook)** ([`kira-rascunhos-automaticos.json`](../n8n/workflows/kira-rascunhos-automaticos.json)). De segunda a sexta, das 7h às 19h30, a cada 30 minutos:
+
+1. lê os e-mails novos da Caixa de Entrada e separa os que parecem perguntar de pedidos (pedido, TRF, cotação, compra, solicitação, produção, prazo, NF). Pula e-mails automáticos, os que você mesmo mandou e os que você já respondeu;
+2. a Kira lê cada um (até 5 por vez), consulta a planilha de pedidos (passo 13) e escreve a resposta no seu nome, marcando como **[confirmar]** o que a planilha não tem;
+3. cria a resposta como **rascunho** na conversa do e-mail, no Outlook. **Nunca envia**;
+4. avisa no Telegram: de quem é, o assunto, o resumo da resposta e um link para o rascunho.
+
+Para remetentes de fora da empresa, ela fala só dos pedidos que a pessoa citou, sem dados de outros clientes, custos ou fornecedores. Se o pedido não estiver na planilha, a resposta diz que você está verificando, sem afirmar que o pedido não existe.
+
+1. Crie a tabela `kira_emails_auto` com as colunas `message_id`, `status` e `motivo` (texto). Cada e-mail é analisado uma vez só; os registros são apagados depois de 10 dias.
+2. Importe o workflow e selecione as credenciais: *Microsoft Outlook* (nos três nós HTTP), *Gemini* (nos dois modelos) e *Telegram* (nos dois avisos).
+3. No nó **Configuração**, preencha `chat_id` (o seu ID do Telegram) e `ativo_desde` (data e hora a partir da qual os e-mails contam, por exemplo `2026-09-28T07:00:00-03:00`; vazio = últimas 72 horas).
+4. Na ferramenta **consultar_pedidos**, selecione o sub-workflow de pedidos e, nele, em **Settings → This workflow can be called by**, libere também este workflow. Publique.
+
+Se o Outlook parar de responder (por exemplo, credencial expirada), a Kira avisa no Telegram no máximo uma vez por dia.
+
+> São cerca de 26 execuções por dia útil no n8n, quase todas rápidas e sem IA; o Gemini só é chamado para os e-mails que parecem ser sobre pedidos.
+
 ## Personalizar
 
 Tudo fica no nó **Configuração da Kira**:
@@ -206,6 +242,8 @@ Tudo fica no nó **Configuração da Kira**:
 | `max_caracteres_voz` | 1500 | Respostas maiores que isso vão por texto |
 | `fuso_horario` | `America/Sao_Paulo` | Data e hora que a Kira considera |
 | `perfil_dono` | texto | O que a Kira sabe sobre você; entra nas instruções dela |
+
+Os ambientes ficam no nó **Ambientes da Kira** (passo 14).
 
 A personalidade e as regras de comportamento estão em [persona-kira.md](persona-kira.md).
 
@@ -230,6 +268,8 @@ Durante os testes ficou uma linha de teste em `kira_logs` (usuário "Teste @test
 | `/publicar N` responde que não conseguiu | Credencial do LinkedIn expirou ou o campo **Person** está vazio | Reconecte a credencial e confira o passo 10; o rascunho continua guardado |
 | A Kira diz que não consegue ler o Teams ou a planilha de pedidos | Credencial do Teams expirou ou o arquivo mudou de lugar | Reconecte a credencial *Microsoft Teams* e confira os ids do arquivo (passos 12 e 13) |
 | O resumo chegou sem o áudio | Limite diário da voz do Gemini | O texto sempre chega; o áudio volta no dia seguinte (veja a execução em **Executions**) |
+| A Kira diz que o assunto é de outro ambiente | O ambiente ativo não é o do assunto | Mande "modo <nome>" (o `/status` mostra o ambiente ativo) |
+| Não apareceu rascunho para um e-mail sobre pedido | Fora do horário, e-mail sem palavras de pedido, já respondido, ou a Kira decidiu que não precisava de resposta | Veja as execuções de **Kira — rascunhos automáticos** e a tabela `kira_emails_auto` (coluna `motivo`) |
 | A Kira diz que não conseguiu gerar a imagem | Limite diário de imagens do plano gratuito ou pedido recusado pelo filtro do Google | Tente amanhã ou mude a descrição; detalhes nas execuções do sub-workflow **Kira — gerar imagem** |
 | "Não consegui processar o seu áudio" | Transcrição sem credencial do Gemini ou modelo indisponível | Selecione a credencial no nó *Transcrever áudio (Gemini)* e confira o modelo |
 | "Atingi o limite de uso do Gemini" | Limite por minuto ou por dia do plano gratuito | Espere alguns minutos ou ative o faturamento |
@@ -244,8 +284,9 @@ A Kira também roda no n8n instalado na VPS. Pontos de atenção:
 2. **HTTPS público**: o Telegram só entrega mensagens para endereços HTTPS públicos, nas portas 443, 80, 88 ou 8443. Configure um domínio com certificado válido (por exemplo, com Caddy, Traefik ou Nginx + Let's Encrypt) e a variável `WEBHOOK_URL` do n8n com esse endereço.
 3. **VPN**: se o editor do n8n fica acessível só pela VPN, mantenha assim, mas libere publicamente o caminho `/webhook/`, senão o Telegram não alcança a Kira.
 4. Crie as tabelas com os mesmos nomes e colunas:
-   - `kira_memoria`: `user_id` (texto), `categoria` (texto), `fato` (texto)
-   - `kira_logs`: `chat_id`, `user_id`, `usuario`, `tipo_entrada`, `entrada`, `resposta`, `modo_resposta`, `entregue_como`, `status`, `erro`, `execucao_id` (texto) e `latencia_ms` (número)
+   - `kira_memoria`: `user_id`, `categoria`, `fato` e `contexto` (texto)
+   - `kira_logs`: `chat_id`, `user_id`, `usuario`, `tipo_entrada`, `entrada`, `resposta`, `modo_resposta`, `entregue_como`, `status`, `erro`, `execucao_id`, `contexto` (texto) e `latencia_ms` (número)
    - `kira_linkedin` e `kira_imagens`: veja os passos 10 e 11
-5. Importe [`n8n/workflows/kira-1.0.json`](../n8n/workflows/kira-1.0.json) (**Workflows → Import from file**), crie as credenciais dos passos 1 a 3 e preencha o `perfil_dono`. Importe também os sub-workflows das imagens, do Teams e dos pedidos (passos 11 a 13).
+   - `kira_config`, `kira_tarefas` e `kira_contatos`: veja o passo 14; `kira_emails_auto`: passo 15
+5. Importe [`n8n/workflows/kira-1.0.json`](../n8n/workflows/kira-1.0.json) (**Workflows → Import from file**), crie as credenciais dos passos 1 a 3 e preencha o `perfil_dono`. Importe também os sub-workflows das imagens, do Teams e dos pedidos e o workflow dos rascunhos automáticos (passos 11 a 15).
 6. Desative a Kira do n8n Cloud antes de publicar a da VPS (um bot, um webhook).

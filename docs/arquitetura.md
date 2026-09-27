@@ -2,7 +2,7 @@
 
 ## Visão geral
 
-A Kira é um **agente central** que roda no n8n. A versão 1.0 cuida só da conversa (texto e voz pelo Telegram); a 2.0 conecta as áreas da vida e do trabalho.
+A Kira é um **agente central** que roda no n8n e conversa pelo Telegram, por texto e voz. Desde a 2.0 ela trabalha em **ambientes** separados: um ativo por vez, cada um com suas memórias, histórico, tarefas e contatos.
 
 ```
                     ┌──────────────────────────┐
@@ -10,18 +10,20 @@ A Kira é um **agente central** que roda no n8n. A versão 1.0 cuida só da conv
                     │   KIRA · agente central  │
                     │     (Google Gemini)      │
                     └────────────┬─────────────┘
-                                 │
+                                 │ um ambiente ativo por vez ("modo <nome>")
            ┌─────────────────────┼─────────────────────┐
            │                     │                     │
-       🏢 HM               💼 NEGÓCIOS            👤 PESSOAL
-   Microsoft 365          clientes, vendas       agenda, estudos,
-   OneDrive, Outlook      estoque, CRM           rotina, notícias,
-   documentos, e-mails                           finanças
+     🏢 TRABALHO            💼 NEGÓCIOS            👤 PESSOAL
+   Outlook, Teams,        clientes, vendas,      agenda, estudos,
+   pedidos (ERP),         estoque, leads         rotina, notícias,
+   rascunhos              (fontes a conectar)    Google Drive
            │                     │                     │
-           └──────────── Kira 2.0 (próxima) ───────────┘
+           └── memórias, histórico, tarefas e contatos separados ──┘
 
-   Kira 1.0 (agora):   📱 Telegram ──► n8n ──► Gemini ──► Kira ──► 📱 Telegram
-                        🎙️ voz ou 💬 texto                    🔊 voz ou 💬 texto
+   📱 Telegram ──► n8n ──► Gemini ──► Kira ──► 📱 Telegram
+   🎙️ voz ou 💬 texto                    🔊 voz ou 💬 texto
+
+   Em paralelo: ☀️ resumo das 7h · 📝 rascunhos automáticos de e-mails sobre pedidos
 ```
 
 ## Caminho de uma mensagem
@@ -32,7 +34,7 @@ Os nomes em **negrito** são os nós do workflow [`n8n/workflows/kira-1.0.json`]
 2. **Configuração da Kira** acrescenta as configurações (nome, IDs liberados, modo de voz, voz, fuso, perfil).
 3. **Normalizar entrada** extrai chat, usuário, texto e tipo (`comando`, `voz`, `texto` ou `outro`), confere se o usuário está liberado e decide se a resposta vai por voz.
 4. **É você?** — quem não está em `ids_autorizados` (ou escreve fora do chat privado) recebe **Resposta: acesso negado**. Com a lista vazia, essa resposta mostra o ID da pessoa (modo de configuração).
-5. **Mostrar "digitando…"** mostra *digitando* ou *gravando voz* no Telegram.
+5. **Mostrar "digitando…"** mostra *digitando* ou *gravando voz* no Telegram. Em seguida, **Ambientes da Kira** (a lista de ambientes e o padrão) → **Buscar ambiente** (tabela `kira_config`) → **Ambiente atual** descobrem em qual ambiente a Kira está com você.
 6. **Tipo de mensagem** separa o caminho:
    - **Comando** → **É /publicar?** / **É /limpar?** → **Buscar memórias (comandos)** → **Resposta do comando**.
      - `/limpar`: **Limpar histórico da conversa** antes de responder.
@@ -40,11 +42,12 @@ Os nomes em **negrito** são os nós do workflow [`n8n/workflows/kira-1.0.json`]
    - **Voz** → **Baixar áudio** → **Transcrever áudio (Gemini)**.
    - **Texto** → segue direto.
    - **Outro** (foto, documento, figurinha…) → **Resposta: tipo não suportado**.
-7. **Pergunta** → **Buscar memórias** → **Agregar memórias** → **Contexto da conversa** montam o que a Kira precisa: a pergunta, a data e hora, o perfil e as memórias guardadas.
+7. **Pergunta** → **Detectar troca de ambiente** → **Trocar ambiente?**: mensagens curtas como "modo pessoal" ou "/negocios" trocam o ambiente (**Salvar ambiente** → **Resposta: ambiente ativado**). Nas outras, **Buscar memórias** → **Memórias do ambiente** (só as do ambiente ativo e as gerais) → **Contexto da conversa** montam o que a Kira precisa: a pergunta, a data e hora, o perfil, o ambiente e as memórias.
 8. **Kira** (AI Agent) responde usando:
    - **Gemini (principal)** e **Gemini (reserva)**: se o principal falhar, a reserva assume;
-   - **Memória da conversa**: as últimas 20 trocas;
-   - ferramentas **salvar_memoria** e **apagar_memoria** (tabela `kira_memoria`);
+   - **Memória da conversa**: as últimas 20 trocas, separadas por ambiente;
+   - ferramentas **salvar_memoria** e **apagar_memoria** (tabela `kira_memoria`, com o ambiente de cada memória);
+   - **buscar_conversas**, **criar_tarefa**, **listar_tarefas**, **concluir_tarefa**, **salvar_contato** e **buscar_contatos**: sempre do seu usuário e do ambiente ativo (tabelas `kira_logs`, `kira_tarefas` e `kira_contatos`);
    - ferramentas do Outlook: **emails_recentes**, **buscar_emails**, **ler_email** e **agenda** (leitura) e **criar_rascunho_resposta** (só rascunho), pelo Microsoft Graph;
    - ferramentas do Google Drive, só leitura: **buscar_arquivos_drive** e **ler_arquivo_drive**;
    - **rascunho_linkedin**: guarda o post (e o número da imagem, se houver) em `kira_linkedin`;
@@ -56,7 +59,7 @@ Os nomes em **negrito** são os nós do workflow [`n8n/workflows/kira-1.0.json`]
     - Voz: **Gerar voz (Gemini)** → **Preparar áudio (WAV)** → **Áudio para arquivo** → **Enviar áudio**.
     - Texto: **Dividir mensagem** (Markdown → HTML do Telegram, em partes de até 3.500 caracteres) → **Enviar texto** (→ **Enviar texto sem formatação**, se o Telegram recusar a formatação).
     - Se a voz falhar, a resposta vai por texto.
-11. **Registrar conversa** grava tudo em `kira_logs`.
+11. **Registrar conversa** grava tudo em `kira_logs`, com o ambiente.
 
 ### Sub-workflows (ferramentas)
 
@@ -65,12 +68,20 @@ Os nomes em **negrito** são os nós do workflow [`n8n/workflows/kira-1.0.json`]
 - **Kira — Teams (ferramenta)**: **Qual ação?** separa listar, ler e enviar. Listar: **Buscar conversas** (Graph, com participantes e última mensagem) → **Resumir conversas** (tira o dono da lista, filtra por nome, ordena pela mais recente). Ler: **Buscar mensagens** → **Resumir mensagens** (texto limpo, em ordem). Enviar: **Preparar envio** (HTML seguro) → **Enviar mensagem** → **Mensagem enviada**. Erros viram **Explicar falha**.
 - **Kira — pedidos (ferramenta)**: **Informações do arquivo** (nome e data de atualização) → **Baixar planilha** → **Ler planilha** (xlsx) → **Consultar planilha** (busca por número ou nome, filtros de atrasados, compras, solicitações e produção, resumo por situação, só os campos úteis). Erros viram **Explicar falha**.
 
+### Rascunhos automáticos (workflow separado)
+
+**Kira — rascunhos automáticos (Outlook)**, de segunda a sexta, das 7h às 19h30, a cada 30 minutos: **Configuração** → **Quem sou eu** (seu endereço, para reconhecer e-mails seus e remetentes de fora) → **Buscar e-mails novos** (Caixa de Entrada, só depois de `ativo_desde`, com a marca de "já respondido") → **Já processados** (`kira_emails_auto`) → **Separar e-mails** (pula os já vistos, automáticos, seus, já respondidos e os que não falam de pedidos; até 5 por vez) → **Kira prepara a resposta** (agente com **consultar_pedidos**, devolve JSON) → **Interpretar resposta** → **Tem resposta?** → **Criar rascunho** (`createReply`) → **Resultado do rascunho** → **Registrar e-mail** e **Montar aviso** → **Avisar no Telegram**. Falha da IA por limite de uso não é registrada (o e-mail volta na próxima rodada); outras falhas são registradas e avisadas. Se o Outlook falhar, **Falha já avisada hoje?** garante no máximo um aviso por dia.
+
 ## Dados
 
 | Tabela | Colunas | Para que serve |
 | --- | --- | --- |
-| `kira_memoria` | `user_id`, `categoria` (`pessoal`, `negocios`, `hm`, `geral`), `fato` | Memórias de longo prazo. A Kira lê as 100 mais recentes a cada mensagem |
-| `kira_logs` | `chat_id`, `user_id`, `usuario`, `tipo_entrada`, `entrada`, `resposta`, `modo_resposta`, `entregue_como`, `status`, `erro`, `latencia_ms`, `execucao_id` | Histórico e diagnóstico de cada mensagem |
+| `kira_memoria` | `user_id`, `contexto` (ambiente ou `GERAL`), `categoria` (tipo: preferência, decisão, cliente…), `fato` | Memórias de longo prazo. A Kira lê as 100 mais recentes e usa só as do ambiente ativo e as gerais |
+| `kira_logs` | `chat_id`, `user_id`, `usuario`, `tipo_entrada`, `entrada`, `resposta`, `modo_resposta`, `entregue_como`, `status`, `erro`, `latencia_ms`, `execucao_id`, `contexto` | Histórico e diagnóstico de cada mensagem; também é onde **buscar_conversas** procura |
+| `kira_config` | `user_id`, `contexto` | O ambiente ativo de cada usuário |
+| `kira_tarefas` | `user_id`, `contexto`, `titulo`, `detalhes`, `prazo`, `status` (`aberta` ou `concluida`) | Tarefas por ambiente |
+| `kira_contatos` | `user_id`, `contexto`, `nome`, `empresa`, `telefone`, `email`, `notas` | Contatos por ambiente |
+| `kira_emails_auto` | `message_id`, `status` (`rascunho`, `ignorado` ou `erro`), `motivo` | E-mails já analisados pelos rascunhos automáticos (guardados por 10 dias) |
 | `kira_linkedin` | `texto`, `status` (`pendente` ou `publicado`), `post_urn`, `erro`, `imagem_id` | Rascunhos de posts; o `id` é o número usado no `/publicar N` |
 | `kira_imagens` | `user_id`, `chat_id`, `file_id`, `descricao`, `legenda`, `formato`, `modelo` | Imagens geradas; o `id` é o número da imagem (#N) e o arquivo fica no Telegram (`file_id`) |
 
@@ -91,6 +102,10 @@ Todas as tabelas também têm `id`, `createdAt` e `updatedAt`, criados pelo n8n.
 **Teams: liberdade para escrever, mas só quando o dono pede.** A Kira lê e envia mensagens em nome do dono, sem rascunho, porque foi o que ele pediu. Para isso não virar risco, ela só envia com um pedido dele na conversa, trata o conteúdo do Teams como informação (nunca como ordem) e não repassa dados da empresa porque alguém pediu no chat.
 
 **Pedidos a partir da planilha exportada pelo ERP.** A planilha já sai todo dia no SharePoint; a Kira baixa pelo Microsoft Graph (a credencial do Teams tem acesso ao arquivo), lê e filtra no n8n e manda ao Gemini só as linhas e colunas da pergunta, com a data de atualização para ela citar.
+
+**Ambientes separados (Kira 2.0).** O ambiente ativo fica em `kira_config` e só muda por uma mensagem curta de troca ("modo pessoal"), reconhecida por código, sem IA: assim a troca é previsível e barata. A separação vale em várias camadas: a memória da conversa usa uma chave por ambiente, as memórias de longo prazo são filtradas antes de chegar à IA, e as ferramentas de tarefas, contatos e conversas filtram por usuário e ambiente com valores que vêm do workflow, nunca da IA. As instruções completam o resto: a Kira não usa dados de outro ambiente sem autorização na mesma mensagem. A lista de ambientes fica num nó próprio (**Ambientes da Kira**), separado da configuração geral.
+
+**Rascunhos automáticos, nunca envio.** Um workflow agendado, separado da Kira, prepara respostas para e-mails sobre pedidos. Um filtro por palavras evita chamar a IA para e-mails que não interessam; a IA decide se responde, consulta a planilha e escreve; o Outlook só recebe um rascunho (`createReply`). O e-mail é tratado como texto de terceiros (a Kira ignora instruções dentro dele), remetentes de fora recebem só dados dos pedidos que citaram e, quando o pedido não está na planilha, a resposta não afirma que ele não existe.
 
 **Resumo da manhã em workflow separado.** Às 7h, RSS de fontes confiáveis + cotações + Gemini + Telegram. Fica separado da Kira para que uma falha num não afete o outro. O Gemini recebe só a lista de notícias do dia e é instruído a não usar nada de fora dela; se ele falhar, vão os títulos com link. Depois do texto, um segundo pedido ao Gemini transforma o resumo num roteiro curto de rádio e a voz do Gemini o lê (o mesmo caminho de áudio da Kira). As buscas do Google Notícias passam por uma lista de veículos confiáveis.
 
@@ -120,17 +135,16 @@ Todas as tabelas também têm `id`, `createdAt` e `updatedAt`, criados pelo n8n.
 - E-mail e agenda só do Outlook: a Kira lê e prepara rascunhos, mas não envia. No Teams, ela só escreve em conversas que já existem. Dos dados da empresa, só a planilha de pedidos exportada pelo ERP; ainda sem OneDrive e sem busca na internet durante a conversa. A Kira foi instruída a dizer isso em vez de inventar.
 - O Google Drive é só leitura, e PDFs, Word e imagens do Drive ainda não são lidos.
 - As imagens dependem da cota gratuita diária do Gemini.
+- O ambiente ativo vale para você em todos os chats e só muda por mensagem ("modo <nome>").
+- Os rascunhos automáticos rodam de segunda a sexta, das 7h às 19h30, até 5 e-mails por rodada, e só usam a planilha de pedidos.
 - O resumo das 7h é enviado por outro workflow: a Kira da conversa não "lembra" dele.
 - Fotos e documentos ainda não são entendidos.
 - Mensagens enviadas em sequência muito rápida são processadas em paralelo e podem ser respondidas fora de ordem.
 
-## Próximos passos (Kira 2.0)
+## Próximos passos
 
-1. **Uma área por vez**, começando pela que der mais retorno, cada uma como um sub-agente ou ferramenta da Kira com permissões mínimas:
-   - **HM**: Microsoft 365. Outlook (leitura e rascunhos), Teams e a planilha de pedidos do ERP já conectados; faltam o OneDrive e os rascunhos automáticos para e-mails que perguntam de pedidos.
-   - **Negócios**: clientes, vendas, estoque e CRM (fontes a definir).
-   - **Pessoal**: agenda, estudos, rotina, notícias e finanças.
+1. **Dados reais de Negócios e Pessoal**: clientes, vendas e estoque (fontes a definir) e finanças, cada um no seu ambiente e com permissões mínimas.
 2. **Memória persistente da conversa** (por exemplo, *Postgres Chat Memory*), para não perder o contexto em reinícios.
-3. **Kira proativa**: o resumo de notícias das 7h já existe; falta juntar agenda e pendências do dia.
+3. **Kira proativa**: juntar ao resumo das 7h a agenda do dia e as tarefas abertas de cada ambiente.
 4. **Fotos e documentos**, aproveitando que o Gemini é multimodal.
 5. **Privacidade**: e-mails, Teams e pedidos já passam pelo Gemini no plano gratuito, por escolha do dono; o plano pago evita que o Google use esse conteúdo. Este repositório deve ficar privado se passar a guardar qualquer coisa sensível.

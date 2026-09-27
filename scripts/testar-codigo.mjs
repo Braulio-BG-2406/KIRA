@@ -61,6 +61,10 @@ const config = {
   max_caracteres_voz: 1500,
   fuso_horario: 'America/Sao_Paulo',
 };
+const ambientesDaKira = Object.fromEntries(
+  (nos['Ambientes da Kira']?.parameters.assignments.assignments ?? []).map((c) => [c.name, c.value]),
+);
+const ambienteAtivo = { ambiente: 'TRABALHO', ambiente_nome: 'Trabalho', ambiente_descricao: 'Trabalho na empresa.', ambientes_texto: '' };
 const entradaNormalizada = {
   chat_id: '111',
   user_id: '111',
@@ -176,6 +180,8 @@ const comando = (cmd, memorias = [{}]) =>
     nosAnteriores: {
       'Normalizar entrada': { ...entradaNormalizada, tipo_entrada: 'comando', comando: cmd, texto: cmd },
       'Configuração da Kira': config,
+      'Ambientes da Kira': ambientesDaKira,
+      'Ambiente atual': ambienteAtivo,
     },
     entrada: memorias,
   })[0];
@@ -195,9 +201,17 @@ teste('comando /status conta as memórias (ignora o item vazio de "nenhum result
   assert.match(comando('/status', [{ id: 1, fato: 'a' }, { id: 2, fato: 'b' }]).texto_resposta, /Memórias guardadas: 2/);
 });
 
-teste('comando /memorias lista id, categoria e fato', () => {
-  const r = comando('/memorias', [{ id: 7, categoria: 'pessoal', fato: 'Prefere respostas curtas' }]);
-  assert.match(partes(r.texto_resposta)[0].html, /• \[7\] \(pessoal\) Prefere respostas curtas/);
+teste('comando /memorias lista só as do ambiente ativo e as gerais', () => {
+  const r = comando('/memorias', [
+    { id: 7, contexto: 'TRABALHO', categoria: 'preferencia', fato: 'Prefere respostas curtas' },
+    { id: 8, contexto: 'PESSOAL', categoria: 'meta', fato: 'Correr 5 km' },
+    { id: 9, categoria: 'geral', fato: 'Mora em Belo Horizonte' },
+  ]);
+  const html = partes(r.texto_resposta)[0].html;
+  assert.match(html, /• \[7\] \(TRABALHO · preferencia\) Prefere respostas curtas/);
+  assert.match(html, /• \[9\] \(GERAL\) Mora em Belo Horizonte/);
+  assert.doesNotMatch(html, /Correr 5 km/);
+  assert.match(html, /ambiente Trabalho e gerais \(2\)/);
 });
 
 teste('comando /id mostra os ids como código', () => {
@@ -210,6 +224,8 @@ function publicar(texto, rodaram = {}) {
   const fixos = {
     'Normalizar entrada': { ...entradaNormalizada, tipo_entrada: 'comando', comando: '/publicar', texto },
     'Configuração da Kira': config,
+    'Ambientes da Kira': ambientesDaKira,
+    'Ambiente atual': ambienteAtivo,
   };
   const $ = (nome) => {
     if (nome in fixos) return { isExecuted: true, first: () => ({ json: fixos[nome] }), all: () => [{ json: fixos[nome] }] };
@@ -251,8 +267,10 @@ teste('/publicar: sem número ou rascunho inexistente', () => {
   assert.match(publicar('/publicar'), /Me diga qual rascunho publicar/);
   assert.match(publicar('/publicar 9', { 'Buscar rascunho (LinkedIn)': { saida: [{}] } }), /Não encontrei o rascunho 9 pendente/);
 });
-teste('comando /status e /ajuda mostram as imagens', () => {
+teste('comando /status e /ajuda mostram as imagens e o ambiente', () => {
   assert.match(comando('/status').texto_resposta, /Imagens: gero com o Gemini/);
+  assert.match(comando('/status').texto_resposta, /Ambiente: Trabalho/);
+  assert.match(comando('/ajuda').texto_resposta, /modo <ambiente> — troca de ambiente \(Trabalho, Negócios, Pessoal\)/);
   assert.match(comando('/ajuda').texto_resposta, /\/publicar N — publica no LinkedIn o rascunho N que eu preparei \(com a imagem, se tiver\)/);
 });
 
@@ -594,6 +612,198 @@ teste('pedidos: repositório sem os ids do arquivo; a Kira tem a ferramenta', ()
   assert.equal(nos.consultar_pedidos.parameters.workflowId.value, '');
 });
 
+// ---------- Kira 2.0: ambientes ----------
+const ambienteDe = (salvo, amb = ambientesDaKira) =>
+  executar(codigoDo('Ambiente atual'), { nosAnteriores: { 'Ambientes da Kira': amb }, entrada: [salvo] })[0];
+
+teste('ambientes: o repositório vem com Trabalho, Negócios e Pessoal (padrão: Trabalho)', () => {
+  const lista = JSON.parse(ambientesDaKira.ambientes);
+  assert.deepEqual(lista.map((a) => a.codigo), ['TRABALHO', 'NEGOCIOS', 'PESSOAL']);
+  assert.equal(ambientesDaKira.ambiente_padrao, 'TRABALHO');
+});
+teste('ambientes: sem nada salvo usa o padrão; o salvo vale em qualquer caixa', () => {
+  const r = ambienteDe({});
+  assert.equal(r.ambiente, 'TRABALHO');
+  assert.match(r.ambientes_texto, /- NEGOCIOS \(Negócios\): Negócios próprios/);
+  assert.equal(ambienteDe({ contexto: 'pessoal' }).ambiente, 'PESSOAL');
+  assert.equal(ambienteDe({ contexto: 'MARTE' }).ambiente, 'TRABALHO');
+});
+teste('ambientes: configuração inválida vira um ambiente único (GERAL)', () => {
+  assert.equal(ambienteDe({ contexto: 'NEGOCIOS' }, { ...ambientesDaKira, ambientes: '{quebrado' }).ambiente, 'GERAL');
+});
+
+const trocaDe = (pergunta) =>
+  executar(codigoDo('Detectar troca de ambiente'), { nosAnteriores: { 'Ambientes da Kira': ambientesDaKira, Pergunta: { pergunta } } })[0].troca;
+for (const [frase, esperado] of [
+  ['Kira, modo negócios.', 'NEGOCIOS'],
+  ['modo Trabalho', 'TRABALHO'],
+  ['/pessoal', 'PESSOAL'],
+  ['/modo negocios', 'NEGOCIOS'],
+  ['Kira, mude para o ambiente pessoal.', 'PESSOAL'],
+  ['vamos para o modo empresa', 'TRABALHO'],
+  ['troca pra vendas', 'NEGOCIOS'],
+  ['Ok Kira, ativar modo escritório!', 'TRABALHO'],
+  ['ambiente pessoal', 'PESSOAL'],
+]) {
+  teste(`ambientes: "${frase}" troca para ${esperado}`, () => assert.equal(trocaDe(frase), esperado));
+}
+teste('ambientes: conversa normal não troca de ambiente', () => {
+  for (const frase of ['Kira, como está minha meta pessoal?', 'modo avião', '/modo', 'Kira, preciso responder aquele e-mail do trabalho sobre o pedido 123 ainda hoje']) {
+    assert.equal(trocaDe(frase), '', frase);
+  }
+});
+
+teste('ambientes: a Kira só vê as memórias do ambiente ativo e as gerais', () => {
+  const [r] = executar(codigoDo('Memórias do ambiente'), {
+    nosAnteriores: { 'Ambientes da Kira': ambientesDaKira, 'Ambiente atual': { ambiente: 'NEGOCIOS' } },
+    entrada: [
+      { id: 1, contexto: 'NEGOCIOS', categoria: 'cliente', fato: 'Cliente A' },
+      { id: 2, contexto: 'TRABALHO', categoria: 'projeto', fato: 'Projeto sigiloso' },
+      { id: 3, categoria: 'negocios', fato: 'Antiga de negócios' },
+      { id: 4, categoria: 'pessoal', fato: 'Antiga pessoal' },
+      { id: 5, contexto: 'GERAL', categoria: 'preferencia', fato: 'Respostas curtas' },
+      {},
+    ],
+  });
+  assert.equal(r.total, 3);
+  assert.equal(r.memorias, '[1] (NEGOCIOS · cliente) Cliente A\n[3] (NEGOCIOS) Antiga de negócios\n[5] (GERAL · preferencia) Respostas curtas');
+});
+
+teste('ambientes: o ambiente é descoberto antes de separar a mensagem e a troca responde na hora', () => {
+  const destino = (origem, saida = 0) => (workflow.connections[origem]?.main?.[saida] ?? []).map((c) => c.node);
+  assert.deepEqual(destino('Mostrar "digitando…"'), ['Ambientes da Kira']);
+  assert.deepEqual(destino('Ambientes da Kira'), ['Buscar ambiente']);
+  assert.deepEqual(destino('Buscar ambiente'), ['Ambiente atual']);
+  assert.deepEqual(destino('Ambiente atual'), ['Tipo de mensagem']);
+  assert.deepEqual(destino('Pergunta'), ['Detectar troca de ambiente']);
+  assert.deepEqual(destino('Trocar ambiente?', 0), ['Salvar ambiente']);
+  assert.deepEqual(destino('Trocar ambiente?', 1), ['Buscar memórias']);
+  assert.deepEqual(destino('Resposta: ambiente ativado'), ['Resposta pronta']);
+});
+
+teste('ambientes: histórico, tarefas, contatos e conversas separados por usuário e ambiente', () => {
+  assert.match(nos['Memória da conversa'].parameters.sessionKey, /\$\('Ambiente atual'\)\.first\(\)\.json\.ambiente/);
+  const doUsuario = /\$\('Normalizar entrada'\)\.first\(\)\.json\.user_id/;
+  const doAmbiente = /\$\('Ambiente atual'\)\.first\(\)\.json\.ambiente/;
+  for (const nome of ['buscar_conversas', 'listar_tarefas', 'concluir_tarefa', 'buscar_contatos']) {
+    const filtros = nos[nome].parameters.filters.conditions;
+    assert.match(filtros.find((f) => f.keyName === 'user_id').keyValue, doUsuario, nome);
+    assert.match(filtros.find((f) => f.keyName === 'contexto').keyValue, doAmbiente, nome);
+    assert.equal(workflow.connections[nome].ai_tool[0][0].node, 'Kira', nome);
+  }
+  for (const nome of ['criar_tarefa', 'salvar_contato']) {
+    const valores = nos[nome].parameters.columns.value;
+    assert.match(valores.user_id, doUsuario, nome);
+    assert.match(valores.contexto, doAmbiente, nome);
+  }
+  assert.ok('contexto' in nos['Registrar conversa'].parameters.columns.value);
+});
+
+// ---------- Rascunhos automáticos (Outlook) ----------
+const rascunhosAuto = JSON.parse(ler('n8n/workflows/kira-rascunhos-automaticos.json'));
+const noRA = (nome) => {
+  const n = rascunhosAuto.nodes.find((x) => x.name === nome);
+  assert.ok(n, `nó não encontrado nos rascunhos automáticos: ${nome}`);
+  return n;
+};
+// Executa um nó Code com $json e $('Nó').item (modo "uma vez por item") ou first/all.
+function executarRA(nome, { nosAnteriores = {}, json = {} } = {}) {
+  const $ = (no) => {
+    const valor = nosAnteriores[no];
+    const lista = [].concat(valor ?? []).map((j) => ({ json: j }));
+    return { first: () => lista[0], all: () => lista, item: lista[0] };
+  };
+  return new Function('$', '$json', '$input', 'DateTime', noRA(nome).parameters.jsCode)($, json, { all: () => [] }, luxon.DateTime);
+}
+const luxon = { DateTime: { fromISO: (iso) => ({ setZone: () => ({ toFormat: () => `data de ${iso}` }) }) } };
+const emailRA = (o) => ({
+  id: o.id,
+  internetMessageId: `<${o.id}@teste>`,
+  subject: o.assunto,
+  from: { emailAddress: { name: o.nome ?? 'Fulano', address: o.de } },
+  toRecipients: (o.para ?? ['dono@empresa.com.br']).map((address) => ({ emailAddress: { address } })),
+  ccRecipients: (o.cc ?? []).map((address) => ({ emailAddress: { address } })),
+  receivedDateTime: o.quando ?? '2026-09-28T12:00:00Z',
+  body: { contentType: 'text', content: o.texto ?? '' },
+  singleValueExtendedProperties: o.verbo ? [{ id: 'Integer 0x1081', value: String(o.verbo) }] : undefined,
+  '@odata.type': o.tipo,
+});
+const separarRA = (caixa, eu = { mail: 'dono@empresa.com.br' }) =>
+  executarRA('Separar e-mails', {
+    nosAnteriores: {
+      Configuração: { max_por_execucao: 5 },
+      'Quem sou eu': eu,
+      'Buscar e-mails novos': { value: caixa },
+      'Já processados': [{ message_id: '<visto@teste>' }],
+    },
+  }).map((i) => i.json);
+
+teste('rascunhos: só entram e-mails de pedidos, novos, de gente, que você ainda não respondeu', () => {
+  const r = separarRA([
+    emailRA({ id: 'a1', de: 'compras@cliente.com', assunto: 'Previsão de entrega', texto: 'Qual a previsão do pedido 123456?', quando: '2026-09-28T12:05:00Z' }),
+    emailRA({ id: 'a2', de: 'colega@empresa.com.br', assunto: 'Status da TRF 98765', texto: 'Consegue ver?', quando: '2026-09-28T11:00:00Z' }),
+    emailRA({ id: 'b1', de: 'no-reply@loja.com', assunto: 'Seu pedido foi enviado', texto: 'Pedido 5555' }),
+    emailRA({ id: 'visto', de: 'compras@cliente.com', assunto: 'Pedido 777', texto: 'já visto' }),
+    emailRA({ id: 'b2', de: 'dono@empresa.com.br', assunto: 'Pedido 888', texto: 'eu mesmo' }),
+    emailRA({ id: 'b3', de: 'amigo@gmail.com', assunto: 'Reunião amanhã', texto: 'Vamos almoçar?' }),
+    emailRA({ id: 'b4', de: 'cliente2@x.com', assunto: 'Pedido 999', texto: 'status?', verbo: 102 }),
+    emailRA({ id: 'b5', de: 'org@empresa.com.br', assunto: 'Convite: Pedido 1234', tipo: '#microsoft.graph.eventMessageRequest' }),
+    emailRA({ id: 'b6', de: 'x@y.com', assunto: 'Resposta automática: Pedido 1', texto: 'fora do escritório' }),
+  ]);
+  assert.deepEqual(r.map((e) => e.id), ['a2', 'a1']);
+  assert.equal(r.find((e) => e.id === 'a1').externo, true);
+  assert.equal(r.find((e) => e.id === 'a2').externo, false);
+});
+teste('rascunhos: corta o histórico citado, marca "só em cópia" e sem saber o dono trata como externo', () => {
+  const [e] = separarRA([
+    emailRA({ id: 'c1', de: 'chefe@empresa.com.br', assunto: 'RES: OP 12345', para: ['outro@empresa.com.br'], cc: ['dono@empresa.com.br'], texto: 'Andamento?\n\nDe: Outra <o@x.com>\nEnviado: segunda\nAssunto: OP\n\nTexto antigo' }),
+  ]);
+  assert.equal(e.texto, 'Andamento?');
+  assert.equal(e.so_em_copia, true);
+  assert.equal(separarRA([emailRA({ id: 'c2', de: 'a@empresa.com.br', assunto: 'Pedido 1', texto: 'x' })], {})[0].externo, true);
+});
+teste('rascunhos: a resposta da Kira vira rascunho só quando vem no formato combinado', () => {
+  const email = { chave: '<a1@teste>', id: 'a1', assunto: 'Pedido 1' };
+  const interpretar = (output) => executarRA('Interpretar resposta', { nosAnteriores: { 'Separar e-mails': email }, json: { output } }).json;
+  let r = interpretar('```json\n{"responder": true, "resumo": "Previsão [confirmar]", "resposta": "Olá!\\nVerificando [confirmar].\\nBráulio", "consultou": true}\n```');
+  assert.equal(r.responder, true);
+  assert.equal(r.confirmar, 1);
+  assert.equal(r.chave, '<a1@teste>');
+  assert.equal(interpretar('{"responder": false, "motivo": "propaganda"}').responder, false);
+  assert.equal(interpretar('texto solto').motivo, 'resposta fora do formato');
+  assert.equal(interpretar('{"responder": true, "resposta": ""}').responder, false);
+});
+teste('rascunhos: aviso no Telegram em HTML seguro, com alerta para remetente externo', () => {
+  const aviso = (json) => executarRA('Montar aviso', { json }).json.html;
+  const html = aviso({ status: 'rascunho', remetente_nome: 'Ana <Cliente>', remetente_email: 'a@c.com', assunto: 'Pedido 1 & 2', resumo: 'Prazo', confirmar: 2, externo: true, link: 'https://outlook.office365.com/owa/?ItemID=X&a=1' });
+  assert.equal(htmlValidoParaTelegram(html), true);
+  assert.match(html, /2 pontos marcados como \[confirmar\]/);
+  assert.match(html, /fora da empresa/);
+  assert.match(html, /eu não envio nada/);
+  assert.doesNotMatch(aviso({ status: 'rascunho', remetente_email: 'a@c.com', assunto: 'x', confirmar: 0, link: 'javascript:alert(1)' }), /href/);
+  assert.equal(htmlValidoParaTelegram(aviso({ status: 'erro', remetente_nome: 'Ana', remetente_email: 'a@c.com', assunto: 'x' })), true);
+});
+teste('rascunhos: limite de uso da IA não registra (tenta de novo); outros erros registram', () => {
+  const falha = (json) => executarRA('Tratar falha da IA', { nosAnteriores: { 'Separar e-mails': { chave: '<a@t>', assunto: 'x' } }, json });
+  assert.deepEqual(falha({ error: { message: '[429] RESOURCE_EXHAUSTED' } }), []);
+  assert.equal(falha({ error: { message: 'bloqueado pelo filtro' } })[0].json.status, 'erro');
+});
+teste('rascunhos: seg a sex a cada 30 min, só cria rascunho (createReply) e nunca envia', () => {
+  assert.equal(noRA('A cada 30 min (seg a sex, 7h às 19h30)').parameters.rule.interval[0].expression, '*/30 7-19 * * 1-5');
+  assert.match(noRA('Criar rascunho').parameters.url, /\/createReply' }}$/);
+  const textoTodo = JSON.stringify(rascunhosAuto);
+  assert.doesNotMatch(textoTodo, /\/send\b|sendMail/);
+  for (const n of rascunhosAuto.nodes.filter((x) => x.parameters?.operation === 'sendMessage')) {
+    assert.equal(n.parameters.additionalFields?.appendAttribution, false, n.name);
+  }
+});
+teste('rascunhos: repositório sem chat_id, data de início ou id do sub-workflow de pedidos', () => {
+  const cfg = Object.fromEntries(noRA('Configuração').parameters.assignments.assignments.map((c) => [c.name, c.value]));
+  assert.equal(cfg.chat_id, '');
+  assert.equal(cfg.ativo_desde, '');
+  assert.equal(noRA('consultar_pedidos').parameters.workflowId.value, '');
+});
+
 teste('segurança: nenhum token do Telegram, chave do Google ou caminho de webhook nos arquivos', () => {
   const arquivos = [
     'n8n/workflows/kira-1.0.json',
@@ -608,6 +818,8 @@ teste('segurança: nenhum token do Telegram, chave do Google ou caminho de webho
     'n8n/sdk/kira-teams.workflow.ts',
     'n8n/workflows/kira-pedidos.json',
     'n8n/sdk/kira-pedidos.workflow.ts',
+    'n8n/workflows/kira-rascunhos-automaticos.json',
+    'n8n/sdk/kira-rascunhos-automaticos.workflow.ts',
   ];
   for (const arquivo of arquivos) {
     const conteudo = ler(arquivo);

@@ -104,7 +104,7 @@ const normalizar = node({
           {
             id: 'n-tipo-entrada',
             name: 'tipo_entrada',
-            value: expr("{{ ($json.message.voice || $json.message.audio) ? 'voz' : (($json.message.text ?? '').trim().startsWith('/') ? 'comando' : (($json.message.text ?? '').trim() ? 'texto' : 'outro')) }}"),
+            value: expr("{{ ($json.message.voice || $json.message.audio) ? 'voz' : (['/start', '/ajuda', '/help', '/comandos', '/status', '/memorias', '/memoria', '/limpar', '/reset', '/id', '/publicar'].includes((($json.message.text ?? '').trim().split(/\\s+/)[0] || '').split('@')[0].toLowerCase()) ? 'comando' : (($json.message.text ?? '').trim() ? 'texto' : 'outro')) }}"),
             type: 'string',
           },
           {
@@ -239,7 +239,7 @@ const memoriaConversa = memory({
     name: 'Memória da conversa',
     parameters: {
       sessionIdType: 'customKey',
-      sessionKey: expr("{{ 'kira-' + $('Normalizar entrada').first().json.chat_id }}"),
+      sessionKey: expr("{{ 'kira-' + $('Normalizar entrada').first().json.chat_id + '-' + $('Ambiente atual').first().json.ambiente }}"),
       contextWindowLength: 20,
     },
     position: [3080, 560],
@@ -253,7 +253,7 @@ const memoriaLimpeza = memory({
     name: 'Memória da conversa (para limpar)',
     parameters: {
       sessionIdType: 'customKey',
-      sessionKey: expr("{{ 'kira-' + $('Normalizar entrada').first().json.chat_id }}"),
+      sessionKey: expr("{{ 'kira-' + $('Normalizar entrada').first().json.chat_id + '-' + $('Ambiente atual').first().json.ambiente }}"),
       contextWindowLength: 20,
     },
     notes: 'Mesma Session Key do nó "Memória da conversa": é assim que o /limpar apaga o histórico da Kira. Se mudar lá, mude aqui também.',
@@ -481,6 +481,146 @@ const marcarPublicado = node({
   output: [{ id: 3, status: 'publicado' }],
 });
 
+// Ambientes (ex.: trabalho, negócios, pessoal): lista em JSON e o ambiente padrão.
+const ambientesDaKira = node({
+  type: 'n8n-nodes-base.set',
+  version: 3.5,
+  config: {
+    name: 'Ambientes da Kira',
+    parameters: {
+      mode: 'manual',
+      includeOtherFields: false,
+      assignments: {
+        assignments: [
+          { id: 'amb-padrao', name: 'ambiente_padrao', value: 'TRABALHO', type: 'string' },
+          { id: 'amb-lista', name: 'ambientes', value: "[{\"codigo\":\"TRABALHO\",\"nome\":\"Trabalho\",\"apelidos\":[\"empresa\",\"escritorio\"],\"descricao\":\"Trabalho na empresa: e-mails e agenda do Outlook, rascunhos de resposta, Teams, pedidos (planilha do ERP), projetos e tarefas.\"},{\"codigo\":\"NEGOCIOS\",\"nome\":\"Negócios\",\"apelidos\":[\"negocio\",\"vendas\"],\"descricao\":\"Negócios próprios: clientes, leads, produtos, estoque, vendas e follow-ups.\"},{\"codigo\":\"PESSOAL\",\"nome\":\"Pessoal\",\"apelidos\":[\"vida pessoal\"],\"descricao\":\"Vida pessoal: agenda pessoal, estudos, finanças, metas, rotina, hábitos, notícias e Google Drive.\"}]", type: 'string' },
+        ],
+      },
+    },
+    position: [1008, 20],
+  },
+  output: [{ ambiente_padrao: 'PESSOAL', ambientes: '[{"codigo":"PESSOAL","nome":"Pessoal","descricao":"Vida pessoal."}]' }],
+});
+
+const buscarAmbiente = node({
+  type: 'n8n-nodes-base.dataTable',
+  version: 1.1,
+  config: {
+    name: 'Buscar ambiente',
+    parameters: {
+      resource: 'row',
+      operation: 'get',
+      dataTableId: { __rl: true, mode: 'name', value: 'kira_config' },
+      matchType: 'allConditions',
+      filters: { conditions: [{ keyName: 'user_id', condition: 'eq', keyValue: expr("{{ $('Normalizar entrada').first().json.user_id }}") }] },
+      limit: 1,
+    },
+    alwaysOutputData: true,
+    executeOnce: true,
+    position: [1008, 160],
+  },
+  output: [{ id: 1, user_id: '111111111', contexto: 'NEGOCIOS' }],
+});
+
+const ambienteAtual = node({
+  type: 'n8n-nodes-base.code',
+  version: 2,
+  config: {
+    name: 'Ambiente atual',
+    parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: "// Descobre em qual ambiente a Kira está trabalhando com este usuário (ex.: trabalho,\n// negócios, pessoal). Os ambientes ficam no campo \"ambientes\" do nó Ambientes da Kira;\n// o escolhido fica salvo na tabela kira_config e só muda por comando (\"modo ...\").\nconst config = $('Ambientes da Kira').first().json;\n\nfunction lerAmbientes(texto) {\n  try {\n    const lista = JSON.parse(texto || '[]');\n    const validos = (Array.isArray(lista) ? lista : [])\n      .filter((a) => a && a.codigo)\n      .map((a) => ({ ...a, codigo: String(a.codigo).toUpperCase() }));\n    if (validos.length) return validos;\n  } catch (e) {\n    // configuração inválida: segue com um ambiente único\n  }\n  return [{ codigo: 'GERAL', nome: 'Geral', descricao: '' }];\n}\n\nconst ambientes = lerAmbientes(config.ambientes);\nconst salvo = String($input.first()?.json?.contexto ?? '').toUpperCase();\nconst padrao = ambientes.find((a) => a.codigo === String(config.ambiente_padrao || '').toUpperCase()) ?? ambientes[0];\nconst atual = ambientes.find((a) => a.codigo === salvo) ?? padrao;\n\nreturn [\n  {\n    json: {\n      ambiente: atual.codigo,\n      ambiente_nome: atual.nome || atual.codigo,\n      ambiente_descricao: atual.descricao || '',\n      ambientes_texto: ambientes.map((a) => `- ${a.codigo} (${a.nome || a.codigo}): ${a.descricao || ''}`.trim()).join('\\n'),\n    },\n  },\n];\n" },
+    position: [1136, 160],
+  },
+  output: [{ ambiente: 'NEGOCIOS', ambiente_nome: 'Negócios', ambiente_descricao: 'Negócios próprios.', ambientes_texto: '- NEGOCIOS (Negócios): Negócios próprios.' }],
+});
+
+const detectarTroca = node({
+  type: 'n8n-nodes-base.code',
+  version: 2,
+  config: {
+    name: 'Detectar troca de ambiente',
+    parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: "// Troca de ambiente por comando: \"modo negócios\", \"/pessoal\", \"/modo trabalho\",\n// \"Kira, mude para o ambiente pessoal\". Só vale para mensagens curtas, para não\n// confundir com uma conversa normal.\nconst config = $('Ambientes da Kira').first().json;\nconst pergunta = String($('Pergunta').first().json.pergunta ?? '');\n\nfunction lerAmbientes(texto) {\n  try {\n    const lista = JSON.parse(texto || '[]');\n    const validos = (Array.isArray(lista) ? lista : [])\n      .filter((a) => a && a.codigo)\n      .map((a) => ({ ...a, codigo: String(a.codigo).toUpperCase() }));\n    if (validos.length) return validos;\n  } catch (e) {\n    // configuração inválida: sem troca de ambiente\n  }\n  return [];\n}\n\nconst normalizar = (s) =>\n  String(s ?? '')\n    .toLowerCase()\n    .normalize('NFD')\n    .replace(/[\\u0300-\\u036f]/g, '')\n    .replace(/[^a-z0-9/ ]+/g, ' ')\n    .replace(/\\s+/g, ' ')\n    .trim();\n\nconst texto = normalizar(pergunta).replace(/^((ok|oi|ola|ei) )?kira /, '');\nconst verbos = '(mude|muda|mudar|troque|troca|trocar|va|vai|ir|vamos|passe|passa|passar|entre|entra|entrar|ative|ativa|ativar|use|usa|usar)';\n\nlet escolhido = null;\nif (texto.length <= 60) {\n  for (const ambiente of lerAmbientes(config.ambientes)) {\n    const nomes = [ambiente.codigo, ambiente.nome, ...(ambiente.apelidos || [])].map(normalizar).filter(Boolean);\n    const pediu = nomes.some((nome) =>\n      [\n        `^/${nome}$`,\n        `^/?modo ${nome}$`,\n        `^(o )?ambiente ${nome}$`,\n        `^${verbos}( para| pro| pra| no| na| em)?( o| a)? (modo|ambiente) ${nome}$`,\n        `^${verbos}( para| pro| pra)( o| a)? ${nome}$`,\n      ].some((padrao) => new RegExp(padrao).test(texto)),\n    );\n    if (pediu) {\n      escolhido = ambiente;\n      break;\n    }\n  }\n}\n\nreturn [\n  {\n    json: {\n      troca: escolhido ? escolhido.codigo : '',\n      ambiente_nome: escolhido ? escolhido.nome || escolhido.codigo : '',\n      ambiente_descricao: escolhido ? escolhido.descricao || '' : '',\n    },\n  },\n];\n" },
+    position: [2072, 464],
+  },
+  output: [{ troca: '', ambiente_nome: '', ambiente_descricao: '' }],
+});
+
+const trocarAmbiente = ifElse({
+  version: 2.3,
+  config: {
+    name: 'Trocar ambiente?',
+    parameters: {
+      conditions: {
+        options: { caseSensitive: true, leftValue: '', typeValidation: 'loose', version: 2 },
+        conditions: [
+          { id: 'cond-troca', leftValue: expr("{{ $json.troca ?? '' }}"), rightValue: '', operator: { type: 'string', operation: 'notEmpty', singleValue: true } },
+        ],
+        combinator: 'and',
+      },
+      options: {},
+    },
+    position: [2192, 464],
+  },
+});
+
+const salvarAmbiente = node({
+  type: 'n8n-nodes-base.dataTable',
+  version: 1.1,
+  config: {
+    name: 'Salvar ambiente',
+    parameters: {
+      resource: 'row',
+      operation: 'upsert',
+      dataTableId: { __rl: true, mode: 'name', value: 'kira_config' },
+      matchType: 'allConditions',
+      filters: { conditions: [{ keyName: 'user_id', condition: 'eq', keyValue: expr("{{ $('Normalizar entrada').first().json.user_id }}") }] },
+      columns: {
+        mappingMode: 'defineBelow',
+        value: {
+          user_id: expr("{{ $('Normalizar entrada').first().json.user_id }}"),
+          contexto: expr("{{ $('Detectar troca de ambiente').first().json.troca }}"),
+        },
+        matchingColumns: [],
+        schema: [
+          { id: 'user_id', displayName: 'user_id', required: false, defaultMatch: false, display: true, type: 'string', canBeUsedToMatch: true },
+          { id: 'contexto', displayName: 'contexto', required: false, defaultMatch: false, display: true, type: 'string', canBeUsedToMatch: true },
+        ],
+      },
+      options: {},
+    },
+    executeOnce: true,
+    position: [2312, 624],
+  },
+  output: [{ id: 1, user_id: '111111111', contexto: 'PESSOAL' }],
+});
+
+const respostaAmbiente = node({
+  type: 'n8n-nodes-base.set',
+  version: 3.5,
+  config: {
+    name: 'Resposta: ambiente ativado',
+    parameters: {
+      mode: 'manual',
+      includeOtherFields: false,
+      assignments: {
+        assignments: [
+          {
+            id: 'ra-texto',
+            name: 'texto_resposta',
+            value: expr("{{ '🗂️ Modo ' + $('Detectar troca de ambiente').first().json.ambiente_nome + ' ativado.' + ($('Detectar troca de ambiente').first().json.ambiente_descricao ? '\\n' + $('Detectar troca de ambiente').first().json.ambiente_descricao : '') }}"),
+            type: 'string',
+          },
+          { id: 'ra-modo', name: 'modo_resposta', value: expr("{{ $('Normalizar entrada').first().json.responder_em_voz ? 'voz' : 'texto' }}"), type: 'string' },
+          { id: 'ra-status', name: 'status', value: 'ok', type: 'string' },
+          { id: 'ra-erro', name: 'erro', value: '', type: 'string' },
+          { id: 'ra-entrada', name: 'entrada', value: expr("{{ $('Pergunta').first().json.pergunta }}"), type: 'string' },
+        ],
+      },
+    },
+    position: [2432, 624],
+  },
+  output: [{ texto_resposta: '🗂️ Modo Pessoal ativado.', modo_resposta: 'texto', status: 'ok', erro: '', entrada: 'modo pessoal' }],
+});
+
 const limparHistorico = node({
   type: '@n8n/n8n-nodes-langchain.memoryManager',
   version: 1.1,
@@ -524,7 +664,7 @@ const respostaComando = node({
   version: 2,
   config: {
     name: 'Resposta do comando',
-    parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: "// Monta a resposta dos comandos (/start, /ajuda, /status, /memorias, /limpar, /id, /publicar).\n// O texto segue para \"Resposta pronta\", que cuida da formatação e do envio.\nconst entrada = $('Normalizar entrada').first().json;\nconst config = $('Configuração da Kira').first().json;\nconst memorias = $input.all().map((item) => item.json).filter((m) => m && m.fato);\n\nconst nome = config.nome_dono || entrada.nome_usuario || '';\nconst agora = DateTime.now()\n  .setZone(config.fuso_horario || 'America/Sao_Paulo')\n  .setLocale('pt-BR')\n  .toFormat(\"dd/MM/yyyy 'às' HH:mm\");\n\nconst modosDeVoz = {\n  espelho: 'quando você manda áudio, eu respondo em áudio',\n  sempre: 'eu sempre respondo em áudio',\n  nunca: 'eu respondo sempre por texto',\n};\n\nconst listaDeComandos = [\n  '/ajuda — mostra esta lista',\n  '/status — mostra se estou online e como estou configurada',\n  '/memorias — mostra o que eu guardei sobre você',\n  '/limpar — apaga o histórico recente da conversa (as memórias continuam)',\n  '/id — mostra o seu ID do Telegram',\n  '/publicar N — publica no LinkedIn o rascunho N que eu preparei (com a imagem, se tiver)',\n].join('\\n');\n\n// Resultado do /publicar N: o post só vai para o LinkedIn por este comando.\nfunction resultadoDoPublicar() {\n  const numero = String(entrada.texto || '').trim().split(/\\s+/)[1] || '';\n  const executou = (no) => {\n    try {\n      return Boolean($(no).isExecuted);\n    } catch (e) {\n      return false;\n    }\n  };\n  const erroDe = (no) => {\n    try {\n      const falha = $(no).all(1)?.[0]?.json?.error;\n      return typeof falha === 'string' ? falha : (falha?.message ?? '');\n    } catch (e) {\n      return '';\n    }\n  };\n  if (!numero) return 'Me diga qual rascunho publicar, por exemplo: /publicar 3';\n  const rascunho = executou('Buscar rascunho (LinkedIn)') ? ($('Buscar rascunho (LinkedIn)').first()?.json ?? {}) : {};\n  if (!rascunho.texto) return `Não encontrei o rascunho ${numero} pendente. Peça para eu escrever o post de novo.`;\n  const imagem = Number(rascunho.imagem_id) || 0;\n  if (executou('Marcar como publicado')) {\n    return `✅ Publiquei no LinkedIn o rascunho ${numero}${imagem ? ` com a imagem #${imagem}` : ''}.`;\n  }\n  if (imagem && !executou('Publicar no LinkedIn (com imagem)')) {\n    const erro = erroDe('Baixar imagem (LinkedIn)');\n    return `😕 Não consegui pegar a imagem #${imagem} do rascunho ${numero}.${erro ? ` Erro: ${erro}` : ''} Nada foi publicado; o rascunho continua guardado.`;\n  }\n  const erro = erroDe(imagem ? 'Publicar no LinkedIn (com imagem)' : 'Publicar no LinkedIn');\n  return `😕 Não consegui publicar o rascunho ${numero} no LinkedIn.${erro ? ` Erro: ${erro}` : ''} O rascunho continua guardado.`;\n}\n\nlet texto;\nswitch (entrada.comando) {\n  case '/start':\n    texto = [\n      `Olá, ${nome}! Eu sou a **Kira** 👋`,\n      'Sua assistente pessoal, rodando no seu próprio servidor.',\n      '',\n      'Pode falar comigo por **texto** ou mandar um **áudio** 🎙️ — quando você fala, eu respondo falando.',\n      '',\n      'Digite /ajuda para ver os comandos.',\n    ].join('\\n');\n    break;\n  case '/ajuda':\n  case '/help':\n  case '/comandos':\n    texto = `**Comandos da Kira**\\n\\n${listaDeComandos}\\n\\nFora isso, é só conversar comigo por texto ou áudio. Também consulto seus e-mails, agenda e Google Drive, preparo rascunhos de resposta no Outlook e posts para o LinkedIn, gero imagens, consulto os pedidos de TRF e leio e respondo no Teams quando você pede. Nada é enviado ou publicado sem você pedir. 🙂`;\n    break;\n  case '/status':\n    texto = [\n      '✅ **Kira 1.0 online**',\n      `🕒 ${agora}`,\n      '🧠 Cérebro: Google Gemini',\n      '📬 Outlook: e-mails e agenda (leitura) e rascunhos de resposta',\n      '📁 Google Drive: leitura',\n      '💼 LinkedIn: rascunhos, com ou sem imagem (publica só com /publicar)',\n      '🖼️ Imagens: gero com o Gemini e mando aqui',\n      '💬 Teams: leio e respondo quando você pede',\n      '📦 Pedidos: consulto a planilha de TRF das filiais (ERP), atualizada todo dia',\n      `🎙️ Voz: ${modosDeVoz[config.modo_voz] || config.modo_voz}`,\n      `📌 Memórias guardadas: ${memorias.length}`,\n    ].join('\\n');\n    break;\n  case '/memorias':\n  case '/memoria':\n    texto = memorias.length\n      ? [\n          `📌 **O que eu guardei sobre você** (${memorias.length})`,\n          '',\n          ...memorias.map((m) => `- [${m.id}] (${m.categoria || 'geral'}) ${m.fato}`),\n          '',\n          'Para eu esquecer algo, é só pedir: \"Kira, esqueça a memória 3\".',\n        ].join('\\n')\n      : 'Ainda não guardei nenhuma memória. É só pedir: \"Kira, lembre que...\" 🙂';\n    break;\n  case '/limpar':\n  case '/reset':\n    texto = '🧹 Pronto! Apaguei o histórico recente da nossa conversa. As memórias guardadas continuam (veja em /memorias).';\n    break;\n  case '/publicar':\n    texto = resultadoDoPublicar();\n    break;\n  case '/id':\n    texto = `🆔 Seu ID do Telegram: \\`${entrada.user_id}\\`\\nID deste chat: \\`${entrada.chat_id}\\``;\n    break;\n  default:\n    texto = `Não conheço o comando ${entrada.comando}. Digite /ajuda para ver o que eu sei fazer.`;\n}\n\nreturn [\n  {\n    json: {\n      texto_resposta: texto,\n      modo_resposta: 'texto',\n      status: 'comando',\n      erro: '',\n      entrada: entrada.texto,\n    },\n  },\n];\n" },
+    parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: "// Monta a resposta dos comandos (/start, /ajuda, /status, /memorias, /limpar, /id, /publicar).\n// O texto segue para \"Resposta pronta\", que cuida da formatação e do envio.\nconst entrada = $('Normalizar entrada').first().json;\nconst config = $('Configuração da Kira').first().json;\nconst ambiente = $('Ambiente atual').first().json;\n\n// Memórias do ambiente ativo e as gerais (as antigas, sem ambiente, usam a categoria).\nfunction lerAmbientes(texto) {\n  try {\n    const lista = JSON.parse(texto || '[]');\n    return (Array.isArray(lista) ? lista : []).filter((a) => a && a.codigo);\n  } catch (e) {\n    return [];\n  }\n}\nconst normalizar = (s) =>\n  String(s ?? '')\n    .toLowerCase()\n    .normalize('NFD')\n    .replace(/[\\u0300-\\u036f]/g, '')\n    .replace(/[^a-z0-9 ]+/g, ' ')\n    .trim();\nconst ambientes = lerAmbientes($('Ambientes da Kira').first().json.ambientes);\nconst apelidos = {};\nfor (const a of ambientes) {\n  for (const n of [a.codigo, a.nome, ...(a.apelidos || [])]) apelidos[normalizar(n)] = String(a.codigo).toUpperCase();\n}\nconst ambienteDa = (m) => String(m.contexto || apelidos[normalizar(m.categoria)] || 'GERAL').toUpperCase();\nconst memorias = $input\n  .all()\n  .map((item) => item.json)\n  .filter((m) => m && m.fato)\n  .map((m) => ({ ...m, ambiente: ambienteDa(m) }))\n  .filter((m) => m.ambiente === ambiente.ambiente || m.ambiente === 'GERAL');\nconst nomesDosAmbientes = ambientes.map((a) => a.nome || a.codigo);\n\nconst nome = config.nome_dono || entrada.nome_usuario || '';\nconst agora = DateTime.now()\n  .setZone(config.fuso_horario || 'America/Sao_Paulo')\n  .setLocale('pt-BR')\n  .toFormat(\"dd/MM/yyyy 'às' HH:mm\");\n\nconst modosDeVoz = {\n  espelho: 'quando você manda áudio, eu respondo em áudio',\n  sempre: 'eu sempre respondo em áudio',\n  nunca: 'eu respondo sempre por texto',\n};\n\nconst listaDeComandos = [\n  '/ajuda — mostra esta lista',\n  '/status — mostra se estou online e como estou configurada',\n  '/memorias — mostra o que eu guardei sobre você',\n  '/limpar — apaga o histórico recente da conversa (as memórias continuam)',\n  '/id — mostra o seu ID do Telegram',\n  ...(nomesDosAmbientes.length ? [`modo <ambiente> — troca de ambiente (${nomesDosAmbientes.join(', ')})`] : []),\n  '/publicar N — publica no LinkedIn o rascunho N que eu preparei (com a imagem, se tiver)',\n].join('\\n');\n\n// Resultado do /publicar N: o post só vai para o LinkedIn por este comando.\nfunction resultadoDoPublicar() {\n  const numero = String(entrada.texto || '').trim().split(/\\s+/)[1] || '';\n  const executou = (no) => {\n    try {\n      return Boolean($(no).isExecuted);\n    } catch (e) {\n      return false;\n    }\n  };\n  const erroDe = (no) => {\n    try {\n      const falha = $(no).all(1)?.[0]?.json?.error;\n      return typeof falha === 'string' ? falha : (falha?.message ?? '');\n    } catch (e) {\n      return '';\n    }\n  };\n  if (!numero) return 'Me diga qual rascunho publicar, por exemplo: /publicar 3';\n  const rascunho = executou('Buscar rascunho (LinkedIn)') ? ($('Buscar rascunho (LinkedIn)').first()?.json ?? {}) : {};\n  if (!rascunho.texto) return `Não encontrei o rascunho ${numero} pendente. Peça para eu escrever o post de novo.`;\n  const imagem = Number(rascunho.imagem_id) || 0;\n  if (executou('Marcar como publicado')) {\n    return `✅ Publiquei no LinkedIn o rascunho ${numero}${imagem ? ` com a imagem #${imagem}` : ''}.`;\n  }\n  if (imagem && !executou('Publicar no LinkedIn (com imagem)')) {\n    const erro = erroDe('Baixar imagem (LinkedIn)');\n    return `😕 Não consegui pegar a imagem #${imagem} do rascunho ${numero}.${erro ? ` Erro: ${erro}` : ''} Nada foi publicado; o rascunho continua guardado.`;\n  }\n  const erro = erroDe(imagem ? 'Publicar no LinkedIn (com imagem)' : 'Publicar no LinkedIn');\n  return `😕 Não consegui publicar o rascunho ${numero} no LinkedIn.${erro ? ` Erro: ${erro}` : ''} O rascunho continua guardado.`;\n}\n\nlet texto;\nswitch (entrada.comando) {\n  case '/start':\n    texto = [\n      `Olá, ${nome}! Eu sou a **Kira** 👋`,\n      'Sua assistente pessoal, rodando no seu próprio servidor.',\n      '',\n      'Pode falar comigo por **texto** ou mandar um **áudio** 🎙️ — quando você fala, eu respondo falando.',\n      '',\n      'Digite /ajuda para ver os comandos.',\n    ].join('\\n');\n    break;\n  case '/ajuda':\n  case '/help':\n  case '/comandos':\n    texto = `**Comandos da Kira**\\n\\n${listaDeComandos}\\n\\nFora isso, é só conversar comigo por texto ou áudio. Também consulto seus e-mails, agenda e Google Drive, preparo rascunhos de resposta no Outlook e posts para o LinkedIn, gero imagens, consulto os pedidos de TRF e leio e respondo no Teams quando você pede. Nada é enviado ou publicado sem você pedir. 🙂`;\n    break;\n  case '/status':\n    texto = [\n      '✅ **Kira 1.0 online**',\n      `🕒 ${agora}`,\n      `🗂️ Ambiente: ${ambiente.ambiente_nome}`,\n      '🧠 Cérebro: Google Gemini',\n      '📬 Outlook: e-mails e agenda (leitura) e rascunhos de resposta',\n      '📁 Google Drive: leitura',\n      '💼 LinkedIn: rascunhos, com ou sem imagem (publica só com /publicar)',\n      '🖼️ Imagens: gero com o Gemini e mando aqui',\n      '💬 Teams: leio e respondo quando você pede',\n      '📦 Pedidos: consulto a planilha de TRF das filiais (ERP), atualizada todo dia',\n      `🎙️ Voz: ${modosDeVoz[config.modo_voz] || config.modo_voz}`,\n      `📌 Memórias guardadas: ${memorias.length}`,\n    ].join('\\n');\n    break;\n  case '/memorias':\n  case '/memoria':\n    texto = memorias.length\n      ? [\n          `📌 **O que eu guardei sobre você** — ambiente ${ambiente.ambiente_nome} e gerais (${memorias.length})`,\n          '',\n          ...memorias.map((m) => `- [${m.id}] (${m.ambiente}${m.contexto && m.categoria ? ` · ${m.categoria}` : ''}) ${m.fato}`),\n          '',\n          'Para eu esquecer algo, é só pedir: \"Kira, esqueça a memória 3\".',\n        ].join('\\n')\n      : `Ainda não guardei nenhuma memória no ambiente ${ambiente.ambiente_nome}. É só pedir: \"Kira, lembre que...\" 🙂`;\n    break;\n  case '/limpar':\n  case '/reset':\n    texto = `🧹 Pronto! Apaguei o histórico recente da nossa conversa no ambiente ${ambiente.ambiente_nome}. As memórias guardadas continuam (veja em /memorias).`;\n    break;\n  case '/publicar':\n    texto = resultadoDoPublicar();\n    break;\n  case '/id':\n    texto = `🆔 Seu ID do Telegram: \\`${entrada.user_id}\\`\\nID deste chat: \\`${entrada.chat_id}\\``;\n    break;\n  default:\n    texto = `Não conheço o comando ${entrada.comando}. Digite /ajuda para ver o que eu sei fazer.`;\n}\n\nreturn [\n  {\n    json: {\n      texto_resposta: texto,\n      modo_resposta: 'texto',\n      status: 'comando',\n      erro: '',\n      entrada: entrada.texto,\n    },\n  },\n];\n" },
     position: [2180, -200],
   },
   output: [{ texto_resposta: '**Comandos da Kira** ...', modo_resposta: 'texto', status: 'comando', erro: '', entrada: '/ajuda' }],
@@ -621,15 +761,15 @@ const buscarMemorias = node({
   output: [{ id: 1, user_id: '111111111', categoria: 'pessoal', fato: 'Prefere respostas curtas e diretas.', createdAt: '2026-09-26T21:00:00.000Z', updatedAt: '2026-09-26T21:00:00.000Z' }],
 });
 
-const agregarMemorias = node({
-  type: 'n8n-nodes-base.aggregate',
-  version: 1,
+const memoriasAmbiente = node({
+  type: 'n8n-nodes-base.code',
+  version: 2,
   config: {
-    name: 'Agregar memórias',
-    parameters: { aggregate: 'aggregateAllItemData', destinationFieldName: 'memorias', include: 'allFields' },
-    position: [2420, 300],
+    name: 'Memórias do ambiente',
+    parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: "// Separa as memórias por ambiente: a Kira só vê as do ambiente ativo e as gerais (GERAL).\n// Memórias antigas, sem ambiente, usam a categoria para descobrir a qual ambiente pertencem.\nconst config = $('Ambientes da Kira').first().json;\nconst atual = $('Ambiente atual').first().json.ambiente;\n\nfunction lerAmbientes(texto) {\n  try {\n    const lista = JSON.parse(texto || '[]');\n    return (Array.isArray(lista) ? lista : []).filter((a) => a && a.codigo);\n  } catch (e) {\n    return [];\n  }\n}\n\nconst normalizar = (s) =>\n  String(s ?? '')\n    .toLowerCase()\n    .normalize('NFD')\n    .replace(/[\\u0300-\\u036f]/g, '')\n    .replace(/[^a-z0-9 ]+/g, ' ')\n    .trim();\n\nconst apelidos = {};\nfor (const ambiente of lerAmbientes(config.ambientes)) {\n  for (const nome of [ambiente.codigo, ambiente.nome, ...(ambiente.apelidos || [])]) {\n    apelidos[normalizar(nome)] = String(ambiente.codigo).toUpperCase();\n  }\n}\nconst ambienteDa = (m) => String(m.contexto || apelidos[normalizar(m.categoria)] || 'GERAL').toUpperCase();\n\nconst memorias = $input\n  .all()\n  .map((item) => item.json)\n  .filter((m) => m && m.fato)\n  .map((m) => ({ ...m, ambiente: ambienteDa(m) }))\n  .filter((m) => m.ambiente === atual || m.ambiente === 'GERAL');\n\nconst texto =\n  memorias\n    .map((m) => `[${m.id}] (${m.ambiente}${m.contexto && m.categoria ? ` · ${m.categoria}` : ''}) ${m.fato}`)\n    .join('\\n') || '(nenhuma memória guardada neste ambiente ainda)';\n\nreturn [{ json: { memorias: texto, total: memorias.length } }];\n" },
+    position: [2432, 304],
   },
-  output: [{ memorias: [{ id: 1, user_id: '111111111', categoria: 'pessoal', fato: 'Prefere respostas curtas e diretas.' }] }],
+  output: [{ memorias: '[1] (GERAL · preferencia) Prefere respostas curtas e diretas.', total: 1 }],
 });
 
 const contexto = node({
@@ -654,18 +794,16 @@ const contexto = node({
             type: 'string',
           },
           { id: 'c-hoje', name: 'hoje', value: expr("{{ $now.setZone($('Configuração da Kira').first().json.fuso_horario).toFormat('yyyy-MM-dd') }}"), type: 'string' },
-          {
-            id: 'c-memorias',
-            name: 'memorias',
-            value: expr("{{ ($json.memorias ?? []).filter(m => m && m.fato).map(m => '[' + m.id + '] (' + (m.categoria || 'geral') + ') ' + m.fato).join('\\n') || '(nenhuma memória guardada ainda)' }}"),
-            type: 'string',
-          },
+          { id: 'c-memorias', name: 'memorias', value: expr('{{ $json.memorias }}'), type: 'string' },
+          { id: 'c-ambiente', name: 'ambiente', value: expr("{{ $('Ambiente atual').first().json.ambiente }}"), type: 'string' },
+          { id: 'c-ambiente-nome', name: 'ambiente_nome', value: expr("{{ $('Ambiente atual').first().json.ambiente_nome }}"), type: 'string' },
+          { id: 'c-ambientes', name: 'ambientes', value: expr("{{ $('Ambiente atual').first().json.ambientes_texto }}"), type: 'string' },
         ],
       },
     },
     position: [2660, 300],
   },
-  output: [{ pergunta: 'Kira, bom dia. Você está online?', canal: 'voz', origem: 'voz', nome: 'Bráulio', perfil: '...', agora: 'sábado, 26 de setembro de 2026, 21:00', hoje: '2026-09-26', memorias: '(nenhuma memória guardada ainda)' }],
+  output: [{ pergunta: 'Kira, bom dia. Você está online?', canal: 'voz', origem: 'voz', nome: 'Bráulio', perfil: '...', agora: 'sábado, 26 de setembro de 2026, 21:00', hoje: '2026-09-26', memorias: '(nenhuma memória guardada neste ambiente ainda)', ambiente: 'PESSOAL', ambiente_nome: 'Pessoal', ambientes: '- PESSOAL (Pessoal): Vida pessoal.' }],
 });
 
 const geminiPrincipal = languageModel({
@@ -697,7 +835,8 @@ const salvarMemoria = tool({
     name: 'salvar_memoria',
     parameters: {
       descriptionType: 'manual',
-      toolDescription: 'Guarda um fato duradouro sobre o dono na memória de longo prazo da Kira (metas, preferências, pessoas importantes, rotinas, projetos). Use quando ele pedir para lembrar de algo.',
+      toolDescription:
+        'Guarda uma memória de longo prazo sobre o dono: contexto importante para o futuro (preferências, decisões, clientes e negociações em andamento, pendências, prazos, metas, projetos). Use quando ele pedir para lembrar e também por conta própria quando ele contar algo importante.',
       resource: 'row',
       operation: 'insert',
       dataTableId: { __rl: true, mode: 'name', value: 'kira_memoria' },
@@ -705,12 +844,14 @@ const salvarMemoria = tool({
         mappingMode: 'defineBelow',
         value: {
           user_id: expr("{{ $('Normalizar entrada').first().json.user_id }}"),
-          categoria: fromAi('categoria', 'Categoria do fato: pessoal, negocios, hm ou geral', 'string'),
+          contexto: expr("{{ String($fromAI('ambiente', 'Código do ambiente da memória: o do ambiente ativo, ou GERAL se valer para todos os ambientes', 'string')).toUpperCase().normalize('NFD').replace(/[^A-Z]/g, '') || 'GERAL' }}"),
+          categoria: fromAi('categoria', 'Tipo da memória: preferencia, decisao, cliente, contato, projeto, meta, pendencia ou outro', 'string'),
           fato: fromAi('fato', 'O fato a lembrar, em uma frase curta e autoexplicativa, em português', 'string'),
         },
         matchingColumns: [],
         schema: [
           { id: 'user_id', displayName: 'user_id', required: false, defaultMatch: false, display: true, type: 'string', canBeUsedToMatch: true },
+          { id: 'contexto', displayName: 'contexto', required: false, defaultMatch: false, display: true, type: 'string', canBeUsedToMatch: true },
           { id: 'categoria', displayName: 'categoria', required: false, defaultMatch: false, display: true, type: 'string', canBeUsedToMatch: true },
           { id: 'fato', displayName: 'fato', required: false, defaultMatch: false, display: true, type: 'string', canBeUsedToMatch: true },
         ],
@@ -1197,6 +1338,209 @@ const consultarPedidos = tool({
   },
 });
 
+// Conversas, tarefas e contatos: sempre do usuário e do ambiente ativo.
+const buscarConversas = tool({
+  type: 'n8n-nodes-base.dataTableTool',
+  version: 1.1,
+  config: {
+    name: 'buscar_conversas',
+    parameters: {
+      descriptionType: 'manual',
+      toolDescription:
+        'Procura conversas anteriores com o dono neste ambiente (o que ele disse, o que você respondeu e a data), da mais recente para a mais antiga. Use quando ele se referir a algo de outro dia ("aquele cliente", "o que combinamos").',
+      resource: 'row',
+      operation: 'get',
+      dataTableId: { __rl: true, mode: 'name', value: 'kira_logs' },
+      matchType: 'allConditions',
+      filters: {
+        conditions: [
+          { keyName: 'user_id', condition: 'eq', keyValue: expr("{{ $('Normalizar entrada').first().json.user_id }}") },
+          { keyName: 'contexto', condition: 'eq', keyValue: expr("{{ $('Ambiente atual').first().json.ambiente }}") },
+          {
+            keyName: 'entrada',
+            condition: 'ilike',
+            keyValue: expr("{{ '%' + String($fromAI('termo', 'Palavra ou nome para procurar no que ele disse antes; deixe vazio para ver as conversas mais recentes', 'string', '')).trim() + '%' }}"),
+          },
+        ],
+      },
+      limit: 15,
+      orderBy: true,
+      orderByColumn: 'createdAt',
+      orderByDirection: 'DESC',
+      options: {},
+    },
+    position: [2752, 960],
+  },
+});
+
+const criarTarefa = tool({
+  type: 'n8n-nodes-base.dataTableTool',
+  version: 1.1,
+  config: {
+    name: 'criar_tarefa',
+    parameters: {
+      descriptionType: 'manual',
+      toolDescription: 'Cria uma tarefa (pendência) para o dono no ambiente ativo e devolve o número (id) dela.',
+      resource: 'row',
+      operation: 'insert',
+      dataTableId: { __rl: true, mode: 'name', value: 'kira_tarefas' },
+      columns: {
+        mappingMode: 'defineBelow',
+        value: {
+          user_id: expr("{{ $('Normalizar entrada').first().json.user_id }}"),
+          contexto: expr("{{ $('Ambiente atual').first().json.ambiente }}"),
+          titulo: fromAi('titulo', 'O que precisa ser feito, em uma frase curta', 'string'),
+          detalhes: fromAi('detalhes', 'Detalhes úteis; pode ficar vazio', 'string', ''),
+          prazo: fromAi('prazo', 'Prazo no formato AAAA-MM-DD; vazio se não houver', 'string', ''),
+          status: 'aberta',
+        },
+        matchingColumns: [],
+        schema: [
+          { id: 'user_id', displayName: 'user_id', required: false, defaultMatch: false, display: true, type: 'string', canBeUsedToMatch: true },
+          { id: 'contexto', displayName: 'contexto', required: false, defaultMatch: false, display: true, type: 'string', canBeUsedToMatch: true },
+          { id: 'titulo', displayName: 'titulo', required: false, defaultMatch: false, display: true, type: 'string', canBeUsedToMatch: true },
+          { id: 'detalhes', displayName: 'detalhes', required: false, defaultMatch: false, display: true, type: 'string', canBeUsedToMatch: true },
+          { id: 'prazo', displayName: 'prazo', required: false, defaultMatch: false, display: true, type: 'string', canBeUsedToMatch: true },
+          { id: 'status', displayName: 'status', required: false, defaultMatch: false, display: true, type: 'string', canBeUsedToMatch: true },
+        ],
+      },
+      options: {},
+    },
+    position: [2880, 960],
+  },
+});
+
+const listarTarefas = tool({
+  type: 'n8n-nodes-base.dataTableTool',
+  version: 1.1,
+  config: {
+    name: 'listar_tarefas',
+    parameters: {
+      descriptionType: 'manual',
+      toolDescription: 'Lista as tarefas do dono no ambiente ativo (abertas, por padrão, ou concluídas), com id, título, detalhes e prazo.',
+      resource: 'row',
+      operation: 'get',
+      dataTableId: { __rl: true, mode: 'name', value: 'kira_tarefas' },
+      matchType: 'allConditions',
+      filters: {
+        conditions: [
+          { keyName: 'user_id', condition: 'eq', keyValue: expr("{{ $('Normalizar entrada').first().json.user_id }}") },
+          { keyName: 'contexto', condition: 'eq', keyValue: expr("{{ $('Ambiente atual').first().json.ambiente }}") },
+          { keyName: 'status', condition: 'eq', keyValue: fromAi('status', 'aberta (padrão) ou concluida', 'string', 'aberta') },
+        ],
+      },
+      limit: 50,
+      orderBy: true,
+      orderByColumn: 'createdAt',
+      orderByDirection: 'ASC',
+      options: {},
+    },
+    position: [3008, 960],
+  },
+});
+
+const concluirTarefa = tool({
+  type: 'n8n-nodes-base.dataTableTool',
+  version: 1.1,
+  config: {
+    name: 'concluir_tarefa',
+    parameters: {
+      descriptionType: 'manual',
+      toolDescription: 'Marca como concluída uma tarefa do ambiente ativo, pelo número (id).',
+      resource: 'row',
+      operation: 'update',
+      dataTableId: { __rl: true, mode: 'name', value: 'kira_tarefas' },
+      matchType: 'allConditions',
+      filters: {
+        conditions: [
+          { keyName: 'id', condition: 'eq', keyValue: fromAi('id', 'O número (id) da tarefa', 'number') },
+          { keyName: 'user_id', condition: 'eq', keyValue: expr("{{ $('Normalizar entrada').first().json.user_id }}") },
+          { keyName: 'contexto', condition: 'eq', keyValue: expr("{{ $('Ambiente atual').first().json.ambiente }}") },
+        ],
+      },
+      columns: {
+        mappingMode: 'defineBelow',
+        value: { status: 'concluida' },
+        matchingColumns: [],
+        schema: [
+          { id: 'status', displayName: 'status', required: false, defaultMatch: false, display: true, type: 'string', canBeUsedToMatch: true },
+        ],
+      },
+      options: {},
+    },
+    position: [3136, 960],
+  },
+});
+
+const salvarContato = tool({
+  type: 'n8n-nodes-base.dataTableTool',
+  version: 1.1,
+  config: {
+    name: 'salvar_contato',
+    parameters: {
+      descriptionType: 'manual',
+      toolDescription: 'Guarda um contato (cliente, fornecedor, colega, lead) do dono no ambiente ativo.',
+      resource: 'row',
+      operation: 'insert',
+      dataTableId: { __rl: true, mode: 'name', value: 'kira_contatos' },
+      columns: {
+        mappingMode: 'defineBelow',
+        value: {
+          user_id: expr("{{ $('Normalizar entrada').first().json.user_id }}"),
+          contexto: expr("{{ $('Ambiente atual').first().json.ambiente }}"),
+          nome: fromAi('nome', 'Nome do contato', 'string'),
+          empresa: fromAi('empresa', 'Empresa; vazio se não souber', 'string', ''),
+          telefone: fromAi('telefone', 'Telefone; vazio se não souber', 'string', ''),
+          email: fromAi('email', 'E-mail; vazio se não souber', 'string', ''),
+          notas: fromAi('notas', 'Observações úteis (interesse, histórico); pode ficar vazio', 'string', ''),
+        },
+        matchingColumns: [],
+        schema: [
+          { id: 'user_id', displayName: 'user_id', required: false, defaultMatch: false, display: true, type: 'string', canBeUsedToMatch: true },
+          { id: 'contexto', displayName: 'contexto', required: false, defaultMatch: false, display: true, type: 'string', canBeUsedToMatch: true },
+          { id: 'nome', displayName: 'nome', required: false, defaultMatch: false, display: true, type: 'string', canBeUsedToMatch: true },
+          { id: 'empresa', displayName: 'empresa', required: false, defaultMatch: false, display: true, type: 'string', canBeUsedToMatch: true },
+          { id: 'telefone', displayName: 'telefone', required: false, defaultMatch: false, display: true, type: 'string', canBeUsedToMatch: true },
+          { id: 'email', displayName: 'email', required: false, defaultMatch: false, display: true, type: 'string', canBeUsedToMatch: true },
+          { id: 'notas', displayName: 'notas', required: false, defaultMatch: false, display: true, type: 'string', canBeUsedToMatch: true },
+        ],
+      },
+      options: {},
+    },
+    position: [3264, 960],
+  },
+});
+
+const buscarContatos = tool({
+  type: 'n8n-nodes-base.dataTableTool',
+  version: 1.1,
+  config: {
+    name: 'buscar_contatos',
+    parameters: {
+      descriptionType: 'manual',
+      toolDescription: 'Procura contatos do dono no ambiente ativo pelo nome (deixe vazio para listar todos).',
+      resource: 'row',
+      operation: 'get',
+      dataTableId: { __rl: true, mode: 'name', value: 'kira_contatos' },
+      matchType: 'allConditions',
+      filters: {
+        conditions: [
+          { keyName: 'user_id', condition: 'eq', keyValue: expr("{{ $('Normalizar entrada').first().json.user_id }}") },
+          { keyName: 'contexto', condition: 'eq', keyValue: expr("{{ $('Ambiente atual').first().json.ambiente }}") },
+          {
+            keyName: 'nome',
+            condition: 'ilike',
+            keyValue: expr("{{ '%' + String($fromAI('nome', 'Nome (ou parte do nome) do contato; vazio para listar todos', 'string', '')).trim() + '%' }}"),
+          },
+        ],
+      },
+      limit: 20,
+      options: {},
+    },
+    position: [3392, 960],
+  },
+});
+
 const instrucoesKira =
   'Você é a Kira, assistente pessoal de inteligência artificial do {{ $json.nome }}.\n' +
   '\n' +
@@ -1260,11 +1604,22 @@ const instrucoesKira =
   '- Só gere imagens quando ele pedir, uma por vez. Para ajustar, gere uma nova com a descrição corrigida.\n' +
   '- Não crie imagens que imitem pessoas reais ou marcas de terceiros, nem nada enganoso. Se a ferramenta falhar, explique o motivo em poucas palavras.\n' +
   '\n' +
+  '# Ambientes\n' +
+  '- Você trabalha em ambientes separados. Ambiente ativo agora: {{ $json.ambiente_nome }} ({{ $json.ambiente }}).\n' +
+  '- Ambientes:\n' +
+  '{{ $json.ambientes }}\n' +
+  '- Regra fundamental: nunca misture informações entre ambientes sem autorização dele. Use só as memórias, conversas, tarefas, contatos e ferramentas que pertencem ao ambiente ativo (veja a descrição de cada um). Memórias GERAL valem para todos.\n' +
+  '- Se ele pedir algo que é claramente de outro ambiente, diga de qual ambiente é e peça para ele trocar dizendo "modo <nome>". Só use dados de outro ambiente se ele autorizar explicitamente naquela mensagem.\n' +
+  '- Para trocar de ambiente ele diz "modo <nome>", "/<nome>" ou "mude para o ambiente <nome>".\n' +
+  '- Imagens e posts do LinkedIn podem ser feitos em qualquer ambiente, mas só com informações do ambiente ativo.\n' +
+  '\n' +
   '# Memória de longo prazo\n' +
-  'O que você já guardou sobre o {{ $json.nome }} (formato: [id] (categoria) fato):\n' +
+  'O que você já guardou sobre o {{ $json.nome }} neste ambiente e em geral (formato: [id] (AMBIENTE · tipo) fato):\n' +
   '{{ $json.memorias }}\n' +
   '\n' +
-  '- Use a ferramenta salvar_memoria quando ele pedir para você lembrar de algo ou quando ele contar algo duradouro e útil (metas, preferências, pessoas importantes, rotinas, projetos). Não guarde assuntos passageiros.\n' +
+  '- Guarde com salvar_memoria o que for importante para o futuro, mesmo sem ele pedir: preferências, decisões, clientes e negociações em andamento, pendências, prazos, metas e projetos. Não guarde conversa passageira. Use o ambiente ativo; GERAL só para o que vale em todos os ambientes.\n' +
+  '- Dados estruturados vão para as tabelas, não para a memória: tarefas (criar_tarefa, listar_tarefas, concluir_tarefa) e contatos (salvar_contato, buscar_contatos).\n' +
+  '- Quando ele se referir a algo de outro dia ("aquele cliente", "o que combinamos"), veja as memórias acima e, se precisar, use buscar_conversas.\n' +
   '- Nunca guarde senhas, tokens, chaves de API, números de cartão ou dados bancários. Se ele pedir, recuse com gentileza e explique o motivo.\n' +
   '- Use a ferramenta apagar_memoria (com o id da lista acima) quando ele pedir para você esquecer algo.\n' +
   '- Depois de guardar ou apagar, confirme em uma frase curta.\n' +
@@ -1315,6 +1670,12 @@ const kira = node({
         lerConversaTeams,
         enviarMensagemTeams,
         consultarPedidos,
+        buscarConversas,
+        criarTarefa,
+        listarTarefas,
+        concluirTarefa,
+        salvarContato,
+        buscarContatos,
       ],
     },
     onError: 'continueErrorOutput',
@@ -1614,6 +1975,7 @@ const registrar = node({
           erro: expr("{{ [$('Resposta pronta').first().json.erro, ($('Resposta pronta').first().json.modo_resposta === 'voz' && !($json.result?.audio || $json.result?.voice)) ? 'falha ao gerar ou enviar a voz: enviada como texto' : ''].filter(Boolean).join(' | ') }}"),
           latencia_ms: expr("{{ $now.toMillis() - $('Telegram Trigger').first().json.message.date * 1000 }}"),
           execucao_id: expr('{{ $execution.id }}'),
+          contexto: expr("{{ $('Ambiente atual').isExecuted ? ($('Salvar ambiente').isExecuted ? $('Detectar troca de ambiente').first().json.troca : $('Ambiente atual').first().json.ambiente) : '' }}"),
         },
         matchingColumns: [],
         schema: [
@@ -1629,6 +1991,7 @@ const registrar = node({
           { id: 'erro', displayName: 'erro', required: false, defaultMatch: false, display: true, type: 'string', canBeUsedToMatch: true },
           { id: 'latencia_ms', displayName: 'latencia_ms', required: false, defaultMatch: false, display: true, type: 'number', canBeUsedToMatch: true },
           { id: 'execucao_id', displayName: 'execucao_id', required: false, defaultMatch: false, display: true, type: 'string', canBeUsedToMatch: true },
+          { id: 'contexto', displayName: 'contexto', required: false, defaultMatch: false, display: true, type: 'string', canBeUsedToMatch: true },
         ],
       },
       options: {},
@@ -1647,9 +2010,10 @@ const notaConfiguracao = sticky(
     '2. **Voz** — usa a mesma chave do Gemini (voz *Kore*). Para trocar, edite **voz_tts** e **modelo_voz** no nó *Configuração da Kira*.\n' +
     '3. **Seu ID** — ative o workflow e mande “oi” para o bot: ele responde com o seu ID. Cole em **ids_autorizados** no nó *Configuração da Kira* e salve.\n' +
     '4. **Outlook** (opcional) — credencial Microsoft nas ferramentas *emails_recentes*, *buscar_emails*, *ler_email*, *agenda* e *criar_rascunho_resposta*. A Kira lê e cria rascunhos; nunca envia.\n' +
-    '5. **Google Drive e LinkedIn** (opcionais) — credenciais em *buscar_arquivos_drive*, *ler_arquivo_drive* e *Publicar no LinkedIn* (este só roda com o comando /publicar).\n\n' +
+    '5. **Google Drive e LinkedIn** (opcionais) — credenciais em *buscar_arquivos_drive*, *ler_arquivo_drive* e *Publicar no LinkedIn* (este só roda com o comando /publicar).\n' +
+    '6. **Ambientes** — campos **ambientes** (JSON) e **ambiente_padrao** no nó *Ambientes da Kira*. Troca por mensagem: "modo <nome>".\n\n' +
     'Guia completo: `docs/configuracao.md` no repositório KIRA.',
-  { color: 4, position: [-80, -220], width: 580, height: 500, name: 'Leia antes de ativar' },
+  { color: 4, position: [-80, -280], width: 600, height: 560, name: 'Leia antes de ativar' },
 );
 
 export default workflow('kira-1-0', 'Kira 1.0 — Assistente pessoal (Telegram + Gemini)', { executionOrder: 'v1', timezone: 'America/Sao_Paulo' })
@@ -1660,7 +2024,7 @@ export default workflow('kira-1-0', 'Kira 1.0 — Assistente pessoal (Telegram +
     autorizado
       .onTrue(
         mostrarDigitando.to(
-          tipoMensagem
+          ambientesDaKira.to(buscarAmbiente.to(ambienteAtual.to(tipoMensagem
             .onCase(
               0,
               ehPublicar
@@ -1669,7 +2033,7 @@ export default workflow('kira-1-0', 'Kira 1.0 — Assistente pessoal (Telegram +
             )
             .onCase(1, baixarAudio.to(transcrever.to(pergunta)))
             .onCase(2, pergunta)
-            .onCase(3, respostaTipoNaoSuportado),
+            .onCase(3, respostaTipoNaoSuportado)))),
         ),
       )
       .onFalse(respostaAcessoNegado),
@@ -1681,8 +2045,10 @@ export default workflow('kira-1-0', 'Kira 1.0 — Assistente pessoal (Telegram +
   .to(respostaComando)
   .to(respostaPronta)
   .add(pergunta)
-  .to(buscarMemorias)
-  .to(agregarMemorias)
+  .to(detectarTroca)
+  .to(trocarAmbiente.onTrue(salvarAmbiente.to(respostaAmbiente.to(respostaPronta))).onFalse(buscarMemorias))
+  .add(buscarMemorias)
+  .to(memoriasAmbiente)
   .to(contexto)
   .to(kira)
   .to(respostaKira)
@@ -1710,8 +2076,8 @@ export default workflow('kira-1-0', 'Kira 1.0 — Assistente pessoal (Telegram +
   .group('Entrada e segurança', [configuracao, normalizar, autorizado], {
     description: 'Lê a mensagem do Telegram e confere se é você (campo ids_autorizados da configuração).',
   })
-  .group('Roteamento', [mostrarDigitando, tipoMensagem], {
-    description: 'Mostra "digitando…" no Telegram e separa a mensagem por tipo: comando, voz, texto ou outro.',
+  .group('Roteamento', [mostrarDigitando, ambientesDaKira, buscarAmbiente, ambienteAtual, tipoMensagem], {
+    description: 'Mostra "digitando…", descobre o ambiente ativo (tabela kira_config) e separa a mensagem por tipo: comando, voz, texto ou outro.',
   })
   .group('Comandos', [ehPublicar, buscarRascunho, rascunhoEncontrado, rascunhoTemImagem, buscarImagemLinkedin, baixarImagemLinkedin, publicarLinkedinImagem, publicarLinkedin, marcarPublicado, ehLimpar, limparHistorico, memoriaLimpeza, buscarMemoriasComando, respostaComando], {
     description: '/start, /ajuda, /status, /memorias, /limpar, /id e /publicar (publica no LinkedIn um rascunho da Kira, com a imagem, se tiver).',
@@ -1719,8 +2085,8 @@ export default workflow('kira-1-0', 'Kira 1.0 — Assistente pessoal (Telegram +
   .group('Voz para texto', [baixarAudio, transcrever], {
     description: 'Baixa o áudio do Telegram e transcreve com o Gemini.',
   })
-  .group('Cérebro da Kira', [pergunta, buscarMemorias, agregarMemorias, contexto, kira, geminiPrincipal, geminiReserva, memoriaConversa, salvarMemoria, apagarMemoria, emailsRecentes, buscarEmails, lerEmail, agenda, criarRascunhoResposta, buscarArquivosDrive, lerArquivoDrive, rascunhoLinkedin, gerarImagem, anexarImagemEmail, conversasTeams, lerConversaTeams, enviarMensagemTeams, consultarPedidos], {
-    description: 'A Kira (Gemini) responde com memórias, Outlook, Google Drive, Teams, pedidos do ERP, LinkedIn e imagens.',
+  .group('Cérebro da Kira', [buscarMemorias, memoriasAmbiente, contexto, kira, geminiPrincipal, geminiReserva, memoriaConversa, salvarMemoria, apagarMemoria, emailsRecentes, buscarEmails, lerEmail, agenda, criarRascunhoResposta, buscarArquivosDrive, lerArquivoDrive, rascunhoLinkedin, buscarConversas, criarTarefa, listarTarefas, concluirTarefa, salvarContato, buscarContatos, gerarImagem, anexarImagemEmail, conversasTeams, lerConversaTeams, enviarMensagemTeams, consultarPedidos], {
+    description: 'A Kira (Gemini) responde no ambiente ativo: memórias, tarefas, contatos, Outlook, Drive, Teams, pedidos do ERP, LinkedIn e imagens.',
   })
   .group('Entrega da resposta', [respostaPronta, responderEmVoz, gerarVoz, prepararAudio, converterAudio, enviarAudio, dividirMensagem, enviarTexto, enviarTextoSimples, registrar], {
     description: 'Responde por voz (Gemini, grátis) ou por texto e registra tudo na tabela kira_logs.',

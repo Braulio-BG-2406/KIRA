@@ -223,8 +223,80 @@ teste('workflow: nenhuma mensagem do Telegram leva a assinatura automática do n
   }
 });
 
+// ---------- Voz: Preparar áudio (WAV) ----------
+teste('voz: áudio PCM do Gemini ganha cabeçalho WAV e duração correta', () => {
+  const pcm = Buffer.alloc(48000 * 3); // 3 s de silêncio, 24 kHz, 16 bits, mono
+  const [r] = executar(codigoDo('Preparar áudio (WAV)'), {
+    entrada: [{ candidates: [{ content: { parts: [{ inlineData: { mimeType: 'audio/L16;codec=pcm;rate=24000', data: pcm.toString('base64') } }] } }] }],
+  });
+  const wav = Buffer.from(r.audioContent, 'base64');
+  assert.equal(wav.subarray(0, 4).toString(), 'RIFF');
+  assert.equal(wav.readUInt32LE(24), 24000);
+  assert.equal(wav.length, pcm.length + 44);
+  assert.equal(r.segundos, 3);
+});
+teste('voz: WAV pronto do Gemini passa sem mudança', () => {
+  const pcm = Buffer.alloc(48000 * 2);
+  const [pronto] = executar(codigoDo('Preparar áudio (WAV)'), {
+    entrada: [{ candidates: [{ content: { parts: [{ inlineData: { mimeType: 'audio/L16;rate=24000', data: pcm.toString('base64') } }] } }] }],
+  });
+  const [r] = executar(codigoDo('Preparar áudio (WAV)'), {
+    entrada: [{ candidates: [{ content: { parts: [{ inlineData: { mimeType: 'audio/wav', data: pronto.audioContent } }] } }] }],
+  });
+  assert.equal(r.audioContent, pronto.audioContent);
+  assert.equal(r.segundos, 2);
+});
+teste('voz: resposta sem áudio vira erro (e a Kira responde por texto)', () => {
+  assert.throws(() => executar(codigoDo('Preparar áudio (WAV)'), { entrada: [{ candidates: [] }] }), /não devolveu áudio/);
+});
+
+// ---------- Outlook: somente leitura ----------
+teste('outlook: as ferramentas só fazem leitura (GET)', () => {
+  const ferramentas = ['emails_recentes', 'buscar_emails', 'ler_email', 'agenda'];
+  for (const nome of ferramentas) {
+    assert.ok(nos[nome], `ferramenta ausente: ${nome}`);
+    assert.equal(nos[nome].parameters.method, 'GET', nome);
+    assert.match(String(nos[nome].parameters.url), /graph\.microsoft\.com\/v1\.0\/me\//, nome);
+  }
+});
+
+// ---------- Resumo da manhã ----------
+const resumo = JSON.parse(ler('n8n/workflows/kira-resumo-da-manha.json'));
+const nosResumo = Object.fromEntries(resumo.nodes.map((n) => [n.name, n]));
+teste('resumo: roda às 7h no horário de Brasília', () => {
+  const regra = nosResumo['Todo dia às 7h'].parameters.rule.interval[0];
+  assert.equal(regra.triggerAtHour, 7);
+  assert.equal(resumo.settings.timezone, 'America/Sao_Paulo');
+});
+teste('resumo: todas as seções têm fontes e o Gemini não inventa (só usa a lista)', () => {
+  const fontes = executar(nosResumo.Fontes.parameters.jsCode, {});
+  for (const secao of ['Brasil', 'Mundo', 'Mercado financeiro', 'Política', 'Tecnologia e tendências']) {
+    assert.ok(fontes.filter((f) => f.secao === secao).length >= 2, secao);
+  }
+  assert.match(nosResumo['Resumir (Gemini)'].parameters.options.systemMessage, /SOMENTE as notícias/);
+});
+teste('resumo: reserva sem IA monta títulos com link', () => {
+  const selecao = { noticias: [{ secao: 'Mundo', fonte: 'BBC', titulo: 'Fato', link: 'https://x/1' }] };
+  const [r] = executar(nosResumo['Resumo reserva (só títulos)'].parameters.jsCode, {
+    nosAnteriores: { 'Selecionar notícias': selecao, 'Configuração do resumo': { nome_dono: 'Bráulio' } },
+  });
+  const [m] = executar(nosResumo['Montar mensagem'].parameters.jsCode, { entrada: [r] });
+  assert.match(m.html, /• Fato \(<a href="https:\/\/x\/1">BBC<\/a>\)/);
+  assert.equal(htmlValidoParaTelegram(m.html), true);
+});
+teste('resumo: repositório sem chat_id preenchido', () => {
+  const chat = nosResumo['Configuração do resumo'].parameters.assignments.assignments.find((a) => a.name === 'chat_id');
+  assert.equal(chat.value, '');
+});
+
 teste('segurança: nenhum token do Telegram, chave do Google ou caminho de webhook nos arquivos', () => {
-  for (const arquivo of ['n8n/workflows/kira-1.0.json', 'n8n/sdk/kira-1.0.workflow.ts']) {
+  const arquivos = [
+    'n8n/workflows/kira-1.0.json',
+    'n8n/sdk/kira-1.0.workflow.ts',
+    'n8n/workflows/kira-resumo-da-manha.json',
+    'n8n/sdk/kira-resumo-da-manha.workflow.ts',
+  ];
+  for (const arquivo of arquivos) {
     const conteudo = ler(arquivo);
     assert.doesNotMatch(conteudo, /\b\d{8,10}:[A-Za-z0-9_-]{35}\b/, `${arquivo}: parece um token de bot do Telegram`);
     assert.doesNotMatch(conteudo, /AIza[0-9A-Za-z_-]{35}/, `${arquivo}: parece uma chave de API do Google`);

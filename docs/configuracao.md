@@ -14,10 +14,11 @@ Prefere rodar na VPS? Veja [Rodar na VPS](#rodar-na-vps-opcional) no fim.
 
 1. [Confirmar o bot do Telegram](#1-bot-do-telegram)
 2. [Criar a chave do Gemini](#2-gemini-o-cérebro)
-3. [Ligar a voz da Kira](#3-voz-da-kira-google-cloud-text-to-speech) (opcional, mas é o que faz ela responder falando)
+3. [Conferir a voz da Kira](#3-voz-da-kira-grátis-com-o-gemini) (usa a mesma chave do Gemini)
 4. [Publicar o workflow](#4-publicar)
 5. [Liberar o seu ID do Telegram](#5-liberar-o-seu-id)
 6. [Fazer o primeiro teste](#6-primeiro-teste-)
+7. Opcionais: [Outlook (e-mails e agenda)](#7-outlook-e-mails-e-agenda-só-leitura) e [Resumo da manhã às 7h](#8-resumo-da-manhã-às-7h)
 
 ---
 
@@ -45,38 +46,31 @@ id - Mostrar seu ID do Telegram
 
 1. Acesse [aistudio.google.com/apikey](https://aistudio.google.com/apikey) com a sua conta Google → **Create API key**.
 2. No n8n: **Overview → Credentials → Create credential → Google Gemini(PaLM) Api**. Cole a chave em **API Key** (deixe o **Host** como está), dê o nome **Gemini (Google AI Studio)** e salve.
-3. No workflow, selecione essa credencial em três nós: **Transcrever áudio (Gemini)**, **Gemini (principal)** e **Gemini (reserva)**.
+3. No workflow, selecione essa credencial em quatro nós: **Transcrever áudio (Gemini)**, **Gemini (principal)**, **Gemini (reserva)** e **Gerar voz (Gemini)**.
 
-> **Sobre "Gateway credits":** ao criar o workflow, o n8n Cloud associou sozinho os nós *Gemini (principal)* e *Gemini (reserva)* aos créditos de IA do próprio n8n (cobrados na conta do n8n, não na sua chave do Google). Os testes rodaram assim. Para usar só a sua chave, troque a credencial desses dois nós para **Gemini (Google AI Studio)**.
+> **Sobre "Gateway credits":** o n8n Cloud pode associar sozinho os nós do Gemini aos créditos de IA do próprio n8n (cobrados na conta do n8n). Para ficar tudo grátis, confira que os quatro nós acima usam a **sua** credencial do Gemini.
 
 Modelos configurados:
 
 | Uso | Modelo |
 | --- | --- |
-| Conversa (principal) | `models/gemini-3-flash-preview` |
-| Conversa (reserva: entra sozinho se o principal falhar ou bater no limite) | `models/gemini-3.1-flash-lite` |
+| Conversa (principal) | `models/gemini-flash-latest` |
+| Conversa (reserva: entra sozinho se o principal falhar ou bater no limite) | `models/gemini-flash-lite-latest` |
 | Transcrição dos áudios | `models/gemini-3.1-flash-lite` |
+| Voz (resposta falada) | `gemini-3.8-flash-tts` (campo `modelo_voz`) |
 
 Se o Google aposentar algum desses modelos, abra o nó e escolha outro na lista.
 
-**Plano gratuito x pago:** a chave do AI Studio funciona no plano gratuito, com limite de uso por minuto e por dia. Nos termos do plano gratuito, o Google pode usar o conteúdo enviado para melhorar os produtos dele. Quando a Kira passar a ver dados das empresas (Kira 2.0), o recomendado é ativar o faturamento do projeto (plano pago), em que isso não acontece.
+**Plano gratuito x pago:** a chave do AI Studio funciona no plano gratuito, com limite de uso por minuto e por dia. Nos termos do plano gratuito, o Google pode usar o conteúdo enviado para melhorar os produtos dele. Isso vale para as conversas e para os e-mails que a Kira ler do Outlook. Se isso não for aceitável (por exemplo, pela política da empresa), ative o faturamento do projeto (plano pago), em que isso não acontece.
 
-## 3. Voz da Kira (Google Cloud Text-to-Speech)
+## 3. Voz da Kira (grátis, com o Gemini)
 
-Sem este passo a Kira funciona normalmente, mas responde os seus áudios **por texto**. Para ela responder **falando**:
+A voz usa o modelo de voz do próprio Gemini, com a **mesma chave gratuita** do passo 2. Não precisa de Google Cloud nem de faturamento. Confira só que o nó **Gerar voz (Gemini)** usa a sua credencial do Gemini.
 
-1. Entre em [console.cloud.google.com](https://console.cloud.google.com) e selecione (ou crie) um projeto.
-2. **APIs e serviços → Biblioteca** → procure **Cloud Text-to-Speech API** → **Ativar**.
-3. O Google exige uma conta de faturamento vinculada ao projeto para essa API. Há uma cota gratuita mensal que costuma cobrir com folga o uso pessoal; confira os valores atuais em [cloud.google.com/text-to-speech/pricing](https://cloud.google.com/text-to-speech/pricing).
-4. **APIs e serviços → Credenciais → Criar credenciais → Chave de API**. Em seguida, **Editar chave → Restrições de API → Restringir chave → Cloud Text-to-Speech API** → Salvar.
-5. No n8n: **Create credential → Google Gemini(PaLM) Api** (é o mesmo tipo de credencial do Gemini, só muda a chave). Cole a chave, dê o nome **Google Cloud TTS** e salve. O teste de conexão do n8n pode acusar erro, porque ele testa o endereço do Gemini e não o de voz; pode salvar mesmo assim.
-6. No workflow, selecione **Google Cloud TTS** no nó **Gerar voz (Google TTS)**.
-
-> **Atenção ao projeto:** se você ativar o faturamento no **mesmo** projeto da chave do Gemini, o Gemini desse projeto também passa para o plano pago. Para manter o Gemini gratuito, use um projeto separado só para a voz.
-
-**Trocar a voz:** campo `voz_tts` no nó **Configuração da Kira**. O padrão é `pt-BR-Chirp3-HD-Kore` (feminina). Outras opções femininas em português, por exemplo: `pt-BR-Chirp3-HD-Aoede`, `pt-BR-Chirp3-HD-Leda`, `pt-BR-Neural2-A`. Lista oficial: [cloud.google.com/text-to-speech/docs/voices](https://cloud.google.com/text-to-speech/docs/voices). Se o nome da voz estiver errado, a Kira não trava: ela manda a resposta por texto e o erro fica registrado em `kira_logs`.
-
-**Como a voz chega:** como um áudio chamado "Kira" que toca direto no chat, com o texto da resposta na legenda.
+- **Trocar a voz:** campo `voz_tts` no nó **Configuração da Kira**. O padrão é `Kore` (feminina, firme). Outras vozes do Gemini: `Aoede`, `Leda`, `Zephyr`, `Callirrhoe`. Lista: [ai.google.dev/gemini-api/docs/speech-generation](https://ai.google.dev/gemini-api/docs/speech-generation).
+- **Trocar o modelo de voz:** campo `modelo_voz` (padrão `gemini-3.8-flash-tts`).
+- **Limite:** o plano gratuito tem limite diário para a voz. Quando acabar, ou se o nome da voz estiver errado, a Kira não trava: responde por texto e o erro fica na execução do n8n.
+- **Como a voz chega:** como um arquivo de áudio "Kira" (WAV) que toca direto no chat, com o texto da resposta na legenda.
 
 ## 4. Publicar
 
@@ -114,6 +108,30 @@ Depois, teste também:
 | `/limpar` | Ela esquece o histórico recente da conversa (as memórias guardadas continuam) |
 | "Kira, como estou na minha meta?" | Ela explica que ainda não tem acesso aos seus dados financeiros, sem inventar números |
 
+## 7. Outlook: e-mails e agenda (só leitura)
+
+A Kira consulta o Outlook com quatro ferramentas: **emails_recentes** (Caixa de Entrada de um período, com o total), **buscar_emails** (por palavra, remetente ou assunto), **ler_email** (um e-mail inteiro, em texto) e **agenda** (compromissos do calendário principal, no horário de Brasília). Todas só **leem**: a Kira não envia, não responde, não apaga e não altera nada.
+
+1. No n8n: **Create credential → Microsoft Outlook OAuth2 API** → entre com a sua conta Microsoft.
+2. Selecione essa credencial nas quatro ferramentas (grupo **Cérebro da Kira**) e publique.
+
+Contas de empresa podem exigir que o administrador do Microsoft 365 aprove o acesso do n8n. As instruções da Kira mandam tratar o conteúdo dos e-mails como informação, nunca como ordem, para que um e-mail não consiga "dar instruções" a ela.
+
+Teste: "Kira, quantos e-mails chegaram hoje?" e "Kira, o que tenho na agenda amanhã?".
+
+## 8. Resumo da manhã às 7h
+
+Workflow separado: **Kira — Resumo da manhã (7h)** ([`n8n/workflows/kira-resumo-da-manha.json`](../n8n/workflows/kira-resumo-da-manha.json)). Todo dia às 7h (Brasília) ele:
+
+1. lê notícias das últimas 24 horas em fontes confiáveis por RSS (g1, Agência Brasil, BBC, InfoMoney, Money Times, Poder360, Tecnoblog, TechCrunch e outras);
+2. pega as cotações de dólar, euro e bitcoin;
+3. pede ao Gemini um resumo curto em cinco seções: Brasil, Mundo, Mercado financeiro, Política e Tecnologia e tendências, cada item com o link da fonte;
+4. manda no Telegram. Se o Gemini falhar, manda só os títulos com link.
+
+Para configurar: no nó **Configuração do resumo**, preencha `chat_id` (o seu ID do Telegram, o mesmo de `ids_autorizados`) e publique. As fontes ficam no nó **Fontes** (seção, nome e endereço do RSS). Tudo usa serviços gratuitos.
+
+> A API de cotações (AwesomeAPI) às vezes recusa pedidos vindos do n8n Cloud por limite de uso. Nesse caso o resumo sai sem a linha de cotações.
+
 ## Personalizar
 
 Tudo fica no nó **Configuração da Kira**:
@@ -123,7 +141,8 @@ Tudo fica no nó **Configuração da Kira**:
 | `nome_dono` | Bráulio | Como a Kira chama você |
 | `ids_autorizados` | vazio | IDs do Telegram liberados, separados por vírgula. Vazio = modo de configuração |
 | `modo_voz` | `espelho` | `espelho`: áudio quando você manda áudio, texto quando você escreve. `sempre`: sempre áudio. `nunca`: sempre texto |
-| `voz_tts` | `pt-BR-Chirp3-HD-Kore` | Voz usada nas respostas faladas |
+| `voz_tts` | `Kore` | Voz do Gemini usada nas respostas faladas |
+| `modelo_voz` | `gemini-3.8-flash-tts` | Modelo de voz do Gemini |
 | `max_caracteres_voz` | 1500 | Respostas maiores que isso vão por texto |
 | `fuso_horario` | `America/Sao_Paulo` | Data e hora que a Kira considera |
 | `perfil_dono` | texto | O que a Kira sabe sobre você; entra nas instruções dela |
@@ -145,7 +164,9 @@ Durante os testes ficou uma linha de teste em `kira_logs` (usuário "Teste @test
 | A Kira não responde nada | Workflow não publicado, token errado ou outro workflow usando o mesmo bot | Publique; confira o token no @BotFather; desative outros workflows com *Telegram Trigger* no mesmo bot |
 | Sempre responde "modo de configuração" | `ids_autorizados` vazio (ou não publicou depois de preencher) | Preencha o campo e publique de novo |
 | Responde "não estou autorizada" para você | ID digitado errado | Apague o campo `ids_autorizados`, publique, mande "oi" para ver o ID certo e repita o passo 5 |
-| Você manda áudio e ela responde por texto | Voz não configurada ou com erro | Veja o passo 3 e a coluna `erro` em `kira_logs` |
+| Você manda áudio e ela responde por texto | Credencial da voz, limite diário da voz ou nome de voz errado | Veja o passo 3 e a execução em **Executions** |
+| Ela diz que não consegue ler seus e-mails | Credencial do Outlook expirou ou foi removida | Reconecte a credencial *Microsoft Outlook* no n8n (passo 7) |
+| O resumo das 7h não chegou | Workflow do resumo desativado ou `chat_id` vazio | Veja o passo 8 e a execução em **Executions** |
 | "Não consegui processar o seu áudio" | Transcrição sem credencial do Gemini ou modelo indisponível | Selecione a credencial no nó *Transcrever áudio (Gemini)* e confira o modelo |
 | "Atingi o limite de uso do Gemini" | Limite por minuto ou por dia do plano gratuito | Espere alguns minutos ou ative o faturamento |
 | "Tive um problema técnico" | Credencial ou modelo do Gemini com problema | Abra a execução com erro em **Executions** |

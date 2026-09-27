@@ -42,10 +42,11 @@ Os nomes em **negrito** são os nós do workflow [`n8n/workflows/kira-1.0.json`]
 8. **Kira** (AI Agent) responde usando:
    - **Gemini (principal)** e **Gemini (reserva)**: se o principal falhar, a reserva assume;
    - **Memória da conversa**: as últimas 20 trocas;
-   - ferramentas **salvar_memoria** e **apagar_memoria** (tabela `kira_memoria`).
+   - ferramentas **salvar_memoria** e **apagar_memoria** (tabela `kira_memoria`);
+   - ferramentas do Outlook, só leitura: **emails_recentes**, **buscar_emails**, **ler_email** e **agenda** (Microsoft Graph).
 9. **Resposta da Kira** (ou **Resposta de erro**, se a transcrição ou a IA falharem) padroniza a resposta.
 10. **Resposta pronta** decide voz ou texto e prepara o texto falado e a legenda.
-    - Voz: **Gerar voz (Google TTS)** → **Áudio para arquivo** → **Enviar áudio**.
+    - Voz: **Gerar voz (Gemini)** → **Preparar áudio (WAV)** → **Áudio para arquivo** → **Enviar áudio**.
     - Texto: **Dividir mensagem** (Markdown → HTML do Telegram, em partes de até 3.500 caracteres) → **Enviar texto** (→ **Enviar texto sem formatação**, se o Telegram recusar a formatação).
     - Se a voz falhar, a resposta vai por texto.
 11. **Registrar conversa** grava tudo em `kira_logs`.
@@ -63,7 +64,11 @@ As duas tabelas também têm `id`, `createdAt` e `updatedAt`, criados pelo n8n.
 
 **Transcrição com o Gemini.** O mesmo Gemini que conversa também entende áudio. O nó usa a operação *Analyze audio* com uma instrução em português ("transcreva literalmente…; se não houver fala, responda [inaudível]"), o que dá uma transcrição limpa, sem rótulos.
 
-**Voz com Google Cloud Text-to-Speech, em MP3.** O Gemini também gera voz, mas entrega áudio cru (PCM) que o Telegram não toca, e o n8n não tem conversor de áudio embutido. O Cloud TTS entrega MP3 pronto, com vozes naturais em português.
+**Voz com o próprio Gemini, grátis.** O modelo de voz do Gemini (`gemini-3.8-flash-tts`) funciona com a mesma chave gratuita do AI Studio, sem Google Cloud nem faturamento. Ele devolve WAV pronto (modelos mais antigos devolvem áudio cru, PCM); o nó *Preparar áudio (WAV)* acrescenta o cabeçalho WAV quando precisa e calcula a duração. A versão anterior usava o Google Cloud Text-to-Speech, que exige faturamento.
+
+**Outlook só para leitura, pelo Microsoft Graph.** As quatro ferramentas são requisições GET com a credencial OAuth do Outlook. Usar a API direto (em vez do nó pronto do Outlook) permite: ler só a Caixa de Entrada em ordem de chegada e com o total do período (`$count`), receber o corpo do e-mail como texto (menos tokens) e a agenda já no horário de Brasília, só do calendário principal. As instruções mandam consultar de novo a cada pergunta e tratar e-mails como informação, nunca como ordem.
+
+**Resumo da manhã em workflow separado.** Às 7h, RSS de fontes confiáveis + cotações + Gemini + Telegram. Fica separado da Kira para que uma falha num não afete o outro. O Gemini recebe só a lista de notícias do dia e é instruído a não usar nada de fora dela; se ele falhar, vão os títulos com link.
 
 **Áudio como "arquivo de áudio", não como "mensagem de voz".** O nó do Telegram no n8n não tem a operação de mensagem de voz (*sendVoice*). Chamar a API do Telegram direto exigiria colocar o token do bot dentro do workflow, o que é inseguro. Por isso a resposta sai como áudio tocável (título "Kira") com o texto na legenda.
 
@@ -88,17 +93,18 @@ As duas tabelas também têm `id`, `createdAt` e `updatedAt`, criados pelo n8n.
 
 - A voz chega como arquivo de áudio, não como mensagem de voz com a onda sonora.
 - A memória da conversa se perde quando o n8n reinicia (as memórias guardadas não).
-- Ainda sem acesso a e-mail, agenda, arquivos, dados das empresas ou internet; a Kira foi instruída a dizer isso em vez de inventar.
+- E-mail e agenda só do Outlook e só para leitura. Ainda sem Google Drive, OneDrive, dados das empresas ou busca na internet durante a conversa; a Kira foi instruída a dizer isso em vez de inventar.
+- O resumo das 7h é enviado por outro workflow: a Kira da conversa não "lembra" dele.
 - Fotos e documentos ainda não são entendidos.
 - Mensagens enviadas em sequência muito rápida são processadas em paralelo e podem ser respondidas fora de ordem.
 
 ## Próximos passos (Kira 2.0)
 
 1. **Uma área por vez**, começando pela que der mais retorno, cada uma como um sub-agente ou ferramenta da Kira com permissões mínimas:
-   - **HM**: Microsoft 365 (Outlook e OneDrive têm nós prontos no n8n).
+   - **HM**: Microsoft 365. Outlook (e-mails e agenda, leitura) já conectado; falta OneDrive.
    - **Negócios**: clientes, vendas, estoque e CRM (fontes a definir).
    - **Pessoal**: agenda, estudos, rotina, notícias e finanças.
 2. **Memória persistente da conversa** (por exemplo, *Postgres Chat Memory*), para não perder o contexto em reinícios.
-3. **Kira proativa**: um resumo de "bom dia" com agenda e pendências (gatilho agendado no n8n).
+3. **Kira proativa**: o resumo de notícias das 7h já existe; falta juntar agenda e pendências do dia.
 4. **Fotos e documentos**, aproveitando que o Gemini é multimodal.
 5. **Privacidade**: plano pago do Gemini antes de conectar dados das empresas, e este repositório privado se ele passar a guardar qualquer coisa sensível.

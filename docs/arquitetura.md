@@ -34,7 +34,9 @@ Os nomes em **negrito** são os nós do workflow [`n8n/workflows/kira-1.0.json`]
 4. **É você?** — quem não está em `ids_autorizados` (ou escreve fora do chat privado) recebe **Resposta: acesso negado**. Com a lista vazia, essa resposta mostra o ID da pessoa (modo de configuração).
 5. **Mostrar "digitando…"** mostra *digitando* ou *gravando voz* no Telegram.
 6. **Tipo de mensagem** separa o caminho:
-   - **Comando** → **É /limpar?** → (**Limpar histórico da conversa**) → **Buscar memórias (comandos)** → **Resposta do comando**.
+   - **Comando** → **É /publicar?** / **É /limpar?** → **Buscar memórias (comandos)** → **Resposta do comando**.
+     - `/limpar`: **Limpar histórico da conversa** antes de responder.
+     - `/publicar N`: **Buscar rascunho (LinkedIn)** → **Rascunho encontrado?** → **Rascunho tem imagem?** → sem imagem, **Publicar no LinkedIn**; com imagem, **Buscar imagem (LinkedIn)** → **Baixar imagem (LinkedIn)** (do Telegram) → **Publicar no LinkedIn (com imagem)**. Depois, **Marcar como publicado**.
    - **Voz** → **Baixar áudio** → **Transcrever áudio (Gemini)**.
    - **Texto** → segue direto.
    - **Outro** (foto, documento, figurinha…) → **Resposta: tipo não suportado**.
@@ -43,7 +45,10 @@ Os nomes em **negrito** são os nós do workflow [`n8n/workflows/kira-1.0.json`]
    - **Gemini (principal)** e **Gemini (reserva)**: se o principal falhar, a reserva assume;
    - **Memória da conversa**: as últimas 20 trocas;
    - ferramentas **salvar_memoria** e **apagar_memoria** (tabela `kira_memoria`);
-   - ferramentas do Outlook, só leitura: **emails_recentes**, **buscar_emails**, **ler_email** e **agenda** (Microsoft Graph).
+   - ferramentas do Outlook: **emails_recentes**, **buscar_emails**, **ler_email** e **agenda** (leitura) e **criar_rascunho_resposta** (só rascunho), pelo Microsoft Graph;
+   - ferramentas do Google Drive, só leitura: **buscar_arquivos_drive** e **ler_arquivo_drive**;
+   - **rascunho_linkedin**: guarda o post (e o número da imagem, se houver) em `kira_linkedin`;
+   - **gerar_imagem** e **anexar_imagem_email**: chamam os sub-workflows de imagem (abaixo).
 9. **Resposta da Kira** (ou **Resposta de erro**, se a transcrição ou a IA falharem) padroniza a resposta.
 10. **Resposta pronta** decide voz ou texto e prepara o texto falado e a legenda.
     - Voz: **Gerar voz (Gemini)** → **Preparar áudio (WAV)** → **Áudio para arquivo** → **Enviar áudio**.
@@ -51,14 +56,21 @@ Os nomes em **negrito** são os nós do workflow [`n8n/workflows/kira-1.0.json`]
     - Se a voz falhar, a resposta vai por texto.
 11. **Registrar conversa** grava tudo em `kira_logs`.
 
+### Sub-workflows de imagem
+
+- **Kira — gerar imagem (ferramenta)**: **Preparar pedido** (descrição, formato e modelo) → **Registrar imagem** (`kira_imagens`, para ter o número) → **Gerar imagem (Gemini)** (se falhar, **Gerar imagem (reserva)** com outro modelo) → **Extrair imagem** → **Imagem para arquivo** → **Enviar imagem** (foto no Telegram, legenda "🖼️ Imagem #N") → **Guardar arquivo** (o `file_id` do Telegram) → **Imagem pronta**. Qualquer falha cai em **Explicar falha**, que devolve à Kira um motivo curto (por exemplo, fim da cota gratuita).
+- **Kira — anexar imagem ao e-mail (ferramenta)**: **Buscar imagem** (só do próprio usuário) → **Baixar imagem** (do Telegram) → **Imagem em base64** → **Anexar ao rascunho** (Microsoft Graph, anexo do rascunho) → **Anexo pronto**.
+
 ## Dados
 
 | Tabela | Colunas | Para que serve |
 | --- | --- | --- |
 | `kira_memoria` | `user_id`, `categoria` (`pessoal`, `negocios`, `hm`, `geral`), `fato` | Memórias de longo prazo. A Kira lê as 100 mais recentes a cada mensagem |
 | `kira_logs` | `chat_id`, `user_id`, `usuario`, `tipo_entrada`, `entrada`, `resposta`, `modo_resposta`, `entregue_como`, `status`, `erro`, `latencia_ms`, `execucao_id` | Histórico e diagnóstico de cada mensagem |
+| `kira_linkedin` | `texto`, `status` (`pendente` ou `publicado`), `post_urn`, `erro`, `imagem_id` | Rascunhos de posts; o `id` é o número usado no `/publicar N` |
+| `kira_imagens` | `user_id`, `chat_id`, `file_id`, `descricao`, `legenda`, `formato`, `modelo` | Imagens geradas; o `id` é o número da imagem (#N) e o arquivo fica no Telegram (`file_id`) |
 
-As duas tabelas também têm `id`, `createdAt` e `updatedAt`, criados pelo n8n.
+Todas as tabelas também têm `id`, `createdAt` e `updatedAt`, criados pelo n8n.
 
 ## Decisões e porquês
 
@@ -67,6 +79,10 @@ As duas tabelas também têm `id`, `createdAt` e `updatedAt`, criados pelo n8n.
 **Voz com o próprio Gemini, grátis.** O modelo de voz do Gemini (`gemini-3.8-flash-tts`) funciona com a mesma chave gratuita do AI Studio, sem Google Cloud nem faturamento. Ele devolve WAV pronto (modelos mais antigos devolvem áudio cru, PCM); o nó *Preparar áudio (WAV)* acrescenta o cabeçalho WAV quando precisa e calcula a duração. A versão anterior usava o Google Cloud Text-to-Speech, que exige faturamento.
 
 **Outlook só para leitura, pelo Microsoft Graph.** As quatro ferramentas são requisições GET com a credencial OAuth do Outlook. Usar a API direto (em vez do nó pronto do Outlook) permite: ler só a Caixa de Entrada em ordem de chegada e com o total do período (`$count`), receber o corpo do e-mail como texto (menos tokens) e a agenda já no horário de Brasília, só do calendário principal. As instruções mandam consultar de novo a cada pergunta e tratar e-mails como informação, nunca como ordem.
+
+**Nada sai em seu nome sem você.** E-mails viram rascunho (`createReply`, nunca envio) e posts ficam em `kira_linkedin` até você mandar `/publicar N`. A publicação é um ramo fixo do workflow, disparado só pelo comando: a IA não tem uma ferramenta de publicar.
+
+**Imagens guardadas no próprio Telegram.** A imagem gerada vai para você como foto; o `file_id` que o Telegram devolve fica em `kira_imagens`. Para o LinkedIn ou um e-mail, o workflow baixa a imagem do Telegram de novo. Assim não é preciso outro armazenamento (nem dar à Kira acesso de escrita ao Drive), e a imagem usada é a mesma que você viu. O anexo do e-mail é criado direto no Microsoft Graph porque o nó pronto do Outlook, no n8n Cloud, não enviava o conteúdo do arquivo corretamente.
 
 **Resumo da manhã em workflow separado.** Às 7h, RSS de fontes confiáveis + cotações + Gemini + Telegram. Fica separado da Kira para que uma falha num não afete o outro. O Gemini recebe só a lista de notícias do dia e é instruído a não usar nada de fora dela; se ele falhar, vão os títulos com link.
 
@@ -93,7 +109,9 @@ As duas tabelas também têm `id`, `createdAt` e `updatedAt`, criados pelo n8n.
 
 - A voz chega como arquivo de áudio, não como mensagem de voz com a onda sonora.
 - A memória da conversa se perde quando o n8n reinicia (as memórias guardadas não).
-- E-mail e agenda só do Outlook e só para leitura. Ainda sem Google Drive, OneDrive, dados das empresas ou busca na internet durante a conversa; a Kira foi instruída a dizer isso em vez de inventar.
+- E-mail e agenda só do Outlook: a Kira lê e prepara rascunhos, mas não envia. Ainda sem OneDrive, dados das empresas ou busca na internet durante a conversa; a Kira foi instruída a dizer isso em vez de inventar.
+- O Google Drive é só leitura, e PDFs, Word e imagens do Drive ainda não são lidos.
+- As imagens dependem da cota gratuita diária do Gemini.
 - O resumo das 7h é enviado por outro workflow: a Kira da conversa não "lembra" dele.
 - Fotos e documentos ainda não são entendidos.
 - Mensagens enviadas em sequência muito rápida são processadas em paralelo e podem ser respondidas fora de ordem.

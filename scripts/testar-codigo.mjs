@@ -1,5 +1,5 @@
-// Testes da Kira: executa o código dos nós "Code" do workflow exportado
-// (n8n/workflows/kira-1.0.json) com dados simulados e confere a estrutura do workflow.
+// Testes da Kira: executa o código dos nós "Code" dos workflows exportados
+// (n8n/workflows/*.json) com dados simulados e confere a estrutura dos workflows.
 // Uso: npm test   (ou: node scripts/testar-codigo.mjs)
 import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
@@ -195,6 +195,58 @@ teste('comando /id mostra os ids como código', () => {
   assert.match(partes(comando('/id').texto_resposta)[0].html, /<code>111<\/code>/);
 });
 
+// ---------- /publicar: LinkedIn, com ou sem imagem ----------
+// Simula os nós do ramo /publicar: quais rodaram, o que devolveram e o erro de cada um.
+function publicar(texto, rodaram = {}) {
+  const fixos = {
+    'Normalizar entrada': { ...entradaNormalizada, tipo_entrada: 'comando', comando: '/publicar', texto },
+    'Configuração da Kira': config,
+  };
+  const $ = (nome) => {
+    if (nome in fixos) return { isExecuted: true, first: () => ({ json: fixos[nome] }), all: () => [{ json: fixos[nome] }] };
+    if (!(nome in rodaram)) {
+      const erro = () => {
+        throw new Error(`nó não executado: ${nome}`);
+      };
+      return { isExecuted: false, first: erro, all: erro };
+    }
+    const { saida = [{}], erro = [] } = rodaram[nome];
+    return {
+      isExecuted: true,
+      first: () => ({ json: saida[0] ?? {} }),
+      all: (saidaDoNo = 0) => (saidaDoNo === 1 ? erro : saida).map((json) => ({ json })),
+    };
+  };
+  const $input = { first: () => undefined, all: () => [] };
+  return new Function('$', '$input', 'DateTime', codigoDo('Resposta do comando'))($, $input, DateTime)[0].json.texto_resposta;
+}
+const rascunho = (imagem_id) => ({ 'Buscar rascunho (LinkedIn)': { saida: [{ id: 3, texto: 'Post', status: 'pendente', imagem_id }] } });
+
+teste('/publicar: post só com texto', () => {
+  const r = publicar('/publicar 3', { ...rascunho(0), 'Publicar no LinkedIn': { saida: [{ urn: 'urn:li:share:1' }] }, 'Marcar como publicado': {} });
+  assert.equal(r, '✅ Publiquei no LinkedIn o rascunho 3.');
+});
+teste('/publicar: post com imagem', () => {
+  const r = publicar('/publicar 3', { ...rascunho(5), 'Publicar no LinkedIn (com imagem)': { saida: [{ urn: 'urn:li:share:1' }] }, 'Marcar como publicado': {} });
+  assert.equal(r, '✅ Publiquei no LinkedIn o rascunho 3 com a imagem #5.');
+});
+teste('/publicar: imagem que não baixou não publica nada', () => {
+  const r = publicar('/publicar 3', { ...rascunho(5), 'Buscar imagem (LinkedIn)': {}, 'Baixar imagem (LinkedIn)': { saida: [], erro: [{ error: 'file not found' }] } });
+  assert.match(r, /Não consegui pegar a imagem #5 do rascunho 3\. Erro: file not found Nada foi publicado/);
+});
+teste('/publicar: erro do LinkedIn aparece e o rascunho continua guardado', () => {
+  const r = publicar('/publicar 3', { ...rascunho(5), 'Baixar imagem (LinkedIn)': {}, 'Publicar no LinkedIn (com imagem)': { saida: [], erro: [{ error: { message: 'Forbidden' } }] } });
+  assert.equal(r, '😕 Não consegui publicar o rascunho 3 no LinkedIn. Erro: Forbidden O rascunho continua guardado.');
+});
+teste('/publicar: sem número ou rascunho inexistente', () => {
+  assert.match(publicar('/publicar'), /Me diga qual rascunho publicar/);
+  assert.match(publicar('/publicar 9', { 'Buscar rascunho (LinkedIn)': { saida: [{}] } }), /Não encontrei o rascunho 9 pendente/);
+});
+teste('comando /status e /ajuda mostram as imagens', () => {
+  assert.match(comando('/status').texto_resposta, /Imagens: gero com o Gemini/);
+  assert.match(comando('/ajuda').texto_resposta, /\/publicar N — publica no LinkedIn o rascunho N que eu preparei \(com a imagem, se tiver\)/);
+});
+
 // ---------- Estrutura e segurança do workflow ----------
 teste('workflow: todas as conexões apontam para nós que existem', () => {
   for (const [origem, tipos] of Object.entries(workflow.connections)) {
@@ -260,6 +312,114 @@ teste('outlook: as ferramentas só fazem leitura (GET)', () => {
   }
 });
 
+// ---------- Google Drive e rascunhos de resposta ----------
+teste('drive: as ferramentas só fazem leitura (GET)', () => {
+  for (const nome of ['buscar_arquivos_drive', 'ler_arquivo_drive']) {
+    assert.ok(nos[nome], `ferramenta ausente: ${nome}`);
+    assert.equal(nos[nome].parameters.method ?? 'GET', 'GET', nome);
+    assert.match(String(nos[nome].parameters.url), /googleapis\.com\/drive\/v3\/files/, nome);
+  }
+});
+teste('outlook: rascunho de resposta só cria rascunho (createReply), nunca envia', () => {
+  const p = nos.criar_rascunho_resposta.parameters;
+  assert.equal(p.method, 'POST');
+  assert.match(p.url, /\/createReply' \}\}$/);
+  assert.doesNotMatch(JSON.stringify(workflow), /\/send'|sendMail|\/reply'/);
+  // o texto vira HTML seguro: escapa & < > e troca quebras de linha por <br>
+  assert.match(p.jsonBody, /replace\(\/&\/g, '&amp;'\)\.replace\(\/<\/g, '&lt;'\)\.replace\(\/>\/g, '&gt;'\)\.replace\(\/\\n\/g, '<br>'\)/);
+});
+
+// ---------- Imagens: ferramentas e sub-workflows ----------
+teste('imagens: gerar_imagem e anexar_imagem_email são ferramentas da Kira', () => {
+  for (const nome of ['gerar_imagem', 'anexar_imagem_email']) {
+    assert.equal(nos[nome]?.type, '@n8n/n8n-nodes-langchain.toolWorkflow', nome);
+    assert.deepEqual(workflow.connections[nome].ai_tool[0][0].node, 'Kira', nome);
+    // o id do sub-workflow é de cada instalação: no repositório ele fica vazio
+    assert.equal(nos[nome].parameters.workflowId.value, '', nome);
+  }
+  const entradas = nos.gerar_imagem.parameters.workflowInputs.value;
+  assert.match(entradas.chat_id, /Normalizar entrada/, 'o chat vem do Telegram, não da IA');
+  assert.match(entradas.user_id, /Normalizar entrada/, 'o usuário vem do Telegram, não da IA');
+});
+teste('imagens: rascunho do LinkedIn guarda o número da imagem', () => {
+  assert.match(nos.rascunho_linkedin.parameters.columns.value.imagem_id, /\$fromAI\('imagem_id'/);
+});
+teste('imagens: /publicar usa o post com imagem só quando o rascunho tem imagem', () => {
+  const ramo = workflow.connections['Rascunho tem imagem?'].main;
+  assert.equal(ramo[0][0].node, 'Buscar imagem (LinkedIn)');
+  assert.equal(ramo[1][0].node, 'Publicar no LinkedIn');
+  const comImagem = nos['Publicar no LinkedIn (com imagem)'].parameters;
+  assert.equal(comImagem.shareMediaCategory, 'IMAGE');
+  assert.equal(comImagem.binaryPropertyName, 'data');
+  for (const nome of ['Publicar no LinkedIn', 'Publicar no LinkedIn (com imagem)']) {
+    assert.equal(nos[nome].parameters.person, '', `${nome}: o id da pessoa no LinkedIn fica só no n8n`);
+  }
+});
+
+const gerarImagem = JSON.parse(ler('n8n/workflows/kira-gerar-imagem.json'));
+const anexarImagem = JSON.parse(ler('n8n/workflows/kira-anexar-imagem.json'));
+const noDe = (w, nome) => {
+  const no = w.nodes.find((n) => n.name === nome);
+  assert.ok(no, `nó não encontrado: ${nome}`);
+  return no;
+};
+
+teste('imagens: pedido ao Gemini com formato e modelos principal e reserva', () => {
+  const [p] = executar(noDe(gerarImagem, 'Preparar pedido').parameters.jsCode, {
+    entrada: [{ descricao: '  Um farol  ', legenda: 'Farol', formato: 'Paisagem', chat_id: 111, user_id: 111 }],
+  });
+  assert.equal(p.descricao, 'Um farol');
+  assert.equal(p.formato, '16:9');
+  assert.equal(p.chat_id, '111');
+  assert.notEqual(p.modelo, p.modelo_reserva);
+  const corpo = JSON.parse(p.corpo);
+  assert.deepEqual(corpo.generationConfig.imageConfig, { aspectRatio: '16:9' });
+  assert.equal(corpo.contents[0].parts[0].text, 'Um farol');
+  assert.equal(executar(noDe(gerarImagem, 'Preparar pedido').parameters.jsCode, { entrada: [{ descricao: 'x', formato: 'qualquer' }] })[0].formato, '1:1');
+  assert.throws(() => executar(noDe(gerarImagem, 'Preparar pedido').parameters.jsCode, { entrada: [{ descricao: ' ' }] }), /descrição/);
+});
+teste('imagens: pega a imagem final do Gemini (ignora rascunhos do modelo)', () => {
+  const [e] = executar(noDe(gerarImagem, 'Extrair imagem').parameters.jsCode, {
+    nosAnteriores: { 'Registrar imagem': { id: 7 } },
+    entrada: [{ candidates: [{ content: { parts: [{ text: 'Aqui está' }, { inlineData: { mimeType: 'image/png', data: 'AAA' }, thought: true }, { inlineData: { mimeType: 'image/jpeg', data: 'BBB' } }] } }] }],
+  });
+  assert.deepEqual(e, { imagem_base64: 'BBB', mime: 'image/jpeg', nome_arquivo: 'kira-imagem-7.jpg' });
+});
+teste('imagens: pedido recusado vira erro com o motivo', () => {
+  assert.throws(
+    () =>
+      executar(noDe(gerarImagem, 'Extrair imagem').parameters.jsCode, {
+        nosAnteriores: { 'Registrar imagem': { id: 7 } },
+        entrada: [{ candidates: [{ finishReason: 'IMAGE_SAFETY', content: { parts: [{ text: 'Não posso gerar isso.' }] } }] }],
+      }),
+    /não devolveu imagem \(IMAGE_SAFETY\): Não posso gerar isso\./,
+  );
+});
+teste('imagens: falta de cota do Google é explicada para a Kira', () => {
+  const [r] = executar(noDe(gerarImagem, 'Explicar falha').parameters.jsCode, {
+    entrada: [{ error: { message: 'Too many requests', error: { error: { code: 429, message: 'You exceeded your current quota', status: 'RESOURCE_EXHAUSTED' } } } }],
+  });
+  assert.equal(r.ok, false);
+  assert.equal(r.sem_cota, true);
+  assert.match(r.erro, /exceeded your current quota/);
+});
+teste('imagens: a imagem vai para o Telegram e a referência fica em kira_imagens', () => {
+  assert.equal(noDe(gerarImagem, 'Enviar imagem').parameters.operation, 'sendPhoto');
+  assert.equal(noDe(gerarImagem, 'Registrar imagem').parameters.dataTableId.value, 'kira_imagens');
+  assert.match(noDe(gerarImagem, 'Guardar arquivo').parameters.columns.value.file_id, /result\.photo/);
+});
+teste('imagens: o anexo só entra em rascunho do Outlook (nunca envia)', () => {
+  const anexar = noDe(anexarImagem, 'Anexar ao rascunho').parameters;
+  assert.equal(anexar.method, 'POST');
+  assert.match(anexar.url, /graph\.microsoft\.com\/v1\.0\/me\/messages\/' \+ encodeURIComponent\(.*\) \+ '\/attachments'/);
+  assert.doesNotMatch(JSON.stringify(anexarImagem), /\/send\b|sendMail/);
+  const busca = noDe(anexarImagem, 'Buscar imagem').parameters.filters.conditions.map((c) => c.keyName);
+  assert.deepEqual(busca, ['id', 'user_id'], 'só imagens do próprio usuário');
+  const [r] = executar(noDe(anexarImagem, 'Explicar falha').parameters.jsCode, { entrada: [{ error: { message: 'ErrorItemNotFound' } }] });
+  assert.equal(r.ok, false);
+  assert.equal(r.erro, 'ErrorItemNotFound');
+});
+
 // ---------- Resumo da manhã ----------
 const resumo = JSON.parse(ler('n8n/workflows/kira-resumo-da-manha.json'));
 const nosResumo = Object.fromEntries(resumo.nodes.map((n) => [n.name, n]));
@@ -295,6 +455,10 @@ teste('segurança: nenhum token do Telegram, chave do Google ou caminho de webho
     'n8n/sdk/kira-1.0.workflow.ts',
     'n8n/workflows/kira-resumo-da-manha.json',
     'n8n/sdk/kira-resumo-da-manha.workflow.ts',
+    'n8n/workflows/kira-gerar-imagem.json',
+    'n8n/sdk/kira-gerar-imagem.workflow.ts',
+    'n8n/workflows/kira-anexar-imagem.json',
+    'n8n/sdk/kira-anexar-imagem.workflow.ts',
   ];
   for (const arquivo of arquivos) {
     const conteudo = ler(arquivo);

@@ -1,0 +1,498 @@
+{
+  "name": "Kira — gerar imagem (ferramenta)",
+  "nodes": [
+    {
+      "id": "cf4ba0bb-cc10-4076-bc95-916a1793addf",
+      "name": "Quando a Kira pedir uma imagem",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "descricao",
+              "type": "string"
+            },
+            {
+              "name": "legenda",
+              "type": "string"
+            },
+            {
+              "name": "formato",
+              "type": "string"
+            },
+            {
+              "name": "chat_id",
+              "type": "string"
+            },
+            {
+              "name": "user_id",
+              "type": "string"
+            },
+            {
+              "name": "modelo",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "04cc9b5d-1133-4e28-bcb3-7634813485ee",
+      "name": "Preparar pedido",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Prepara o pedido de imagem ao Gemini: confere a descrição, escolhe o formato e o modelo.\n// Modelos de imagem do Gemini (\"Nano Banana\"): o principal e um reserva, usado se o principal falhar.\nconst MODELO_PRINCIPAL = 'gemini-3.1-flash-image';\nconst MODELO_RESERVA = 'gemini-2.5-flash-image';\n\nconst FORMATOS = {\n  quadrado: '1:1', quadrada: '1:1', feed: '1:1',\n  retrato: '4:5', vertical: '4:5',\n  story: '9:16', stories: '9:16', reels: '9:16',\n  paisagem: '16:9', horizontal: '16:9', banner: '16:9', widescreen: '16:9',\n};\nconst PROPORCOES = ['1:1', '2:3', '3:2', '3:4', '4:3', '4:5', '5:4', '9:16', '16:9', '21:9'];\n\nconst entrada = $input.first().json;\nconst descricao = String(entrada.descricao ?? '').trim();\nif (!descricao) throw new Error('Faltou a descrição da imagem.');\n\nconst pedido = String(entrada.formato ?? '').trim().toLowerCase();\nconst formato = PROPORCOES.includes(pedido) ? pedido : FORMATOS[pedido] ?? '1:1';\nconst modelo = String(entrada.modelo ?? '').trim().replace(/^models\\//, '') || MODELO_PRINCIPAL;\nconst corpo = {\n  contents: [{ role: 'user', parts: [{ text: descricao }] }],\n  generationConfig: { responseModalities: ['TEXT', 'IMAGE'], imageConfig: { aspectRatio: formato } },\n};\n\nreturn [\n  {\n    json: {\n      descricao,\n      legenda: String(entrada.legenda ?? '').trim().slice(0, 900),\n      formato,\n      chat_id: String(entrada.chat_id ?? '').trim(),\n      user_id: String(entrada.user_id ?? '').trim(),\n      modelo,\n      modelo_reserva: modelo === MODELO_RESERVA ? MODELO_PRINCIPAL : MODELO_RESERVA,\n      corpo: JSON.stringify(corpo),\n    },\n  },\n];\n"
+      }
+    },
+    {
+      "id": "e48c9e0c-2685-4dde-b04d-bce3e5723f93",
+      "name": "Registrar imagem",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        440,
+        300
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "kira_imagens"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "user_id": "={{ $json.user_id }}",
+            "chat_id": "={{ $json.chat_id }}",
+            "descricao": "={{ $json.descricao }}",
+            "legenda": "={{ $json.legenda }}",
+            "formato": "={{ $json.formato }}",
+            "modelo": "={{ $json.modelo }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "user_id",
+              "displayName": "user_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "chat_id",
+              "displayName": "chat_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "file_id",
+              "displayName": "file_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "descricao",
+              "displayName": "descricao",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "legenda",
+              "displayName": "legenda",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "formato",
+              "displayName": "formato",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "modelo",
+              "displayName": "modelo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "969a47d5-b362-41b9-bd79-5db6fa704555",
+      "name": "Gerar imagem (Gemini)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        660,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://generativelanguage.googleapis.com/v1beta/models/' + $('Preparar pedido').first().json.modelo + ':generateContent' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googlePalmApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $('Preparar pedido').first().json.corpo }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "credentials": {},
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "bba4c6e1-77fe-4417-9521-d65d10c8e63c",
+      "name": "Extrair imagem",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Pega a imagem que o Gemini devolveu (base64) para virar arquivo.\n// Se veio só texto (por exemplo, um pedido recusado), gera um erro com a explicação do modelo.\nconst resposta = $input.first().json;\nconst candidato = resposta.candidates?.[0] ?? {};\nconst partes = candidato.content?.parts ?? [];\nconst imagem = partes.filter((p) => p.inlineData?.data && !p.thought).pop()?.inlineData;\nif (!imagem) {\n  const texto = partes.filter((p) => p.text && !p.thought).map((p) => p.text).join(' ').trim();\n  const motivo = candidato.finishReason || resposta.promptFeedback?.blockReason || '';\n  throw new Error(`O Gemini não devolveu imagem${motivo ? ` (${motivo})` : ''}${texto ? `: ${texto.slice(0, 300)}` : '.'}`);\n}\n\nconst mime = imagem.mimeType || 'image/png';\nconst extensao = mime === 'image/jpeg' ? 'jpg' : mime.split('/')[1] || 'png';\nconst id = $('Registrar imagem').first().json.id;\nreturn [{ json: { imagem_base64: imagem.data, mime, nome_arquivo: `kira-imagem-${id}.${extensao}` } }];\n"
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "7352b971-ad3e-4108-a2fc-4fc0090bdc9e",
+      "name": "Imagem para arquivo",
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        1320,
+        300
+      ],
+      "parameters": {
+        "operation": "toBinary",
+        "sourceProperty": "imagem_base64",
+        "options": {
+          "fileName": "={{ $json.nome_arquivo }}",
+          "mimeType": "={{ $json.mime }}"
+        }
+      }
+    },
+    {
+      "id": "7d97d025-cc77-4d4a-8858-9d8d497e8806",
+      "name": "Enviar imagem",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1540,
+        300
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendPhoto",
+        "chatId": "={{ $('Preparar pedido').first().json.chat_id }}",
+        "binaryData": true,
+        "binaryPropertyName": "data",
+        "additionalFields": {
+          "caption": "={{ ('🖼️ Imagem #' + $('Registrar imagem').first().json.id + ($('Preparar pedido').first().json.legenda ? ' — ' + $('Preparar pedido').first().json.legenda : '')).slice(0, 1024) }}"
+        }
+      },
+      "credentials": {},
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "0e3a1ff8-e5d7-4f17-a289-378983b7e5df",
+      "name": "Guardar arquivo",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1760,
+        300
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "kira_imagens"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Registrar imagem').first().json.id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "file_id": "={{ $json.result.photo[$json.result.photo.length - 1].file_id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "file_id",
+              "displayName": "file_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "3d92e67f-836d-4c9e-a295-370c8dfea829",
+      "name": "Imagem pronta",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1980,
+        300
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "img-ok",
+              "name": "ok",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "img-id",
+              "name": "imagem_id",
+              "value": "={{ $('Registrar imagem').first().json.id }}",
+              "type": "number"
+            },
+            {
+              "id": "img-msg",
+              "name": "mensagem",
+              "value": "={{ 'A imagem #' + $('Registrar imagem').first().json.id + ' já está no Telegram do dono. Diga o número dela na resposta e não repita a descrição inteira. Para um post do LinkedIn com esta imagem, passe imagem_id em rascunho_linkedin; para anexar a um rascunho de e-mail, use anexar_imagem_email.' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "74886571-ccca-4df1-8405-ec05c21a5aef",
+      "name": "Gerar imagem (reserva)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        880,
+        500
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://generativelanguage.googleapis.com/v1beta/models/' + $('Preparar pedido').first().json.modelo_reserva + ':generateContent' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googlePalmApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $('Preparar pedido').first().json.corpo }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "credentials": {},
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "a7ccbc26-3271-4216-84c1-2bbf7f7f382a",
+      "name": "Explicar falha",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        600
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Resume o erro para a Kira explicar ao dono (sem travar a conversa).\nconst item = $input.first().json;\nconst bruto = item.error ?? item;\nconst textos = [];\nconst coletar = (valor, profundidade = 0) => {\n  if (!valor || profundidade > 4) return;\n  if (typeof valor === 'string') {\n    textos.push(valor);\n    return;\n  }\n  if (typeof valor === 'object') {\n    for (const chave of ['message', 'description']) {\n      if (typeof valor[chave] === 'string') textos.push(valor[chave]);\n    }\n    coletar(valor.error, profundidade + 1);\n  }\n};\ncoletar(bruto);\n\nlet completo = '';\ntry {\n  completo = JSON.stringify(bruto);\n} catch (e) {\n  completo = textos.join(' ');\n}\nconst erro = [...new Set(textos.map((t) => t.trim()).filter(Boolean))].join(' — ').slice(0, 600) || 'erro desconhecido';\nconst semCota = /quota|RESOURCE_EXHAUSTED|limit: 0|billing|429/i.test(completo + erro);\n\nreturn [\n  {\n    json: {\n      ok: false,\n      imagem_id: 0,\n      erro,\n      sem_cota: semCota,\n      orientacao: semCota\n        ? 'A cota gratuita da API do Google para gerar imagens acabou ou não está disponível agora. Explique isso ao dono em poucas palavras.'\n        : 'Explique o erro ao dono em poucas palavras e sugira tentar de novo com outra descrição.',\n    },\n  },\n];\n"
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Quando a Kira pedir uma imagem": {
+      "main": [
+        [
+          {
+            "node": "Preparar pedido",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar pedido": {
+      "main": [
+        [
+          {
+            "node": "Registrar imagem",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registrar imagem": {
+      "main": [
+        [
+          {
+            "node": "Gerar imagem (Gemini)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gerar imagem (Gemini)": {
+      "main": [
+        [
+          {
+            "node": "Extrair imagem",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Gerar imagem (reserva)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extrair imagem": {
+      "main": [
+        [
+          {
+            "node": "Imagem para arquivo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Explicar falha",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Imagem para arquivo": {
+      "main": [
+        [
+          {
+            "node": "Enviar imagem",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar imagem": {
+      "main": [
+        [
+          {
+            "node": "Guardar arquivo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Explicar falha",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar arquivo": {
+      "main": [
+        [
+          {
+            "node": "Imagem pronta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gerar imagem (reserva)": {
+      "main": [
+        [
+          {
+            "node": "Extrair imagem",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Explicar falha",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Sao_Paulo"
+  },
+  "tags": []
+}

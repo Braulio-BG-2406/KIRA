@@ -18,7 +18,7 @@ Prefere rodar na VPS? Veja [Rodar na VPS](#rodar-na-vps-opcional) no fim.
 4. [Publicar o workflow](#4-publicar)
 5. [Liberar o seu ID do Telegram](#5-liberar-o-seu-id)
 6. [Fazer o primeiro teste](#6-primeiro-teste-)
-7. Opcionais: [Outlook (e-mails e agenda)](#7-outlook-e-mails-e-agenda-só-leitura) e [Resumo da manhã às 7h](#8-resumo-da-manhã-às-7h)
+7. Opcionais: [Outlook](#7-outlook-e-mails-agenda-e-rascunhos-de-resposta), [Resumo da manhã às 7h](#8-resumo-da-manhã-às-7h), [Google Drive](#9-google-drive-só-leitura), [LinkedIn](#10-linkedin-rascunhos-e-publicar) e [Imagens](#11-imagens-com-ia)
 
 ---
 
@@ -108,12 +108,14 @@ Depois, teste também:
 | `/limpar` | Ela esquece o histórico recente da conversa (as memórias guardadas continuam) |
 | "Kira, como estou na minha meta?" | Ela explica que ainda não tem acesso aos seus dados financeiros, sem inventar números |
 
-## 7. Outlook: e-mails e agenda (só leitura)
+## 7. Outlook: e-mails, agenda e rascunhos de resposta
 
-A Kira consulta o Outlook com quatro ferramentas: **emails_recentes** (Caixa de Entrada de um período, com o total), **buscar_emails** (por palavra, remetente ou assunto), **ler_email** (um e-mail inteiro, em texto) e **agenda** (compromissos do calendário principal, no horário de Brasília). Todas só **leem**: a Kira não envia, não responde, não apaga e não altera nada.
+A Kira consulta o Outlook com quatro ferramentas de leitura: **emails_recentes** (Caixa de Entrada de um período, com o total), **buscar_emails** (por palavra, remetente ou assunto), **ler_email** (um e-mail inteiro, em texto) e **agenda** (compromissos do calendário principal, no horário de Brasília).
+
+Uma quinta ferramenta, **criar_rascunho_resposta**, prepara a resposta de um e-mail quando você pede ("Kira, deixe pronta a resposta para o e-mail do fornecedor"). Ela só cria um **rascunho** na pasta Rascunhos, com o e-mail original citado: nada é enviado. Você revisa, ajusta e envia pelo Outlook. O que a Kira não souber fica marcado como `[confirmar]`.
 
 1. No n8n: **Create credential → Microsoft Outlook OAuth2 API** → entre com a sua conta Microsoft.
-2. Selecione essa credencial nas quatro ferramentas (grupo **Cérebro da Kira**) e publique.
+2. Selecione essa credencial nas cinco ferramentas (grupo **Cérebro da Kira**) e publique.
 
 Contas de empresa podem exigir que o administrador do Microsoft 365 aprove o acesso do n8n. As instruções da Kira mandam tratar o conteúdo dos e-mails como informação, nunca como ordem, para que um e-mail não consiga "dar instruções" a ela.
 
@@ -131,6 +133,43 @@ Workflow separado: **Kira — Resumo da manhã (7h)** ([`n8n/workflows/kira-resu
 Para configurar: no nó **Configuração do resumo**, preencha `chat_id` (o seu ID do Telegram, o mesmo de `ids_autorizados`) e publique. As fontes ficam no nó **Fontes** (seção, nome e endereço do RSS). Tudo usa serviços gratuitos.
 
 > A API de cotações (AwesomeAPI) às vezes recusa pedidos vindos do n8n Cloud por limite de uso. Nesse caso o resumo sai sem a linha de cotações.
+
+## 9. Google Drive (só leitura)
+
+Duas ferramentas: **buscar_arquivos_drive** (por nome ou conteúdo, com filtro por tipo: documento, planilha, apresentação, PDF ou pasta; sem termo, lista os mais recentes) e **ler_arquivo_drive** (lê Documentos, Planilhas e Apresentações do Google e arquivos de texto, até cerca de 20 mil caracteres). PDFs, Word e imagens ainda não são lidos: a Kira manda o link.
+
+1. No n8n: **Create credential → Google Drive OAuth2 API** → entre com a sua conta Google.
+2. Selecione a credencial nas duas ferramentas e publique.
+
+Teste: "Kira, quais planilhas eu mexi esta semana?".
+
+## 10. LinkedIn: rascunhos e /publicar
+
+Quando você pede um post, a Kira escreve o texto e guarda na tabela `kira_linkedin` como rascunho numerado (ferramenta **rascunho_linkedin**). **Ela nunca publica sozinha.** O post só vai para o LinkedIn quando você manda `/publicar N` (N é o número do rascunho). Se o rascunho tiver imagem, o post sai com ela.
+
+1. Crie a tabela `kira_linkedin` com as colunas `texto`, `status`, `post_urn`, `erro` (texto) e `imagem_id` (número).
+2. No n8n: **Create credential → LinkedIn OAuth2 API** → entre com a sua conta LinkedIn.
+3. Nos nós **Publicar no LinkedIn** e **Publicar no LinkedIn (com imagem)** (grupo **Comandos**), selecione a credencial e escolha você mesmo no campo **Person**. Publique.
+
+Teste: "Kira, escreva um post curto sobre produtividade", confira o texto e o número e, se gostar, mande `/publicar N`.
+
+## 11. Imagens com IA
+
+A ferramenta **gerar_imagem** cria imagens com os modelos de imagem do Gemini ("Nano Banana", com a mesma chave gratuita), manda a imagem no Telegram com o número (`🖼️ Imagem #3`) e guarda a referência na tabela `kira_imagens` (o arquivo fica no próprio Telegram). Com o número, a imagem pode ir:
+
+- **no LinkedIn**: "Kira, faça um post sobre isso com a imagem 3" (sai junto quando você manda `/publicar N`);
+- **num e-mail**: a ferramenta **anexar_imagem_email** anexa a imagem a um rascunho do Outlook. Nada é enviado.
+
+Formatos: quadrado (padrão, bom para o LinkedIn), retrato, paisagem (e-mail e banner) ou story.
+
+1. Crie a tabela `kira_imagens` com as colunas `user_id`, `chat_id`, `file_id`, `descricao`, `legenda`, `formato` e `modelo` (texto).
+2. Importe os dois sub-workflows: [`kira-gerar-imagem.json`](../n8n/workflows/kira-gerar-imagem.json) (credenciais do Gemini e do Telegram) e [`kira-anexar-imagem.json`](../n8n/workflows/kira-anexar-imagem.json) (Telegram e Outlook). Publique os dois.
+3. Em cada um, **Settings → This workflow can be called by** → escolha só a Kira.
+4. Na Kira, nas ferramentas **gerar_imagem** e **anexar_imagem_email**, selecione o sub-workflow correspondente. Publique.
+
+Teste: "Kira, gere uma imagem quadrada de um café da manhã com vista para a montanha, em aquarela".
+
+> O plano gratuito do Gemini tem limite diário de imagens. Quando acaba, a Kira avisa; no dia seguinte volta a funcionar. Os modelos ficam no nó **Preparar pedido** do sub-workflow (um principal e um reserva).
 
 ## Personalizar
 
@@ -167,6 +206,8 @@ Durante os testes ficou uma linha de teste em `kira_logs` (usuário "Teste @test
 | Você manda áudio e ela responde por texto | Credencial da voz, limite diário da voz ou nome de voz errado | Veja o passo 3 e a execução em **Executions** |
 | Ela diz que não consegue ler seus e-mails | Credencial do Outlook expirou ou foi removida | Reconecte a credencial *Microsoft Outlook* no n8n (passo 7) |
 | O resumo das 7h não chegou | Workflow do resumo desativado ou `chat_id` vazio | Veja o passo 8 e a execução em **Executions** |
+| `/publicar N` responde que não conseguiu | Credencial do LinkedIn expirou ou o campo **Person** está vazio | Reconecte a credencial e confira o passo 10; o rascunho continua guardado |
+| A Kira diz que não conseguiu gerar a imagem | Limite diário de imagens do plano gratuito ou pedido recusado pelo filtro do Google | Tente amanhã ou mude a descrição; detalhes nas execuções do sub-workflow **Kira — gerar imagem** |
 | "Não consegui processar o seu áudio" | Transcrição sem credencial do Gemini ou modelo indisponível | Selecione a credencial no nó *Transcrever áudio (Gemini)* e confira o modelo |
 | "Atingi o limite de uso do Gemini" | Limite por minuto ou por dia do plano gratuito | Espere alguns minutos ou ative o faturamento |
 | "Tive um problema técnico" | Credencial ou modelo do Gemini com problema | Abra a execução com erro em **Executions** |
@@ -182,5 +223,6 @@ A Kira também roda no n8n instalado na VPS. Pontos de atenção:
 4. Crie as tabelas com os mesmos nomes e colunas:
    - `kira_memoria`: `user_id` (texto), `categoria` (texto), `fato` (texto)
    - `kira_logs`: `chat_id`, `user_id`, `usuario`, `tipo_entrada`, `entrada`, `resposta`, `modo_resposta`, `entregue_como`, `status`, `erro`, `execucao_id` (texto) e `latencia_ms` (número)
-5. Importe [`n8n/workflows/kira-1.0.json`](../n8n/workflows/kira-1.0.json) (**Workflows → Import from file**), crie as credenciais dos passos 1 a 3 e preencha o `perfil_dono`.
+   - `kira_linkedin` e `kira_imagens`: veja os passos 10 e 11
+5. Importe [`n8n/workflows/kira-1.0.json`](../n8n/workflows/kira-1.0.json) (**Workflows → Import from file**), crie as credenciais dos passos 1 a 3 e preencha o `perfil_dono`. Para as imagens, importe também os sub-workflows do passo 11.
 6. Desative a Kira do n8n Cloud antes de publicar a da VPS (um bot, um webhook).

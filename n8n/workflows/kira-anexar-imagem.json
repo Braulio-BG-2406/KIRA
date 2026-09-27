@@ -1,0 +1,335 @@
+{
+  "name": "Kira — anexar imagem ao e-mail (ferramenta)",
+  "nodes": [
+    {
+      "id": "05492bed-0a18-4d45-a013-76166851e5b4",
+      "name": "Quando a Kira pedir um anexo",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "rascunho_id",
+              "type": "string"
+            },
+            {
+              "name": "imagem_id",
+              "type": "number"
+            },
+            {
+              "name": "user_id",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "9b7f2e48-a0f8-4304-95b8-fd8a259eb3e5",
+      "name": "Buscar imagem",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        220,
+        300
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "kira_imagens"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ Number($json.imagem_id) || 0 }}"
+            },
+            {
+              "keyName": "user_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.user_id }}"
+            }
+          ]
+        },
+        "limit": 1
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "553ba464-c733-4f72-b824-1e5af1cba1f1",
+      "name": "Imagem encontrada?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        440,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-imagem",
+              "leftValue": "={{ $json.file_id ?? '' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "1fd1d115-b925-4b7f-a39d-c5ed7eeb4374",
+      "name": "Baixar imagem",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        660,
+        200
+      ],
+      "parameters": {
+        "resource": "file",
+        "operation": "get",
+        "fileId": "={{ $json.file_id }}",
+        "download": true,
+        "additionalFields": {}
+      },
+      "credentials": {},
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "ec5be7cb-55ed-4b55-8165-9b508ba335b1",
+      "name": "Imagem em base64",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        880,
+        200
+      ],
+      "parameters": {
+        "operation": "binaryToPropery",
+        "destinationKey": "imagem_base64"
+      }
+    },
+    {
+      "id": "d49b8856-b10d-41ac-b6d8-d2a21ecea54e",
+      "name": "Anexar ao rascunho",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1100,
+        200
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://graph.microsoft.com/v1.0/me/messages/' + encodeURIComponent($('Quando a Kira pedir um anexo').first().json.rascunho_id) + '/attachments' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "microsoftOutlookOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ '@odata.type': '#microsoft.graph.fileAttachment', name: 'kira-imagem-' + $('Buscar imagem').first().json.id + '.jpg', contentType: 'image/jpeg', contentBytes: $json.imagem_base64 }) }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "credentials": {},
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "92f3e06f-3e54-4527-a681-8cc9ff737a0d",
+      "name": "Anexo pronto",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1320,
+        200
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "anx-ok",
+              "name": "ok",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "anx-msg",
+              "name": "mensagem",
+              "value": "={{ 'A imagem #' + $('Buscar imagem').first().json.id + ' foi anexada ao rascunho. Nada foi enviado: o dono revisa e envia pelo Outlook.' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "6f6c29ad-fb0d-4ced-9919-fac8a2a38c10",
+      "name": "Imagem não encontrada",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        660,
+        450
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "nf-ok",
+              "name": "ok",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "nf-erro",
+              "name": "erro",
+              "value": "={{ 'Não encontrei a imagem #' + $('Quando a Kira pedir um anexo').first().json.imagem_id + '. Gere a imagem de novo com gerar_imagem e use o número novo.' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "08fcf02e-cf5a-40d2-9530-fe2b7eeaa3da",
+      "name": "Explicar falha",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        450
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Resume o erro ao anexar a imagem, para a Kira explicar ao dono.\nconst item = $input.first().json;\nconst bruto = item.error ?? item;\nconst textos = [];\nconst coletar = (valor, profundidade = 0) => {\n  if (!valor || profundidade > 4) return;\n  if (typeof valor === 'string') {\n    textos.push(valor);\n    return;\n  }\n  if (typeof valor === 'object') {\n    for (const chave of ['message', 'description']) {\n      if (typeof valor[chave] === 'string') textos.push(valor[chave]);\n    }\n    coletar(valor.error, profundidade + 1);\n  }\n};\ncoletar(bruto);\nconst erro = [...new Set(textos.map((t) => t.trim()).filter(Boolean))].join(' — ').slice(0, 600) || 'erro desconhecido';\n\nreturn [\n  {\n    json: {\n      ok: false,\n      erro,\n      orientacao: 'Não foi possível anexar a imagem. Explique o erro ao dono em poucas palavras; o rascunho continua na pasta Rascunhos, sem a imagem.',\n    },\n  },\n];\n"
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Quando a Kira pedir um anexo": {
+      "main": [
+        [
+          {
+            "node": "Buscar imagem",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar imagem": {
+      "main": [
+        [
+          {
+            "node": "Imagem encontrada?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Imagem encontrada?": {
+      "main": [
+        [
+          {
+            "node": "Baixar imagem",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Imagem não encontrada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Baixar imagem": {
+      "main": [
+        [
+          {
+            "node": "Imagem em base64",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Explicar falha",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Imagem em base64": {
+      "main": [
+        [
+          {
+            "node": "Anexar ao rascunho",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anexar ao rascunho": {
+      "main": [
+        [
+          {
+            "node": "Anexo pronto",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Explicar falha",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Sao_Paulo"
+  },
+  "tags": []
+}

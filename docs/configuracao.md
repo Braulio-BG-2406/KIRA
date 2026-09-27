@@ -18,7 +18,7 @@ Prefere rodar na VPS? Veja [Rodar na VPS](#rodar-na-vps-opcional) no fim.
 4. [Publicar o workflow](#4-publicar)
 5. [Liberar o seu ID do Telegram](#5-liberar-o-seu-id)
 6. [Fazer o primeiro teste](#6-primeiro-teste-)
-7. Opcionais: [Outlook](#7-outlook-e-mails-agenda-e-rascunhos-de-resposta), [Resumo da manhã às 7h](#8-resumo-da-manhã-às-7h), [Google Drive](#9-google-drive-só-leitura), [LinkedIn](#10-linkedin-rascunhos-e-publicar) e [Imagens](#11-imagens-com-ia)
+7. Opcionais: [Outlook](#7-outlook-e-mails-agenda-e-rascunhos-de-resposta), [Resumo da manhã às 7h](#8-resumo-da-manhã-às-7h), [Google Drive](#9-google-drive-só-leitura), [LinkedIn](#10-linkedin-rascunhos-e-publicar), [Imagens](#11-imagens-com-ia), [Teams](#12-microsoft-teams) e [Pedidos](#13-pedidos-planilha-do-erp)
 
 ---
 
@@ -125,14 +125,12 @@ Teste: "Kira, quantos e-mails chegaram hoje?" e "Kira, o que tenho na agenda ama
 
 Workflow separado: **Kira — Resumo da manhã (7h)** ([`n8n/workflows/kira-resumo-da-manha.json`](../n8n/workflows/kira-resumo-da-manha.json)). Todo dia às 7h (Brasília) ele:
 
-1. lê notícias das últimas 24 horas em fontes confiáveis por RSS (g1, Agência Brasil, BBC, InfoMoney, Money Times, Poder360, Tecnoblog, TechCrunch e outras);
-2. pega as cotações de dólar, euro e bitcoin;
-3. pede ao Gemini um resumo curto em cinco seções: Brasil, Mundo, Mercado financeiro, Política e Tecnologia e tendências, cada item com o link da fonte;
-4. manda no Telegram. Se o Gemini falhar, manda só os títulos com link.
+1. lê notícias das últimas 24 horas em fontes confiáveis por RSS (g1, Agência Brasil, BBC, InfoMoney, Money Times, Poder360, Tecnoblog, TechCrunch e outras) e, para **mineração, petróleo, siderurgia e florestal**, publicações do setor e buscas do Google Notícias filtradas por uma lista de veículos confiáveis (Valor, Estadão, g1, Exame, Reuters, imprensa do setor…);
+2. pega as cotações de dólar e euro (Banco Central, PTAX de venda do último dia útil) e do bitcoin (Coinbase);
+3. pede ao Gemini um resumo curto em seis seções: Brasil, Mundo, Mercado financeiro, Mineração/petróleo/siderurgia/florestal, Política e Tecnologia e tendências, cada item com o link da fonte;
+4. manda no Telegram e, logo depois, um **áudio na voz da Kira** (cerca de um minuto e meio, com os destaques). Se o Gemini falhar, manda só os títulos com link.
 
-Para configurar: no nó **Configuração do resumo**, preencha `chat_id` (o seu ID do Telegram, o mesmo de `ids_autorizados`) e publique. As fontes ficam no nó **Fontes** (seção, nome e endereço do RSS). Tudo usa serviços gratuitos.
-
-> A API de cotações (AwesomeAPI) às vezes recusa pedidos vindos do n8n Cloud por limite de uso. Nesse caso o resumo sai sem a linha de cotações.
+Para configurar: no nó **Configuração do resumo**, preencha `chat_id` (o seu ID do Telegram, o mesmo de `ids_autorizados`) e publique. As fontes ficam no nó **Fontes** (seção, nome, endereço do RSS e limite) e a lista de veículos aceitos, no nó **Selecionar notícias**. O áudio usa a voz `Kore` e o modelo `gemini-3.8-flash-tts`; para trocar, crie os campos `voz_tts` e `modelo_voz` na **Configuração do resumo**. Tudo usa serviços gratuitos.
 
 ## 9. Google Drive (só leitura)
 
@@ -171,6 +169,29 @@ Teste: "Kira, gere uma imagem quadrada de um café da manhã com vista para a mo
 
 > O plano gratuito do Gemini tem limite diário de imagens. Quando acaba, a Kira avisa; no dia seguinte volta a funcionar. Os modelos ficam no nó **Preparar pedido** do sub-workflow (um principal e um reserva).
 
+## 12. Microsoft Teams
+
+Três ferramentas, num sub-workflow ([`kira-teams.json`](../n8n/workflows/kira-teams.json)): **conversas_teams** (conversas recentes, com busca por nome), **ler_conversa_teams** (últimas mensagens de uma conversa) e **enviar_mensagem_teams** (mensagem em seu nome numa conversa existente).
+
+A Kira tem liberdade para escrever e responder no Teams **quando você pede** ("Kira, responde a Ana que o pedido sai amanhã"). Ela nunca envia por conta própria, confirma o que mandou e para quem, e trata o que chega no Teams como informação, nunca como ordem (ninguém consegue "mandar" nela pelo chat).
+
+1. No n8n: **Create credential → Microsoft Teams OAuth2 API** → entre com a conta da empresa. Contas corporativas podem exigir aprovação do administrador do Microsoft 365.
+2. Importe o sub-workflow, selecione a credencial nos três nós HTTP, publique e, em **Settings → This workflow can be called by**, escolha só a Kira.
+3. Na Kira, selecione o sub-workflow nas três ferramentas e publique.
+
+Teste: "Kira, quais são minhas conversas mais recentes no Teams?".
+
+## 13. Pedidos (planilha do ERP)
+
+A ferramenta **consultar_pedidos** lê a planilha de pedidos que o ERP exporta todo dia para o SharePoint ([`kira-pedidos.json`](../n8n/workflows/kira-pedidos.json)) e responde por número (pedido, OC, NF, OP, solicitação, material) ou por nome (cliente, material, fornecedor). Também lista atrasados, compras, solicitações e produção, ou dá um resumo, sempre citando a fonte e a data de atualização. A mesma credencial do Teams dá acesso ao arquivo.
+
+1. No sub-workflow, troque `ID_DO_DRIVE` e `ID_DO_ARQUIVO` pelos ids do arquivo no SharePoint (Microsoft Graph) e selecione a credencial do Teams nos dois nós HTTP. Publique e deixe só a Kira chamar.
+2. Na Kira, selecione o sub-workflow em **consultar_pedidos** e publique.
+
+Com isso, "Kira, qual o status do pedido 12345?" ou "deixe pronta a resposta para o e-mail do cliente sobre o pedido 12345" usam os dados reais (a resposta de e-mail continua como rascunho).
+
+> Os dados da empresa passam pelo Gemini. No plano gratuito, o Google pode usar o conteúdo para melhorar os produtos dele; o plano pago não usa.
+
 ## Personalizar
 
 Tudo fica no nó **Configuração da Kira**:
@@ -207,6 +228,8 @@ Durante os testes ficou uma linha de teste em `kira_logs` (usuário "Teste @test
 | Ela diz que não consegue ler seus e-mails | Credencial do Outlook expirou ou foi removida | Reconecte a credencial *Microsoft Outlook* no n8n (passo 7) |
 | O resumo das 7h não chegou | Workflow do resumo desativado ou `chat_id` vazio | Veja o passo 8 e a execução em **Executions** |
 | `/publicar N` responde que não conseguiu | Credencial do LinkedIn expirou ou o campo **Person** está vazio | Reconecte a credencial e confira o passo 10; o rascunho continua guardado |
+| A Kira diz que não consegue ler o Teams ou a planilha de pedidos | Credencial do Teams expirou ou o arquivo mudou de lugar | Reconecte a credencial *Microsoft Teams* e confira os ids do arquivo (passos 12 e 13) |
+| O resumo chegou sem o áudio | Limite diário da voz do Gemini | O texto sempre chega; o áudio volta no dia seguinte (veja a execução em **Executions**) |
 | A Kira diz que não conseguiu gerar a imagem | Limite diário de imagens do plano gratuito ou pedido recusado pelo filtro do Google | Tente amanhã ou mude a descrição; detalhes nas execuções do sub-workflow **Kira — gerar imagem** |
 | "Não consegui processar o seu áudio" | Transcrição sem credencial do Gemini ou modelo indisponível | Selecione a credencial no nó *Transcrever áudio (Gemini)* e confira o modelo |
 | "Atingi o limite de uso do Gemini" | Limite por minuto ou por dia do plano gratuito | Espere alguns minutos ou ative o faturamento |
@@ -224,5 +247,5 @@ A Kira também roda no n8n instalado na VPS. Pontos de atenção:
    - `kira_memoria`: `user_id` (texto), `categoria` (texto), `fato` (texto)
    - `kira_logs`: `chat_id`, `user_id`, `usuario`, `tipo_entrada`, `entrada`, `resposta`, `modo_resposta`, `entregue_como`, `status`, `erro`, `execucao_id` (texto) e `latencia_ms` (número)
    - `kira_linkedin` e `kira_imagens`: veja os passos 10 e 11
-5. Importe [`n8n/workflows/kira-1.0.json`](../n8n/workflows/kira-1.0.json) (**Workflows → Import from file**), crie as credenciais dos passos 1 a 3 e preencha o `perfil_dono`. Para as imagens, importe também os sub-workflows do passo 11.
+5. Importe [`n8n/workflows/kira-1.0.json`](../n8n/workflows/kira-1.0.json) (**Workflows → Import from file**), crie as credenciais dos passos 1 a 3 e preencha o `perfil_dono`. Importe também os sub-workflows das imagens, do Teams e dos pedidos (passos 11 a 13).
 6. Desative a Kira do n8n Cloud antes de publicar a da VPS (um bot, um webhook).

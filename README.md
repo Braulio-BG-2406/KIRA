@@ -2,7 +2,7 @@
 
 Meu bot particular: a **Kira** é uma assistente pessoal de IA que roda no **n8n**, pensa com o **Google Gemini** e conversa comigo pelo **Telegram**, por texto ou por voz.
 
-> **Status: Kira 1.0 no ar**, grátis (chave gratuita do Gemini): Outlook (leitura e rascunhos de resposta), Google Drive (leitura), rascunhos de posts do LinkedIn, imagens com IA e resumo de notícias às 7h. Para montar do zero, siga o [guia de configuração](docs/configuracao.md).
+> **Status: Kira 1.0 no ar**, grátis (chave gratuita do Gemini): Outlook (leitura e rascunhos de resposta), Google Drive (leitura), Microsoft Teams (lê e responde quando você pede), pedidos da empresa (planilha do ERP), rascunhos de posts do LinkedIn, imagens com IA e resumo de notícias às 7h em texto e áudio. Para montar do zero, siga o [guia de configuração](docs/configuracao.md).
 
 ## Como funciona
 
@@ -19,11 +19,13 @@ Meu bot particular: a **Kira** é uma assistente pessoal de IA que roda no **n8n
               │                  ◄── Google Drive (leitura)
               │                  ◄── LinkedIn: rascunhos (publica só com /publicar)
               │                  ◄── imagens com IA (Gemini) ─► Telegram
+              │                  ◄── Teams: lê e responde quando você pede
+              │                  ◄── pedidos: planilha do ERP no SharePoint
               │
               ▼
    resposta falada (voz do Gemini) ou escrita ─► Telegram ─► registro em kira_logs
 
-   ☀️ 7h: notícias (RSS) + cotações ─► resumo do Gemini ─► Telegram
+   ☀️ 7h: notícias (RSS) + cotações ─► resumo do Gemini ─► Telegram (texto + áudio da Kira)
 ```
 
 ## O que a Kira 1.0 faz
@@ -41,7 +43,9 @@ Meu bot particular: a **Kira** é uma assistente pessoal de IA que roda no **n8n
 | 📁 Google Drive | Procura e lê Documentos, Planilhas e Apresentações do Google e arquivos de texto. Só leitura. |
 | 💼 LinkedIn | Escreve o post e guarda como rascunho numerado, com ou sem imagem. Só vai para o LinkedIn quando você manda `/publicar N`. |
 | 🖼️ Imagens | Gera imagens com o Gemini ("Nano Banana") quando você pede, manda no Telegram e numera (#1, #2…) para usar no LinkedIn ou em e-mails. |
-| ☀️ Resumo da manhã | Todo dia às 7h: Brasil, Mundo, Mercado financeiro, Política e Tecnologia, com links das fontes. |
+| 💬 Teams | Lista e lê suas conversas do Microsoft Teams e escreve ou responde em seu nome **quando você pede** ("responde o João que o pedido sai amanhã"). |
+| 📦 Pedidos | Consulta a planilha de pedidos exportada todo dia pelo ERP (pedido, cliente, material, prazos, atraso, compras, solicitações, produção) e responde citando a fonte e a data de atualização. |
+| ☀️ Resumo da manhã | Todo dia às 7h: Brasil, Mundo, Mercado financeiro, Mineração/petróleo/siderurgia/florestal, Política e Tecnologia, com links das fontes, cotações do dia e **áudio na voz da Kira**. |
 
 ## Estrutura do repositório
 
@@ -52,6 +56,8 @@ Meu bot particular: a **Kira** é uma assistente pessoal de IA que roda no **n8n
 | [`n8n/workflows/kira-resumo-da-manha.json`](n8n/workflows/kira-resumo-da-manha.json) | Workflow do resumo de notícias das 7h (e o SDK em [`n8n/sdk/kira-resumo-da-manha.workflow.ts`](n8n/sdk/kira-resumo-da-manha.workflow.ts)) |
 | [`n8n/workflows/kira-gerar-imagem.json`](n8n/workflows/kira-gerar-imagem.json) | Sub-workflow da ferramenta `gerar_imagem` (e o SDK em [`n8n/sdk/kira-gerar-imagem.workflow.ts`](n8n/sdk/kira-gerar-imagem.workflow.ts)) |
 | [`n8n/workflows/kira-anexar-imagem.json`](n8n/workflows/kira-anexar-imagem.json) | Sub-workflow da ferramenta `anexar_imagem_email` (e o SDK em [`n8n/sdk/kira-anexar-imagem.workflow.ts`](n8n/sdk/kira-anexar-imagem.workflow.ts)) |
+| [`n8n/workflows/kira-teams.json`](n8n/workflows/kira-teams.json) | Sub-workflow das ferramentas do Teams (e o SDK em [`n8n/sdk/kira-teams.workflow.ts`](n8n/sdk/kira-teams.workflow.ts)) |
+| [`n8n/workflows/kira-pedidos.json`](n8n/workflows/kira-pedidos.json) | Sub-workflow da ferramenta `consultar_pedidos` (e o SDK em [`n8n/sdk/kira-pedidos.workflow.ts`](n8n/sdk/kira-pedidos.workflow.ts)) |
 | [`docs/configuracao.md`](docs/configuracao.md) | Passo a passo para ativar, primeiro teste e solução de problemas |
 | [`docs/arquitetura.md`](docs/arquitetura.md) | Como tudo se encaixa, decisões técnicas e próximos passos |
 | [`docs/persona-kira.md`](docs/persona-kira.md) | Personalidade e instruções da Kira |
@@ -65,15 +71,15 @@ Com Node.js 18 ou mais recente:
 npm test
 ```
 
-Os testes executam o código dos nós dos workflows (formatação para o Telegram, voz e texto, áudio WAV, comandos, `/publicar` com e sem imagem, geração e anexo de imagens, resumo da manhã), conferem que Outlook e Drive só leem (o Outlook só cria rascunhos) e verificam que nenhum token, chave de API ou caminho de webhook foi parar nos arquivos.
+Os testes executam o código dos nós dos workflows (formatação para o Telegram, voz e texto, áudio WAV, comandos, `/publicar` com e sem imagem, geração e anexo de imagens, Teams, consulta de pedidos, resumo da manhã com cotações, fontes confiáveis e áudio), conferem que Outlook e Drive só leem (o Outlook só cria rascunhos) e verificam que nenhum token, chave de API ou caminho de webhook foi parar nos arquivos.
 
 ## Segurança
 
 - Tokens e chaves de API ficam **só nas credenciais do n8n**. Nunca no chat, no código ou neste repositório.
 - Este repositório é **público**: o perfil pessoal da Kira, os IDs do Telegram e do LinkedIn e os IDs dos sub-workflows ficam preenchidos apenas no n8n.
-- Nada sai em seu nome sem você: e-mails ficam como rascunho e posts só vão para o LinkedIn com `/publicar N`.
+- Nada sai em seu nome sem você: e-mails ficam como rascunho, posts só vão para o LinkedIn com `/publicar N` e mensagens no Teams só saem quando você pede.
 
 ## Roadmap
 
-- **Kira 1.0** (agora): Telegram + Gemini, texto e voz, memória, comandos e logs; Outlook (leitura e rascunhos), Google Drive (leitura), LinkedIn (rascunhos e `/publicar`), imagens com IA e resumo das 7h.
+- **Kira 1.0** (agora): Telegram + Gemini, texto e voz, memória, comandos e logs; Outlook (leitura e rascunhos), Google Drive (leitura), Teams (lê e responde quando você pede), pedidos da empresa, LinkedIn (rascunhos e `/publicar`), imagens com IA e resumo das 7h em texto e áudio.
 - **Kira 2.0**: conectar as áreas **HM** (Microsoft 365: OneDrive, Outlook, documentos e e-mails), **Negócios** (clientes, vendas, estoque, CRM) e **Pessoal** (agenda, estudos, rotina, notícias, finanças). Detalhes em [arquitetura.md](docs/arquitetura.md#próximos-passos-kira-20).

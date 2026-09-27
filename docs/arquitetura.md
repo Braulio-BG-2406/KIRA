@@ -48,7 +48,9 @@ Os nomes em **negrito** são os nós do workflow [`n8n/workflows/kira-1.0.json`]
    - ferramentas do Outlook: **emails_recentes**, **buscar_emails**, **ler_email** e **agenda** (leitura) e **criar_rascunho_resposta** (só rascunho), pelo Microsoft Graph;
    - ferramentas do Google Drive, só leitura: **buscar_arquivos_drive** e **ler_arquivo_drive**;
    - **rascunho_linkedin**: guarda o post (e o número da imagem, se houver) em `kira_linkedin`;
-   - **gerar_imagem** e **anexar_imagem_email**: chamam os sub-workflows de imagem (abaixo).
+   - **gerar_imagem** e **anexar_imagem_email**: chamam os sub-workflows de imagem (abaixo);
+   - **conversas_teams**, **ler_conversa_teams** e **enviar_mensagem_teams**: sub-workflow do Teams;
+   - **consultar_pedidos**: sub-workflow que lê a planilha de pedidos do ERP no SharePoint.
 9. **Resposta da Kira** (ou **Resposta de erro**, se a transcrição ou a IA falharem) padroniza a resposta.
 10. **Resposta pronta** decide voz ou texto e prepara o texto falado e a legenda.
     - Voz: **Gerar voz (Gemini)** → **Preparar áudio (WAV)** → **Áudio para arquivo** → **Enviar áudio**.
@@ -56,10 +58,12 @@ Os nomes em **negrito** são os nós do workflow [`n8n/workflows/kira-1.0.json`]
     - Se a voz falhar, a resposta vai por texto.
 11. **Registrar conversa** grava tudo em `kira_logs`.
 
-### Sub-workflows de imagem
+### Sub-workflows (ferramentas)
 
 - **Kira — gerar imagem (ferramenta)**: **Preparar pedido** (descrição, formato e modelo) → **Registrar imagem** (`kira_imagens`, para ter o número) → **Gerar imagem (Gemini)** (se falhar, **Gerar imagem (reserva)** com outro modelo) → **Extrair imagem** → **Imagem para arquivo** → **Enviar imagem** (foto no Telegram, legenda "🖼️ Imagem #N") → **Guardar arquivo** (o `file_id` do Telegram) → **Imagem pronta**. Qualquer falha cai em **Explicar falha**, que devolve à Kira um motivo curto (por exemplo, fim da cota gratuita).
 - **Kira — anexar imagem ao e-mail (ferramenta)**: **Buscar imagem** (só do próprio usuário) → **Baixar imagem** (do Telegram) → **Imagem em base64** → **Anexar ao rascunho** (Microsoft Graph, anexo do rascunho) → **Anexo pronto**.
+- **Kira — Teams (ferramenta)**: **Qual ação?** separa listar, ler e enviar. Listar: **Buscar conversas** (Graph, com participantes e última mensagem) → **Resumir conversas** (tira o dono da lista, filtra por nome, ordena pela mais recente). Ler: **Buscar mensagens** → **Resumir mensagens** (texto limpo, em ordem). Enviar: **Preparar envio** (HTML seguro) → **Enviar mensagem** → **Mensagem enviada**. Erros viram **Explicar falha**.
+- **Kira — pedidos (ferramenta)**: **Informações do arquivo** (nome e data de atualização) → **Baixar planilha** → **Ler planilha** (xlsx) → **Consultar planilha** (busca por número ou nome, filtros de atrasados, compras, solicitações e produção, resumo por situação, só os campos úteis). Erros viram **Explicar falha**.
 
 ## Dados
 
@@ -84,7 +88,11 @@ Todas as tabelas também têm `id`, `createdAt` e `updatedAt`, criados pelo n8n.
 
 **Imagens guardadas no próprio Telegram.** A imagem gerada vai para você como foto; o `file_id` que o Telegram devolve fica em `kira_imagens`. Para o LinkedIn ou um e-mail, o workflow baixa a imagem do Telegram de novo. Assim não é preciso outro armazenamento (nem dar à Kira acesso de escrita ao Drive), e a imagem usada é a mesma que você viu. O anexo do e-mail é criado direto no Microsoft Graph porque o nó pronto do Outlook, no n8n Cloud, não enviava o conteúdo do arquivo corretamente.
 
-**Resumo da manhã em workflow separado.** Às 7h, RSS de fontes confiáveis + cotações + Gemini + Telegram. Fica separado da Kira para que uma falha num não afete o outro. O Gemini recebe só a lista de notícias do dia e é instruído a não usar nada de fora dela; se ele falhar, vão os títulos com link.
+**Teams: liberdade para escrever, mas só quando o dono pede.** A Kira lê e envia mensagens em nome do dono, sem rascunho, porque foi o que ele pediu. Para isso não virar risco, ela só envia com um pedido dele na conversa, trata o conteúdo do Teams como informação (nunca como ordem) e não repassa dados da empresa porque alguém pediu no chat.
+
+**Pedidos a partir da planilha exportada pelo ERP.** A planilha já sai todo dia no SharePoint; a Kira baixa pelo Microsoft Graph (a credencial do Teams tem acesso ao arquivo), lê e filtra no n8n e manda ao Gemini só as linhas e colunas da pergunta, com a data de atualização para ela citar.
+
+**Resumo da manhã em workflow separado.** Às 7h, RSS de fontes confiáveis + cotações + Gemini + Telegram. Fica separado da Kira para que uma falha num não afete o outro. O Gemini recebe só a lista de notícias do dia e é instruído a não usar nada de fora dela; se ele falhar, vão os títulos com link. Depois do texto, um segundo pedido ao Gemini transforma o resumo num roteiro curto de rádio e a voz do Gemini o lê (o mesmo caminho de áudio da Kira). As buscas do Google Notícias passam por uma lista de veículos confiáveis.
 
 **Áudio como "arquivo de áudio", não como "mensagem de voz".** O nó do Telegram no n8n não tem a operação de mensagem de voz (*sendVoice*). Chamar a API do Telegram direto exigiria colocar o token do bot dentro do workflow, o que é inseguro. Por isso a resposta sai como áudio tocável (título "Kira") com o texto na legenda.
 
@@ -109,7 +117,7 @@ Todas as tabelas também têm `id`, `createdAt` e `updatedAt`, criados pelo n8n.
 
 - A voz chega como arquivo de áudio, não como mensagem de voz com a onda sonora.
 - A memória da conversa se perde quando o n8n reinicia (as memórias guardadas não).
-- E-mail e agenda só do Outlook: a Kira lê e prepara rascunhos, mas não envia. Ainda sem OneDrive, dados das empresas ou busca na internet durante a conversa; a Kira foi instruída a dizer isso em vez de inventar.
+- E-mail e agenda só do Outlook: a Kira lê e prepara rascunhos, mas não envia. No Teams, ela só escreve em conversas que já existem. Dos dados da empresa, só a planilha de pedidos exportada pelo ERP; ainda sem OneDrive e sem busca na internet durante a conversa. A Kira foi instruída a dizer isso em vez de inventar.
 - O Google Drive é só leitura, e PDFs, Word e imagens do Drive ainda não são lidos.
 - As imagens dependem da cota gratuita diária do Gemini.
 - O resumo das 7h é enviado por outro workflow: a Kira da conversa não "lembra" dele.
@@ -119,10 +127,10 @@ Todas as tabelas também têm `id`, `createdAt` e `updatedAt`, criados pelo n8n.
 ## Próximos passos (Kira 2.0)
 
 1. **Uma área por vez**, começando pela que der mais retorno, cada uma como um sub-agente ou ferramenta da Kira com permissões mínimas:
-   - **HM**: Microsoft 365. Outlook (e-mails e agenda, leitura) já conectado; falta OneDrive.
+   - **HM**: Microsoft 365. Outlook (leitura e rascunhos), Teams e a planilha de pedidos do ERP já conectados; faltam o OneDrive e os rascunhos automáticos para e-mails que perguntam de pedidos.
    - **Negócios**: clientes, vendas, estoque e CRM (fontes a definir).
    - **Pessoal**: agenda, estudos, rotina, notícias e finanças.
 2. **Memória persistente da conversa** (por exemplo, *Postgres Chat Memory*), para não perder o contexto em reinícios.
 3. **Kira proativa**: o resumo de notícias das 7h já existe; falta juntar agenda e pendências do dia.
 4. **Fotos e documentos**, aproveitando que o Gemini é multimodal.
-5. **Privacidade**: plano pago do Gemini antes de conectar dados das empresas, e este repositório privado se ele passar a guardar qualquer coisa sensível.
+5. **Privacidade**: e-mails, Teams e pedidos já passam pelo Gemini no plano gratuito, por escolha do dono; o plano pago evita que o Google use esse conteúdo. Este repositório deve ficar privado se passar a guardar qualquer coisa sensível.

@@ -71,13 +71,22 @@ const entradaNormalizada = {
 };
 
 let falhas = 0;
+const pendentes = [];
 function teste(nome, fn) {
-  try {
-    fn();
-    console.log(`ok    ${nome}`);
-  } catch (erro) {
+  const registrar = (erro) => {
+    if (!erro) return console.log(`ok    ${nome}`);
     falhas += 1;
     console.log(`FALHA ${nome}\n      ${erro.message}`);
+  };
+  try {
+    const resultado = fn();
+    if (resultado && typeof resultado.then === 'function') {
+      pendentes.push(resultado.then(() => registrar(), registrar));
+      return;
+    }
+    registrar();
+  } catch (erro) {
+    registrar(erro);
   }
 }
 
@@ -430,7 +439,7 @@ teste('resumo: roda às 7h no horário de Brasília', () => {
 });
 teste('resumo: todas as seções têm fontes e o Gemini não inventa (só usa a lista)', () => {
   const fontes = executar(nosResumo.Fontes.parameters.jsCode, {});
-  for (const secao of ['Brasil', 'Mundo', 'Mercado financeiro', 'Política', 'Tecnologia e tendências']) {
+  for (const secao of ['Brasil', 'Mundo', 'Mercado financeiro', 'Mineração, petróleo, siderurgia e florestal', 'Política', 'Tecnologia e tendências']) {
     assert.ok(fontes.filter((f) => f.secao === secao).length >= 2, secao);
   }
   assert.match(nosResumo['Resumir (Gemini)'].parameters.options.systemMessage, /SOMENTE as notícias/);
@@ -444,9 +453,145 @@ teste('resumo: reserva sem IA monta títulos com link', () => {
   assert.match(m.html, /• Fato \(<a href="https:\/\/x\/1">BBC<\/a>\)/);
   assert.equal(htmlValidoParaTelegram(m.html), true);
 });
+teste('resumo: setores só com veículos confiáveis do Google Notícias', () => {
+  const agora = new Date().toISOString();
+  const busca = { secao: 'Mineração, petróleo, siderurgia e florestal', fonte: 'Google Notícias: petróleo', limite: 4 };
+  const itens = [
+    { title: 'Petrobras anuncia novo poço - Valor Econômico', link: 'https://news.google.com/rss/articles/1', isoDate: agora },
+    { title: 'Time vence o Siderúrgica - Jornal Local', link: 'https://news.google.com/rss/articles/2', isoDate: agora },
+    { title: 'Sem veículo no título', link: 'https://news.google.com/rss/articles/3', isoDate: agora },
+  ];
+  const $ = (nome) => {
+    if (nome === 'Configuração do resumo') return { first: () => ({ json: { itens_por_fonte: 6, horas: 24 } }) };
+    if (nome === 'Fontes') return { itemMatching: () => ({ json: busca }) };
+    throw new Error(nome);
+  };
+  const [sel] = new Function('$', '$input', nosResumo['Selecionar notícias'].parameters.jsCode)($, { all: () => itens.map((json) => ({ json })) }).map((i) => i.json);
+  assert.equal(sel.total, 1);
+  assert.equal(sel.noticias[0].fonte, 'Valor Econômico');
+  assert.equal(sel.noticias[0].titulo, 'Petrobras anuncia novo poço');
+});
+teste('resumo: cotações do Banco Central e da Coinbase, cada uma independente', async () => {
+  const codigo = nosResumo['Cotações do dia'].parameters.jsCode;
+  const rodar = async (respostas) => {
+    const helpers = { httpRequest: async ({ url }) => { const r = respostas(url); if (r instanceof Error) throw r; return r; } };
+    const tempo = { now: () => ({ setZone() { return this; }, minus() { return this; }, toFormat: () => '2026-09-26' }) };
+    const fn = new Function('DateTime', `return (async function () { ${codigo} });`)(tempo);
+    return (await fn.call({ helpers }))[0].json;
+  };
+  const ok = (url) =>
+    url.includes('sgs.1/') ? [{ valor: '5.00' }, { valor: '5.10' }]
+    : url.includes('sgs.21619/') ? [{ valor: '6.00' }, { valor: '5.94' }]
+    : url.includes('date=') ? { data: { amount: '400000' } }
+    : { data: { amount: '404000' } };
+  const r = await rodar(ok);
+  assert.ok(Math.abs(r.USDBRL.pctChange - 2) < 1e-9);
+  assert.equal(r.BTCBRL.bid, 404000);
+  const parcial = await rodar((url) => (url.includes('bcb') ? new Error('403') : ok(url)));
+  assert.equal(parcial.USDBRL, undefined);
+  assert.equal(parcial.BTCBRL.bid, 404000);
+  assert.deepEqual(parcial.falhas, ['USDBRL: 403', 'EURBRL: 403']);
+});
+teste('resumo: depois do texto vem o áudio da Kira (roteiro + voz do Gemini)', () => {
+  const proximo = (nome) => resumo.connections[nome].main[0][0].node;
+  assert.equal(proximo('Enviar resumo'), 'Texto para a voz');
+  assert.equal(proximo('Texto para a voz'), 'Roteiro da voz (Gemini)');
+  assert.equal(proximo('Roteiro da voz (Gemini)'), 'Voz do resumo (Gemini)');
+  assert.equal(proximo('Voz do resumo (Gemini)'), 'Preparar áudio (WAV)');
+  assert.equal(proximo('Preparar áudio (WAV)'), 'Áudio para arquivo');
+  assert.equal(proximo('Áudio para arquivo'), 'Enviar áudio do resumo');
+  assert.equal(nosResumo['Enviar áudio do resumo'].parameters.operation, 'sendAudio');
+  const anteriores = {
+    'Resumir (Gemini)': { mergedResponse: '- Fato ([g1](https://g1.globo.com/a)) e https://x.com/b' },
+    'Configuração do resumo': { nome_dono: 'Bráulio' },
+  };
+  const $ = (nome) => ({ isExecuted: nome in anteriores, first: () => ({ json: anteriores[nome] }) });
+  const [voz] = new Function('$', nosResumo['Texto para a voz'].parameters.jsCode)($).map((i) => i.json);
+  assert.equal(voz.resumo, '- Fato (g1) e');
+  assert.equal(voz.nome, 'Bráulio');
+});
+
 teste('resumo: repositório sem chat_id preenchido', () => {
   const chat = nosResumo['Configuração do resumo'].parameters.assignments.assignments.find((a) => a.name === 'chat_id');
   assert.equal(chat.value, '');
+});
+
+// ---------- Teams ----------
+const teams = JSON.parse(ler('n8n/workflows/kira-teams.json'));
+const tempoTeams = { fromISO: (iso) => ({ setZone: () => ({ toFormat: () => `(${iso})` }) }) };
+const rodarTeams = (nome, entradaTrigger, entrada) =>
+  new Function('$', '$input', 'DateTime', noDe(teams, nome).parameters.jsCode)(
+    () => ({ first: () => ({ json: entradaTrigger }) }),
+    { first: () => ({ json: entrada }) },
+    tempoTeams,
+  ).map((i) => i.json);
+teste('teams: ferramentas da Kira (listar, ler e enviar) no sub-workflow', () => {
+  for (const [nome, acao] of [['conversas_teams', 'listar'], ['ler_conversa_teams', 'ler'], ['enviar_mensagem_teams', 'enviar']]) {
+    assert.equal(nos[nome]?.type, '@n8n/n8n-nodes-langchain.toolWorkflow', nome);
+    assert.equal(nos[nome].parameters.workflowInputs.value.acao, acao, nome);
+    assert.equal(workflow.connections[nome].ai_tool[0][0].node, 'Kira', nome);
+    assert.equal(nos[nome].parameters.workflowId.value, '', nome);
+  }
+  assert.match(nos.Kira.parameters.options.systemMessage, /Envie só quando ele pedir/);
+});
+teste('teams: conversas resumidas, com o dono fora da lista e busca por nome', () => {
+  const dono = { userId: 'eu', displayName: 'Dono' };
+  const [r] = rodarTeams('Resumir conversas', { busca: 'joao', quantidade: 5 }, {
+    value: [
+      { id: 'c1', chatType: 'oneOnOne', members: [dono, { userId: 'u1', displayName: 'João Silva' }], lastMessagePreview: { createdDateTime: '2026-09-27T12:00:00Z', from: { user: { displayName: 'João Silva' } }, body: { content: '<p>Oi &amp; tudo bem?</p>' } } },
+      { id: 'c2', chatType: 'group', topic: 'Compras', members: [dono, { userId: 'u2', displayName: 'Maria' }] },
+    ],
+  });
+  assert.equal(r.total, 1);
+  assert.deepEqual(r.conversas[0].pessoas, ['João Silva']);
+  assert.equal(r.conversas[0].ultima_mensagem.texto, 'Oi & tudo bem?');
+});
+teste('teams: mensagens em ordem e envio só em conversa existente (HTML seguro)', () => {
+  const [m] = rodarTeams('Resumir mensagens', { chat_id: 'c1' }, {
+    value: [
+      { messageType: 'message', createdDateTime: 'B', from: { user: { displayName: 'João' } }, body: { content: '<div>Segunda</div>' } },
+      { messageType: 'systemEventMessage', body: { content: '' } },
+      { messageType: 'message', createdDateTime: 'A', from: { user: { displayName: 'Dono' } }, body: { content: 'Primeira' } },
+    ],
+  });
+  assert.deepEqual(m.mensagens.map((x) => x.texto), ['Primeira', 'Segunda']);
+  const [e] = rodarTeams('Preparar envio', { chat_id: 'c1', texto: 'Oi\n<pedido> & prazo' }, {});
+  assert.deepEqual(JSON.parse(e.corpo), { body: { contentType: 'html', content: 'Oi<br>&lt;pedido&gt; &amp; prazo' } });
+  assert.throws(() => rodarTeams('Preparar envio', { chat_id: '', texto: 'x' }, {}), /id da conversa/);
+  const enviar = noDe(teams, 'Enviar mensagem').parameters;
+  assert.equal(enviar.method, 'POST');
+  assert.match(enviar.url, /graph\.microsoft\.com\/v1\.0\/chats\/' \+ encodeURIComponent\(\$json\.chat_id\) \+ '\/messages'/);
+});
+
+// ---------- Pedidos (planilha do ERP) ----------
+const pedidos = JSON.parse(ler('n8n/workflows/kira-pedidos.json'));
+teste('pedidos: busca por número e por nome, filtros e resumo, sem inventar campos', () => {
+  const linhas = [
+    { CD_PEDIDO: 1001, SEQUENCIA: 1, CLIENTE_FANTASIA: 'Mineradora Alfa', CD_MATERIAL: 555, DESC_MATERIAL: 'Bomba hidráulica', SITUACAO_PEDIDO: 'Aberto', ATRASO: 5, CD_ORDEM: 9001, NOME_FORNECEDOR_OC: 'Fornecedor X' },
+    { CD_PEDIDO: 1001, SEQUENCIA: 2, CLIENTE_FANTASIA: 'Mineradora Alfa', DESC_MATERIAL: 'Válvula', SITUACAO_PEDIDO: 'Aberto', ATRASO: 0, CD_SOLICITACAO: 7001 },
+    { CD_PEDIDO: 2002, SEQUENCIA: 1, CLIENTE_FANTASIA: 'Siderúrgica Beta', CD_MATERIAL: 1001, DESC_MATERIAL: 'Cilindro', SITUACAO_PEDIDO: 'Faturado', NF: 12345, OP: 3003 },
+  ];
+  const tempo = { fromMillis: () => ({ toFormat: () => '' }), fromISO: () => ({ setZone: () => ({ toFormat: () => '27/09/2026 às 10:44' }) }) };
+  const consultar = (entrada) =>
+    new Function('$', '$input', 'DateTime', noDe(pedidos, 'Consultar planilha').parameters.jsCode)(
+      (nome) => ({ first: () => ({ json: nome === 'Informações do arquivo' ? { name: 'pedidos.xlsx', lastModifiedDateTime: 'x' } : entrada }) }),
+      { all: () => linhas.map((json) => ({ json })) },
+      tempo,
+    )[0].json;
+  assert.equal(consultar({ busca: '1001' }).resumo.itens, 3, 'pedido 1001 e material 1001');
+  const beta = consultar({ busca: 'siderurgica' });
+  assert.deepEqual([beta.itens[0].nf, beta.itens[0].op], ['12345', '3003']);
+  assert.equal(beta.itens[0].compra, undefined, 'campos vazios não aparecem');
+  assert.equal(consultar({ tipo: 'atrasados' }).resumo.itens, 1);
+  assert.equal(consultar({ tipo: 'solicitacao' }).itens[0].solicitacao.numero, '7001');
+  assert.equal(consultar({ tipo: 'resumo' }).itens.length, 0);
+  assert.match(consultar({ busca: 'nada' }).orientacao, /Nada encontrado/);
+  assert.match(consultar({ busca: '1001' }).fonte, /pedidos\.xlsx do ERP, atualizada em 27\/09\/2026/);
+});
+teste('pedidos: repositório sem os ids do arquivo; a Kira tem a ferramenta', () => {
+  assert.match(noDe(pedidos, 'Baixar planilha').parameters.url, /drives\/ID_DO_DRIVE\/items\/ID_DO_ARQUIVO\/content$/);
+  assert.equal(workflow.connections.consultar_pedidos.ai_tool[0][0].node, 'Kira');
+  assert.equal(nos.consultar_pedidos.parameters.workflowId.value, '');
 });
 
 teste('segurança: nenhum token do Telegram, chave do Google ou caminho de webhook nos arquivos', () => {
@@ -459,6 +604,10 @@ teste('segurança: nenhum token do Telegram, chave do Google ou caminho de webho
     'n8n/sdk/kira-gerar-imagem.workflow.ts',
     'n8n/workflows/kira-anexar-imagem.json',
     'n8n/sdk/kira-anexar-imagem.workflow.ts',
+    'n8n/workflows/kira-teams.json',
+    'n8n/sdk/kira-teams.workflow.ts',
+    'n8n/workflows/kira-pedidos.json',
+    'n8n/sdk/kira-pedidos.workflow.ts',
   ];
   for (const arquivo of arquivos) {
     const conteudo = ler(arquivo);
@@ -468,5 +617,6 @@ teste('segurança: nenhum token do Telegram, chave do Google ou caminho de webho
   }
 });
 
+await Promise.all(pendentes);
 console.log(falhas ? `\n${falhas} teste(s) falharam` : '\nTodos os testes passaram');
 process.exit(falhas ? 1 : 0);

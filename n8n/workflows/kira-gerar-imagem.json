@@ -2,7 +2,7 @@
   "name": "Kira — gerar imagem (ferramenta)",
   "nodes": [
     {
-      "id": "cf4ba0bb-cc10-4076-bc95-916a1793addf",
+      "id": "c30c7b7e-0353-4c6f-a610-87fc8585e0bd",
       "name": "Quando a Kira pedir uma imagem",
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1.1,
@@ -43,7 +43,7 @@
       }
     },
     {
-      "id": "04cc9b5d-1133-4e28-bcb3-7634813485ee",
+      "id": "f7bdb191-98bd-40bf-a42d-65789d19a06b",
       "name": "Preparar pedido",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -58,7 +58,7 @@
       }
     },
     {
-      "id": "e48c9e0c-2685-4dde-b04d-bce3e5723f93",
+      "id": "7e5adeed-1969-454e-aa5d-dd2acc636abf",
       "name": "Registrar imagem",
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
@@ -155,7 +155,7 @@
       }
     },
     {
-      "id": "969a47d5-b362-41b9-bd79-5db6fa704555",
+      "id": "59b2604a-5877-4a73-a8a8-445d13e28450",
       "name": "Gerar imagem (Gemini)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.5,
@@ -179,7 +179,7 @@
       "onError": "continueErrorOutput"
     },
     {
-      "id": "bba4c6e1-77fe-4417-9521-d65d10c8e63c",
+      "id": "b04c73c9-4162-4c21-a33d-35fd34c327da",
       "name": "Extrair imagem",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -195,7 +195,7 @@
       "onError": "continueErrorOutput"
     },
     {
-      "id": "7352b971-ad3e-4108-a2fc-4fc0090bdc9e",
+      "id": "62360789-e726-4c9b-a524-baf00d40c1f5",
       "name": "Imagem para arquivo",
       "type": "n8n-nodes-base.convertToFile",
       "typeVersion": 1.1,
@@ -213,7 +213,7 @@
       }
     },
     {
-      "id": "7d97d025-cc77-4d4a-8858-9d8d497e8806",
+      "id": "bfe736ee-df61-46cc-ad0e-a5e0d9143b49",
       "name": "Enviar imagem",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
@@ -235,7 +235,7 @@
       "onError": "continueErrorOutput"
     },
     {
-      "id": "0e3a1ff8-e5d7-4f17-a289-378983b7e5df",
+      "id": "77272229-ddf1-47b9-a0a2-603a3782097f",
       "name": "Guardar arquivo",
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
@@ -283,7 +283,7 @@
       }
     },
     {
-      "id": "3d92e67f-836d-4c9e-a295-370c8dfea829",
+      "id": "b9e13090-63b5-4c0c-aa74-2a1feb26188c",
       "name": "Imagem pronta",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
@@ -320,7 +320,7 @@
       }
     },
     {
-      "id": "74886571-ccca-4df1-8405-ec05c21a5aef",
+      "id": "f766ca47-c44a-40fe-a087-57addf841dc4",
       "name": "Gerar imagem (reserva)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.5,
@@ -344,7 +344,7 @@
       "onError": "continueErrorOutput"
     },
     {
-      "id": "a7ccbc26-3271-4216-84c1-2bbf7f7f382a",
+      "id": "e4be24de-b157-4e31-a7d2-3436ba5728b6",
       "name": "Explicar falha",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,

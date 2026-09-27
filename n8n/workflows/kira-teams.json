@@ -1,0 +1,488 @@
+{
+  "name": "Kira — Teams (ferramenta)",
+  "nodes": [
+    {
+      "id": "3ebb803f-3ffc-4745-a175-63d7bd85ed77",
+      "name": "Quando a Kira usar o Teams",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "acao",
+              "type": "string"
+            },
+            {
+              "name": "busca",
+              "type": "string"
+            },
+            {
+              "name": "chat_id",
+              "type": "string"
+            },
+            {
+              "name": "texto",
+              "type": "string"
+            },
+            {
+              "name": "quantidade",
+              "type": "number"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "49c5137f-15d9-4aa9-a5a5-b578758325d1",
+      "name": "Qual ação?",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        300
+      ],
+      "parameters": {
+        "mode": "rules",
+        "rules": {
+          "values": [
+            {
+              "renameOutput": true,
+              "outputKey": "Listar",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "acao-listar",
+                    "leftValue": "={{ $json.acao }}",
+                    "rightValue": "listar",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "renameOutput": true,
+              "outputKey": "Ler",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "acao-ler",
+                    "leftValue": "={{ $json.acao }}",
+                    "rightValue": "ler",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "renameOutput": true,
+              "outputKey": "Enviar",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "acao-enviar",
+                    "leftValue": "={{ $json.acao }}",
+                    "rightValue": "enviar",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "Outra"
+        }
+      }
+    },
+    {
+      "id": "c81cda0b-7b28-4685-a88b-33a92980cd31",
+      "name": "Buscar conversas",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        480,
+        100
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://graph.microsoft.com/v1.0/me/chats",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "microsoftTeamsOAuth2Api",
+        "sendQuery": true,
+        "specifyQuery": "keypair",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "$expand",
+              "value": "members,lastMessagePreview"
+            },
+            {
+              "name": "$top",
+              "value": "50"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "credentials": {},
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "84d4fbcf-8ddd-4616-ae42-9e5ad35a292a",
+      "name": "Resumir conversas",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        700,
+        100
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Resume as conversas do Teams: com quem é, a última mensagem e quando (horário de Brasília).\n// Filtra pelo nome da pessoa ou do grupo (busca) e devolve as mais recentes primeiro.\nconst entrada = $('Quando a Kira usar o Teams').first().json;\nconst normalizar = (s) => String(s ?? '').toLowerCase().normalize('NFD').replace(/[^a-z0-9 ]/g, '').replace(/\\s+/g, ' ').trim();\nconst textoDe = (html) =>\n  String(html ?? '')\n    .replace(/<br\\s*\\/?>/gi, '\\n')\n    .replace(/<\\/p>/gi, '\\n')\n    .replace(/<[^>]+>/g, '')\n    .replace(/&nbsp;/g, ' ')\n    .replace(/&lt;/g, '<')\n    .replace(/&gt;/g, '>')\n    .replace(/&quot;/g, '\"')\n    .replace(/&#39;/g, \"'\")\n    .replace(/&amp;/g, '&')\n    .replace(/[ \\t]+\\n/g, '\\n')\n    .trim();\nconst quando = (iso) => (iso ? DateTime.fromISO(iso).setZone('America/Sao_Paulo').toFormat('dd/MM HH:mm') : '');\nconst TIPOS = { oneOnOne: 'individual', group: 'grupo', meeting: 'reunião' };\n\nconst chats = $input.first().json.value ?? [];\n// O dono aparece em todas as conversas: é o participante mais frequente.\nconst contagem = new Map();\nfor (const c of chats) for (const m of c.members ?? []) if (m.userId) contagem.set(m.userId, (contagem.get(m.userId) ?? 0) + 1);\nconst dono = chats.length > 1 ? [...contagem.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] : null;\n\nconst busca = normalizar(entrada.busca);\nconst quantidade = Math.min(Math.max(Number(entrada.quantidade) || 10, 1), 30);\nconst conversas = chats\n  .map((c) => {\n    const todas = (c.members ?? []).filter((m) => m.userId !== dono).map((m) => m.displayName).filter(Boolean);\n    const pessoas = todas.length > 8 ? [...todas.slice(0, 8), `e mais ${todas.length - 8}`] : todas;\n    const ultima = c.lastMessagePreview ?? null;\n    return {\n      chat_id: c.id,\n      tipo: TIPOS[c.chatType] ?? c.chatType,\n      nome: c.topic || (todas.length > 4 ? `${todas.slice(0, 4).join(', ')} e mais ${todas.length - 4}` : todas.join(', ')) || '(sem nome)',\n      pessoas,\n      todas,\n      ultima_mensagem: ultima?.body\n        ? { de: ultima.from?.user?.displayName ?? '', quando: quando(ultima.createdDateTime), texto: textoDe(ultima.body.content).slice(0, 200) }\n        : null,\n      data: ultima?.createdDateTime ?? c.lastUpdatedDateTime ?? '',\n    };\n  })\n  .filter((c) => !busca || normalizar([c.nome, ...c.todas].join(' ')).includes(busca))\n  .sort((a, b) => String(b.data).localeCompare(String(a.data)));\n\nreturn [{ json: { total: conversas.length, conversas: conversas.slice(0, quantidade).map(({ data, todas, ...c }) => c) } }];\n"
+      }
+    },
+    {
+      "id": "9b4f4bb2-11cb-4a12-a250-8a77baaf44b1",
+      "name": "Buscar mensagens",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        480,
+        300
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://graph.microsoft.com/v1.0/me/chats/' + encodeURIComponent(String($json.chat_id ?? '').trim()) + '/messages' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "microsoftTeamsOAuth2Api",
+        "sendQuery": true,
+        "specifyQuery": "keypair",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "$top",
+              "value": "={{ Math.min(Math.max(Number($json.quantidade) || 15, 1), 50) }}"
+            },
+            {
+              "name": "$orderby",
+              "value": "createdDateTime desc"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "credentials": {},
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "0f4ef089-9410-472e-a192-1ea667d1b60a",
+      "name": "Resumir mensagens",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        700,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Resume as mensagens de uma conversa do Teams, da mais antiga para a mais nova.\nconst entrada = $('Quando a Kira usar o Teams').first().json;\nconst textoDe = (html) =>\n  String(html ?? '')\n    .replace(/<br\\s*\\/?>/gi, '\\n')\n    .replace(/<\\/p>/gi, '\\n')\n    .replace(/<[^>]+>/g, '')\n    .replace(/&nbsp;/g, ' ')\n    .replace(/&lt;/g, '<')\n    .replace(/&gt;/g, '>')\n    .replace(/&quot;/g, '\"')\n    .replace(/&#39;/g, \"'\")\n    .replace(/&amp;/g, '&')\n    .replace(/[ \\t]+\\n/g, '\\n')\n    .trim();\nconst quando = (iso) => (iso ? DateTime.fromISO(iso).setZone('America/Sao_Paulo').toFormat('dd/MM HH:mm') : '');\n\nconst mensagens = ($input.first().json.value ?? [])\n  .filter((m) => m.messageType === 'message' && !m.deletedDateTime)\n  .map((m) => ({\n    de: m.from?.user?.displayName ?? m.from?.application?.displayName ?? '',\n    quando: quando(m.createdDateTime),\n    texto: textoDe(m.body?.content).slice(0, 800),\n    anexos: (m.attachments ?? []).map((a) => a.name).filter(Boolean),\n  }))\n  .reverse();\n\nreturn [{ json: { chat_id: entrada.chat_id, total: mensagens.length, mensagens } }];\n"
+      }
+    },
+    {
+      "id": "6a17287e-4ad3-4d4d-a18b-654b408e1195",
+      "name": "Preparar envio",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        500
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Confere o pedido de envio e monta a mensagem (texto simples vira HTML seguro, com quebras de linha).\nconst entrada = $('Quando a Kira usar o Teams').first().json;\nconst chat = String(entrada.chat_id ?? '').trim();\nconst texto = String(entrada.texto ?? '').trim();\nif (!chat) throw new Error('Faltou o id da conversa: use conversas_teams para achar a conversa certa.');\nif (!texto) throw new Error('Faltou o texto da mensagem.');\nconst html = texto.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\\n/g, '<br>');\nreturn [{ json: { chat_id: chat, corpo: JSON.stringify({ body: { contentType: 'html', content: html } }) } }];\n"
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "72a4f2a9-e9bf-4930-adac-06ccb188ee5c",
+      "name": "Enviar mensagem",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        700,
+        500
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://graph.microsoft.com/v1.0/chats/' + encodeURIComponent($json.chat_id) + '/messages' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "microsoftTeamsOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.corpo }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "credentials": {},
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "381bbff5-b426-4cf1-ab3a-583731dc36e9",
+      "name": "Mensagem enviada",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        920,
+        500
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "env-ok",
+              "name": "ok",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "env-id",
+              "name": "mensagem_id",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "env-quando",
+              "name": "enviada_em",
+              "value": "={{ DateTime.fromISO($json.createdDateTime).setZone('America/Sao_Paulo').toFormat('dd/MM/yyyy HH:mm') }}",
+              "type": "string"
+            },
+            {
+              "id": "env-msg",
+              "name": "orientacao",
+              "value": "Mensagem enviada no Teams. Confirme ao dono o que foi enviado e para quem.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "d51216e5-bebf-49bc-af84-7c89cae23453",
+      "name": "Ação inválida",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        480,
+        700
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "inv-ok",
+              "name": "ok",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "inv-erro",
+              "name": "erro",
+              "value": "={{ 'Ação desconhecida: ' + ($json.acao || '(vazia)') + '. Use listar, ler ou enviar.' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "cfdb15e8-383b-4c37-a937-f6405d0d3185",
+      "name": "Explicar falha",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        920,
+        700
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Resume o erro para a Kira explicar ao dono.\nconst item = $input.first().json;\nconst bruto = item.error ?? item;\nconst textos = [];\nconst coletar = (valor, profundidade = 0) => {\n  if (!valor || profundidade > 4) return;\n  if (typeof valor === 'string') {\n    textos.push(valor);\n    return;\n  }\n  if (typeof valor === 'object') {\n    for (const chave of ['message', 'description']) {\n      if (typeof valor[chave] === 'string') textos.push(valor[chave]);\n    }\n    coletar(valor.error, profundidade + 1);\n  }\n};\ncoletar(bruto);\nconst erro = [...new Set(textos.map((t) => t.trim()).filter(Boolean))].join(' — ').slice(0, 600) || 'erro desconhecido';\n\nreturn [{ json: { ok: false, erro, orientacao: 'Não deu certo no Teams. Explique o erro ao dono em poucas palavras; nada foi enviado.' } }];\n"
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Quando a Kira usar o Teams": {
+      "main": [
+        [
+          {
+            "node": "Qual ação?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Qual ação?": {
+      "main": [
+        [
+          {
+            "node": "Buscar conversas",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Buscar mensagens",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Preparar envio",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ação inválida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar conversas": {
+      "main": [
+        [
+          {
+            "node": "Resumir conversas",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Explicar falha",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar mensagens": {
+      "main": [
+        [
+          {
+            "node": "Resumir mensagens",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Explicar falha",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar envio": {
+      "main": [
+        [
+          {
+            "node": "Enviar mensagem",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Explicar falha",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar mensagem": {
+      "main": [
+        [
+          {
+            "node": "Mensagem enviada",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Explicar falha",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Sao_Paulo"
+  },
+  "tags": []
+}

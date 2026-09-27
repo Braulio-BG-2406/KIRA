@@ -2,7 +2,7 @@
   "name": "Kira — anexar imagem ao e-mail (ferramenta)",
   "nodes": [
     {
-      "id": "05492bed-0a18-4d45-a013-76166851e5b4",
+      "id": "00d7c899-75f9-4a7c-a064-743c33e80346",
       "name": "Quando a Kira pedir um anexo",
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1.1,
@@ -31,7 +31,7 @@
       }
     },
     {
-      "id": "9b7f2e48-a0f8-4304-95b8-fd8a259eb3e5",
+      "id": "c13e4773-5ef1-40d0-a7d7-ffac7b8f116b",
       "name": "Buscar imagem",
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
@@ -68,7 +68,7 @@
       "alwaysOutputData": true
     },
     {
-      "id": "553ba464-c733-4f72-b824-1e5af1cba1f1",
+      "id": "13945af6-3b5c-41ef-a8f3-54a893ad2949",
       "name": "Imagem encontrada?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
@@ -102,7 +102,7 @@
       }
     },
     {
-      "id": "1fd1d115-b925-4b7f-a39d-c5ed7eeb4374",
+      "id": "fec00d38-7e90-4c2a-af54-feb095c9e3bf",
       "name": "Baixar imagem",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
@@ -121,7 +121,7 @@
       "onError": "continueErrorOutput"
     },
     {
-      "id": "ec5be7cb-55ed-4b55-8165-9b508ba335b1",
+      "id": "a0087b42-931c-4adf-a86b-c2c4d382f8a2",
       "name": "Imagem em base64",
       "type": "n8n-nodes-base.extractFromFile",
       "typeVersion": 1.1,
@@ -135,7 +135,7 @@
       }
     },
     {
-      "id": "d49b8856-b10d-41ac-b6d8-d2a21ecea54e",
+      "id": "286c7160-2615-44a2-a4f7-48cbe01bbcac",
       "name": "Anexar ao rascunho",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.5,
@@ -159,7 +159,7 @@
       "onError": "continueErrorOutput"
     },
     {
-      "id": "92f3e06f-3e54-4527-a681-8cc9ff737a0d",
+      "id": "f18d741d-2b67-44bc-a675-3007106809e9",
       "name": "Anexo pronto",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
@@ -190,7 +190,7 @@
       }
     },
     {
-      "id": "6f6c29ad-fb0d-4ced-9919-fac8a2a38c10",
+      "id": "838a094b-ad4b-46df-a2f1-274149d00e5d",
       "name": "Imagem não encontrada",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
@@ -221,7 +221,7 @@
       }
     },
     {
-      "id": "08fcf02e-cf5a-40d2-9530-fe2b7eeaa3da",
+      "id": "d943114a-5c0e-4370-a9dd-321ab9f20d53",
       "name": "Explicar falha",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,

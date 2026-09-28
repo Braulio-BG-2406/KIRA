@@ -18,7 +18,7 @@ Prefere rodar na VPS? Veja [Rodar na VPS](#rodar-na-vps-opcional) no fim.
 4. [Publicar o workflow](#4-publicar)
 5. [Liberar o seu ID do Telegram](#5-liberar-o-seu-id)
 6. [Fazer o primeiro teste](#6-primeiro-teste-)
-7. Opcionais: [Outlook](#7-outlook-e-mails-agenda-e-rascunhos-de-resposta), [Resumo da manhã às 7h](#8-resumo-da-manhã-às-7h), [Google Drive](#9-google-drive-só-leitura), [LinkedIn](#10-linkedin-rascunhos-e-publicar), [Imagens](#11-imagens-com-ia), [Teams](#12-microsoft-teams), [Pedidos](#13-pedidos-planilha-do-erp), [Ambientes](#14-ambientes-kira-20), [Rascunhos automáticos](#15-rascunhos-automáticos-de-e-mails-sobre-pedidos) e [Internet](#16-internet-pesquisa-no-google)
+7. Opcionais: [Outlook](#7-outlook-e-mails-agenda-e-rascunhos-de-resposta), [Resumo da manhã às 7h](#8-resumo-da-manhã-às-7h), [Google Drive](#9-google-drive-só-leitura), [LinkedIn](#10-linkedin-rascunhos-e-publicar), [Imagens](#11-imagens-com-ia), [Teams](#12-microsoft-teams), [Pedidos](#13-pedidos-base-oficial-do-erp), [Ambientes](#14-ambientes-kira-20), [Rascunhos automáticos](#15-rascunhos-automáticos-de-e-mails-sobre-pedidos), [Internet](#16-internet-pesquisa-no-google) e [Assinatura nos rascunhos](#17-assinatura-nos-rascunhos-de-resposta)
 
 ---
 
@@ -112,10 +112,10 @@ Depois, teste também:
 
 A Kira consulta o Outlook com quatro ferramentas de leitura: **emails_recentes** (Caixa de Entrada de um período, com o total), **buscar_emails** (por palavra, remetente ou assunto), **ler_email** (um e-mail inteiro, em texto) e **agenda** (compromissos do calendário principal, no horário de Brasília).
 
-Uma quinta ferramenta, **criar_rascunho_resposta**, prepara a resposta de um e-mail quando você pede ("Kira, deixe pronta a resposta para o e-mail do fornecedor"). Ela só cria um **rascunho** na pasta Rascunhos, com o e-mail original citado: nada é enviado. Você revisa, ajusta e envia pelo Outlook. O que a Kira não souber fica marcado como `[confirmar]`.
+Uma quinta ferramenta, **criar_rascunho_resposta**, prepara a resposta de um e-mail quando você pede ("Kira, deixe pronta a resposta para o e-mail do fornecedor"). Ela só cria um **rascunho** na pasta Rascunhos, com o e-mail original citado e a sua assinatura (passo 17): nada é enviado. Você revisa, ajusta e envia pelo Outlook. O que a Kira não souber fica marcado como `[confirmar]`.
 
 1. No n8n: **Create credential → Microsoft Outlook OAuth2 API** → entre com a sua conta Microsoft.
-2. Selecione essa credencial nas cinco ferramentas (grupo **Cérebro da Kira**) e publique.
+2. Selecione essa credencial nas quatro ferramentas de leitura (grupo **Cérebro da Kira**) e publique. A quinta, **criar_rascunho_resposta**, chama o sub-workflow do rascunho com assinatura (passo 17).
 
 Contas de empresa podem exigir que o administrador do Microsoft 365 aprove o acesso do n8n. As instruções da Kira mandam tratar o conteúdo dos e-mails como informação, nunca como ordem, para que um e-mail não consiga "dar instruções" a ela.
 
@@ -181,14 +181,25 @@ A Kira tem liberdade para escrever e responder no Teams **quando você pede** ("
 
 Teste: "Kira, quais são minhas conversas mais recentes no Teams?".
 
-## 13. Pedidos (planilha do ERP)
+## 13. Pedidos (base oficial do ERP)
 
-A ferramenta **consultar_pedidos** lê a planilha de pedidos que o ERP exporta todo dia para o SharePoint ([`kira-pedidos.json`](../n8n/workflows/kira-pedidos.json)) e responde por número (pedido, OC, NF, OP, solicitação, material) ou por nome (cliente, material, fornecedor). Também lista atrasados, compras, solicitações e produção, ou dá um resumo, sempre citando a fonte e a data de atualização. A mesma credencial do Teams dá acesso ao arquivo.
+A ferramenta **consultar_pedidos** responde com a base oficial de pedidos que o ERP exporta para o SharePoint (a planilha grande, de todas as unidades). São dois workflows:
 
-1. No sub-workflow, troque `ID_DO_DRIVE` e `ID_DO_ARQUIVO` pelos ids do arquivo no SharePoint (Microsoft Graph) e selecione a credencial do Teams nos dois nós HTTP. Publique e deixe só a Kira chamar.
-2. Na Kira, selecione o sub-workflow em **consultar_pedidos** e publique.
+- **Kira — base de pedidos (sincronização)** ([`kira-base-de-pedidos.json`](../n8n/workflows/kira-base-de-pedidos.json)): de segunda a sábado, às 9h, 12h, 15h e 18h (e pelo botão **Atualizar agora**), lê a planilha e grava no seu OneDrive uma **base compacta** (`Kira/base-pedidos.json`) com os itens emitidos nos últimos 120 dias, todos os itens ainda em aberto e os totais de pedidos emitidos por mês e unidade (de todas as linhas, sem os cancelados). Se a planilha não mudou desde a última leitura, não faz nada. Se falhar, avisa no Telegram e a Kira continua com a última base salva.
+- **Kira — pedidos (ferramenta)** ([`kira-pedidos.json`](../n8n/workflows/kira-pedidos.json)): lê a base compacta e devolve só o que interessa à pergunta, sempre com a fonte e a hora da atualização da planilha.
 
-Com isso, "Kira, qual o status do pedido 12345?" ou "deixe pronta a resposta para o e-mail do cliente sobre o pedido 12345" usam os dados reais (a resposta de e-mail continua como rascunho).
+A planilha oficial passa de 250 MB, o limite do Excel Online. Por isso a sincronização não abre o arquivo no Excel: ela baixa a planilha em pedaços, descomprime em JavaScript puro (sem bibliotecas externas) e lê as linhas em etapas de cerca de 35 segundos, guardando o ponto em que parou (o n8n Cloud limita cada nó Code a 60 segundos). Para cerca de 300 MB, leva uns 3 minutos. A mesma credencial do Teams dá acesso ao arquivo e ao OneDrive.
+
+1. Importe a sincronização. Nos nós **Informações da planilha** e **Novo link**, troque `ID_DO_DRIVE` e `ID_DO_ARQUIVO` pelos ids da planilha no SharePoint (Microsoft Graph). Selecione a credencial do Teams nos três nós HTTP e a do Telegram em **Avisar no Telegram**, onde vai também o seu `chat_id`. Se as colunas da sua planilha tiverem outros nomes, ajuste a lista `CAMPOS` no nó **Preparar leitura**.
+2. Clique em **Atualizar agora** uma vez (confira em **Executions**) e publique.
+3. Importe a ferramenta, selecione a credencial do Teams em **Baixar base**, publique e, em **Settings → This workflow can be called by**, libere a Kira e os rascunhos automáticos.
+4. Na Kira, selecione a ferramenta em **consultar_pedidos** e publique.
+
+Tipos de consulta: `pedido` (padrão: tudo o que combinar com o número ou o nome), `abertos`, `atrasados`, `compra`, `solicitacao`, `producao`, `resumo` (só números: itens, valores, situações, unidades e clientes) e `totais` (pedidos emitidos por mês e unidade, por exemplo "agosto 2026"). Um item é considerado fechado quando está FATURADO, ENVIADO ou CANCELADO; atrasado é o item em aberto com o prazo vencido ou com o status "em atraso".
+
+Com isso, "Kira, qual o status do pedido 12345?", "quantos itens estão atrasados por unidade?", "quanto foi emitido em agosto?" ou "deixe pronta a resposta para o e-mail do cliente sobre o pedido 12345" usam os dados reais (a resposta de e-mail continua como rascunho). Pedido antigo e já fechado pode não estar na base; nesse caso a Kira diz isso.
+
+> Os dois workflows guardam no histórico só as execuções com erro: cada leitura passa dezenas de MB entre as etapas e cada consulta baixa a base inteira (alguns MB).
 
 > Os dados da empresa passam pelo Gemini. No plano gratuito, o Google pode usar o conteúdo para melhorar os produtos dele; o plano pago não usa.
 
@@ -213,16 +224,16 @@ As memórias antigas, sem ambiente, são distribuídas pela categoria (`pessoal`
 Workflow separado: **Kira — rascunhos automáticos (Outlook)** ([`kira-rascunhos-automaticos.json`](../n8n/workflows/kira-rascunhos-automaticos.json)). De segunda a sexta, das 7h às 19h30, a cada 30 minutos:
 
 1. lê os e-mails novos da Caixa de Entrada e separa os que parecem perguntar de pedidos (pedido, TRF, cotação, compra, solicitação, produção, prazo, NF). Pula e-mails automáticos, os que você mesmo mandou e os que você já respondeu;
-2. a Kira lê cada um (até 5 por vez), consulta a planilha de pedidos (passo 13) e escreve a resposta no seu nome, marcando como **[confirmar]** o que a planilha não tem;
-3. cria a resposta como **rascunho** na conversa do e-mail, no Outlook. **Nunca envia**;
-4. avisa no Telegram: de quem é, o assunto, o resumo da resposta e um link para o rascunho.
+2. a Kira lê cada um (até 5 por vez), consulta a base de pedidos (passo 13) e escreve a resposta no seu nome, marcando como **[confirmar]** o que a base não tem;
+3. cria a resposta como **rascunho** na conversa do e-mail, no Outlook, com a sua assinatura (passo 17). **Nunca envia**;
+4. avisa no Telegram: de quem é, o assunto, o resumo da resposta e um link para o rascunho (e se a imagem da assinatura ficou de fora).
 
-Para remetentes de fora da empresa, ela fala só dos pedidos que a pessoa citou, sem dados de outros clientes, custos ou fornecedores. Se o pedido não estiver na planilha, a resposta diz que você está verificando, sem afirmar que o pedido não existe.
+Para remetentes de fora da empresa, ela fala só dos pedidos que a pessoa citou, sem dados de outros clientes, custos ou fornecedores. Se o pedido não estiver na base, a resposta diz que você está verificando, sem afirmar que o pedido não existe.
 
 1. Crie a tabela `kira_emails_auto` com as colunas `message_id`, `status` e `motivo` (texto). Cada e-mail é analisado uma vez só; os registros são apagados depois de 10 dias.
-2. Importe o workflow e selecione as credenciais: *Microsoft Outlook* (nos três nós HTTP), *Gemini* (nos dois modelos) e *Telegram* (nos dois avisos).
+2. Importe o workflow e selecione as credenciais: *Microsoft Outlook* (nos dois nós HTTP), *Gemini* (nos dois modelos) e *Telegram* (nos dois avisos).
 3. No nó **Configuração**, preencha `chat_id` (o seu ID do Telegram) e `ativo_desde` (data e hora a partir da qual os e-mails contam, por exemplo `2026-09-28T07:00:00-03:00`; vazio = últimas 72 horas).
-4. Na ferramenta **consultar_pedidos**, selecione o sub-workflow de pedidos e, nele, em **Settings → This workflow can be called by**, libere também este workflow. Publique.
+4. Na ferramenta **consultar_pedidos**, selecione o sub-workflow de pedidos e, no nó **Criar rascunho**, o sub-workflow do rascunho com assinatura (passo 17). Nos dois, em **Settings → This workflow can be called by**, libere também este workflow. Publique.
 
 Se o Outlook parar de responder (por exemplo, credencial expirada), a Kira avisa no Telegram no máximo uma vez por dia.
 
@@ -240,6 +251,22 @@ Ela usa a própria Busca Google do Gemini, com a **mesma chave gratuita**: não 
 Teste: "Kira, como fechou o Ibovespa no último pregão?".
 
 > O plano gratuito tem um limite diário de pesquisas com a Busca Google. Quando acaba, a Kira avisa e responde com o que já sabe. As perguntas vão para o Google, por isso a Kira é instruída a nunca colocar nelas dados internos da empresa nem dados pessoais seus.
+
+## 17. Assinatura nos rascunhos de resposta
+
+A assinatura que você configura no Outlook não entra nos rascunhos criados pela Kira (eles são criados pelo Microsoft Graph, fora do Outlook). Por isso os rascunhos de resposta, os que você pede e os automáticos, passam por um sub-workflow próprio: **Kira — rascunho de resposta com assinatura** ([`kira-rascunho-resposta.json`](../n8n/workflows/kira-rascunho-resposta.json)). Ele cria o rascunho com o texto da Kira, a sua assinatura logo abaixo (a **imagem** e o seu **e-mail**) e o e-mail original citado, como o botão Responder. Nada é enviado.
+
+- A imagem fica no seu OneDrive, em **`Kira/assinatura.png`** (PNG, JPG ou GIF de até 1 MB; aparece com no máximo 600 px de largura). Para trocar a assinatura, é só trocar o arquivo.
+- Sem a imagem no OneDrive, o rascunho sai só com o e-mail: a Kira avisa na conversa e, nos rascunhos automáticos, o aviso do Telegram traz uma linha sobre isso.
+- A Kira termina o texto com a despedida e o seu nome e não repete e-mail, telefone ou cargo, que já estão na assinatura.
+
+1. Importe o sub-workflow. Selecione a credencial *Microsoft Outlook* em **Criar rascunho** e **Anexar imagem da assinatura** e a do Teams em **Imagem da assinatura** (ela lê o OneDrive).
+2. No nó **Assinatura**, preencha o seu `email` (e, se quiser, outro caminho em `imagem_onedrive` ou outra `largura_maxima`).
+3. Publique e, em **Settings → This workflow can be called by**, libere a Kira e os rascunhos automáticos.
+4. Na Kira, selecione o sub-workflow em **criar_rascunho_resposta**; nos rascunhos automáticos, no nó **Criar rascunho**. Publique os dois.
+5. Coloque a imagem em `Kira/assinatura.png` no OneDrive (pela pasta do OneDrive no computador ou pelo site).
+
+Teste: "Kira, deixe pronta uma resposta para o último e-mail do fornecedor dizendo que recebi". O rascunho aparece em Rascunhos com a imagem e o e-mail no fim.
 
 ## Personalizar
 
@@ -279,7 +306,10 @@ Durante os testes ficou uma linha de teste em `kira_logs` (usuário "Teste @test
 | Ela diz que não consegue ler seus e-mails | Credencial do Outlook expirou ou foi removida | Reconecte a credencial *Microsoft Outlook* no n8n (passo 7) |
 | O resumo das 7h não chegou | Workflow do resumo desativado ou `chat_id` vazio | Veja o passo 8 e a execução em **Executions** |
 | `/publicar N` responde que não conseguiu | Credencial do LinkedIn expirou ou o campo **Person** está vazio | Reconecte a credencial e confira o passo 10; o rascunho continua guardado |
-| A Kira diz que não consegue ler o Teams ou a planilha de pedidos | Credencial do Teams expirou ou o arquivo mudou de lugar | Reconecte a credencial *Microsoft Teams* e confira os ids do arquivo (passos 12 e 13) |
+| A Kira diz que não consegue ler o Teams ou a base de pedidos | Credencial do Teams expirou, a planilha mudou de lugar ou a sincronização ainda não rodou | Reconecte a credencial *Microsoft Teams*, confira os ids da planilha e rode **Atualizar agora** na sincronização (passos 12 e 13) |
+| A Kira diz que a base de pedidos está numa versão antiga | A base foi gerada por uma versão anterior da sincronização | Rode **Atualizar agora** em **Kira — base de pedidos (sincronização)** |
+| Chegou no Telegram "Não consegui atualizar a base de pedidos" | A planilha estava sendo salva, mudou de colunas ou a credencial expirou | A Kira segue com a última base; veja a execução com erro e tente **Atualizar agora** |
+| O rascunho saiu sem a imagem da assinatura | A imagem não está em `Kira/assinatura.png` no OneDrive, passa de 1 MB ou não é PNG, JPG ou GIF | Coloque a imagem no lugar certo (passo 17); o próximo rascunho já sai com ela |
 | O resumo chegou sem o áudio | Limite diário da voz do Gemini | O texto sempre chega; o áudio volta no dia seguinte (veja a execução em **Executions**) |
 | A Kira diz que o assunto é de outro ambiente | O ambiente ativo não é o do assunto | Mande "modo <nome>" (o `/status` mostra o ambiente ativo) |
 | Não apareceu rascunho para um e-mail sobre pedido | Fora do horário, e-mail sem palavras de pedido, já respondido, ou a Kira decidiu que não precisava de resposta | Veja as execuções de **Kira — rascunhos automáticos** e a tabela `kira_emails_auto` (coluna `motivo`) |
@@ -302,5 +332,5 @@ A Kira também roda no n8n instalado na VPS. Pontos de atenção:
    - `kira_logs`: `chat_id`, `user_id`, `usuario`, `tipo_entrada`, `entrada`, `resposta`, `modo_resposta`, `entregue_como`, `status`, `erro`, `execucao_id`, `contexto` (texto) e `latencia_ms` (número)
    - `kira_linkedin` e `kira_imagens`: veja os passos 10 e 11
    - `kira_config`, `kira_tarefas` e `kira_contatos`: veja o passo 14; `kira_emails_auto`: passo 15
-5. Importe [`n8n/workflows/kira-1.0.json`](../n8n/workflows/kira-1.0.json) (**Workflows → Import from file**), crie as credenciais dos passos 1 a 3 e preencha o `perfil_dono`. Importe também os sub-workflows das imagens, do Teams, dos pedidos e da internet e o workflow dos rascunhos automáticos (passos 11 a 16).
+5. Importe [`n8n/workflows/kira-1.0.json`](../n8n/workflows/kira-1.0.json) (**Workflows → Import from file**), crie as credenciais dos passos 1 a 3 e preencha o `perfil_dono`. Importe também os sub-workflows das imagens, do Teams, dos pedidos, da internet e do rascunho com assinatura, a sincronização da base de pedidos e o workflow dos rascunhos automáticos (passos 11 a 17).
 6. Desative a Kira do n8n Cloud antes de publicar a da VPS (um bot, um webhook).

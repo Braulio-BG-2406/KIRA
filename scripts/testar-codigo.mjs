@@ -2,6 +2,7 @@
 // (n8n/workflows/*.json) com dados simulados e confere a estrutura dos workflows.
 // Uso: npm test   (ou: node scripts/testar-codigo.mjs)
 import { readFileSync } from 'node:fs';
+import { deflateRawSync } from 'node:zlib';
 import assert from 'node:assert/strict';
 
 const raiz = new URL('../', import.meta.url);
@@ -347,13 +348,14 @@ teste('drive: as ferramentas só fazem leitura (GET)', () => {
     assert.match(String(nos[nome].parameters.url), /googleapis\.com\/drive\/v3\/files/, nome);
   }
 });
-teste('outlook: rascunho de resposta só cria rascunho (createReply), nunca envia', () => {
-  const p = nos.criar_rascunho_resposta.parameters;
-  assert.equal(p.method, 'POST');
-  assert.match(p.url, /\/createReply' \}\}$/);
+teste('outlook: rascunho de resposta vai pelo sub-workflow com assinatura e nunca envia', () => {
+  const no = nos.criar_rascunho_resposta;
+  assert.equal(no.type, '@n8n/n8n-nodes-langchain.toolWorkflow');
+  assert.equal(no.parameters.workflowId.value, '', 'repositório sem o id do sub-workflow');
+  assert.deepEqual(Object.keys(no.parameters.workflowInputs.value).sort(), ['id_email', 'referencia', 'texto']);
+  assert.equal(workflow.connections.criar_rascunho_resposta.ai_tool[0][0].node, 'Kira');
   assert.doesNotMatch(JSON.stringify(workflow), /\/send'|sendMail|\/reply'/);
-  // o texto vira HTML seguro: escapa & < > e troca quebras de linha por <br>
-  assert.match(p.jsonBody, /replace\(\/&\/g, '&amp;'\)\.replace\(\/<\/g, '&lt;'\)\.replace\(\/>\/g, '&gt;'\)\.replace\(\/\\n\/g, '<br>'\)/);
+  assert.match(nos.Kira.parameters.options.systemMessage, /A assinatura dele \(imagem e e-mail\) entra sozinha/);
 });
 
 // ---------- Imagens: ferramentas e sub-workflows ----------
@@ -581,35 +583,354 @@ teste('teams: mensagens em ordem e envio só em conversa existente (HTML seguro)
   assert.match(enviar.url, /graph\.microsoft\.com\/v1\.0\/chats\/' \+ encodeURIComponent\(\$json\.chat_id\) \+ '\/messages'/);
 });
 
-// ---------- Pedidos (planilha do ERP) ----------
+// ---------- Pedidos: base oficial (sincronização em etapas + ferramenta) ----------
+const sincronizacao = JSON.parse(ler('n8n/workflows/kira-base-de-pedidos.json'));
 const pedidos = JSON.parse(ler('n8n/workflows/kira-pedidos.json'));
-teste('pedidos: busca por número e por nome, filtros e resumo, sem inventar campos', () => {
-  const linhas = [
-    { CD_PEDIDO: 1001, SEQUENCIA: 1, CLIENTE_FANTASIA: 'Mineradora Alfa', CD_MATERIAL: 555, DESC_MATERIAL: 'Bomba hidráulica', SITUACAO_PEDIDO: 'Aberto', ATRASO: 5, CD_ORDEM: 9001, NOME_FORNECEDOR_OC: 'Fornecedor X' },
-    { CD_PEDIDO: 1001, SEQUENCIA: 2, CLIENTE_FANTASIA: 'Mineradora Alfa', DESC_MATERIAL: 'Válvula', SITUACAO_PEDIDO: 'Aberto', ATRASO: 0, CD_SOLICITACAO: 7001 },
-    { CD_PEDIDO: 2002, SEQUENCIA: 1, CLIENTE_FANTASIA: 'Siderúrgica Beta', CD_MATERIAL: 1001, DESC_MATERIAL: 'Cilindro', SITUACAO_PEDIDO: 'Faturado', NF: 12345, OP: 3003 },
-  ];
-  const tempo = { fromMillis: () => ({ toFormat: () => '' }), fromISO: () => ({ setZone: () => ({ toFormat: () => '27/09/2026 às 10:44' }) }) };
-  const consultar = (entrada) =>
-    new Function('$', '$input', 'DateTime', noDe(pedidos, 'Consultar planilha').parameters.jsCode)(
-      (nome) => ({ first: () => ({ json: nome === 'Informações do arquivo' ? { name: 'pedidos.xlsx', lastModifiedDateTime: 'x' } : entrada }) }),
-      { all: () => linhas.map((json) => ({ json })) },
-      tempo,
-    )[0].json;
-  assert.equal(consultar({ busca: '1001' }).resumo.itens, 3, 'pedido 1001 e material 1001');
-  const beta = consultar({ busca: 'siderurgica' });
-  assert.deepEqual([beta.itens[0].nf, beta.itens[0].op], ['12345', '3003']);
-  assert.equal(beta.itens[0].compra, undefined, 'campos vazios não aparecem');
-  assert.equal(consultar({ tipo: 'atrasados' }).resumo.itens, 1);
-  assert.equal(consultar({ tipo: 'solicitacao' }).itens[0].solicitacao.numero, '7001');
-  assert.equal(consultar({ tipo: 'resumo' }).itens.length, 0);
-  assert.match(consultar({ busca: 'nada' }).orientacao, /Nada encontrado/);
-  assert.match(consultar({ busca: '1001' }).fonte, /pedidos\.xlsx do ERP, atualizada em 27\/09\/2026/);
+
+// Monta um .xlsx pequeno de verdade (ZIP com XML), parecido com a planilha oficial: cabeçalho, datas
+// seriais, textos compartilhados e diretos, fórmula de texto, item repetido (uma linha por NF), OC do
+// cliente ora número, ora texto, e uma aba menor que não deve ser lida.
+function zip(arquivos) {
+  const partes = [];
+  const indice = [];
+  let posicao = 0;
+  for (const { nome, texto } of arquivos) {
+    const dados = Buffer.from(texto, 'utf8');
+    const comprimido = deflateRawSync(dados);
+    const n = Buffer.from(nome);
+    const local = Buffer.alloc(30);
+    local.writeUInt32LE(0x04034b50, 0);
+    local.writeUInt16LE(20, 4);
+    local.writeUInt16LE(8, 8);
+    local.writeUInt32LE(comprimido.length, 18);
+    local.writeUInt32LE(dados.length, 22);
+    local.writeUInt16LE(n.length, 26);
+    const central = Buffer.alloc(46);
+    central.writeUInt32LE(0x02014b50, 0);
+    central.writeUInt16LE(20, 4);
+    central.writeUInt16LE(20, 6);
+    central.writeUInt16LE(8, 10);
+    central.writeUInt32LE(comprimido.length, 20);
+    central.writeUInt32LE(dados.length, 24);
+    central.writeUInt16LE(n.length, 28);
+    central.writeUInt32LE(posicao, 42);
+    partes.push(local, n, comprimido);
+    indice.push(central, n);
+    posicao += 30 + n.length + comprimido.length;
+  }
+  const diretorio = Buffer.concat(indice);
+  const fim = Buffer.alloc(22);
+  fim.writeUInt32LE(0x06054b50, 0);
+  fim.writeUInt16LE(arquivos.length, 8);
+  fim.writeUInt16LE(arquivos.length, 10);
+  fim.writeUInt32LE(diretorio.length, 12);
+  fim.writeUInt32LE(posicao, 16);
+  return Buffer.concat([...partes, diretorio, fim]);
+}
+const serial = (iso) => Math.round(Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10)) / 86400000 + 25569);
+const HOJE = serial('2026-09-28');
+const colunasPlanilha = ['DATA_EMISSAO', 'CD_PEDIDO', 'SEQUENCIA', 'DESC_UNIDADE_NEGOCIO', 'CLIENTE_FANTASIA', 'ITEM_DESC_CONTROLE', 'VL_TOTAL_ITEM', 'PRAZO_ENTREGA_ITEM', 'STATUS ITEM', 'CD_ORDEM_COMPRA', 'NF', 'DESC_MATERIAL'];
+const situacoes = ['FATURADO', 'ENVIADO', 'CANCELADO- PREÇO', 'FATURADO PARCIAL', 'ENVIADO PARA SEPARACAO WMS', 'LIBERADO PARA EMITIR NOTA'];
+const linhasPlanilha = [];
+for (let p = 0; p < 150; p++) {
+  const pedido = 700000 + p;
+  const emissao = HOJE - ((p * 7) % 400);
+  for (let seq = 1; seq <= 2; seq++) {
+    const situacao = situacoes[(p + seq) % situacoes.length];
+    const nfs = situacao !== 'FATURADO' ? [null] : p % 2 === 1 ? [900000 + p * 2, 900001 + p * 2] : [900000 + p * 2];
+    for (const nf of nfs) {
+      linhasPlanilha.push({
+        DATA_EMISSAO: emissao,
+        CD_PEDIDO: pedido,
+        SEQUENCIA: seq,
+        DESC_UNIDADE_NEGOCIO: ['MATRIZ', 'FILIAL NORTE', 'FILIAL SUL'][p % 3],
+        CLIENTE_FANTASIA: p % 4 === 0 ? 'Siderúrgica Beta & Cia' : 'Mineradora Alfa',
+        ITEM_DESC_CONTROLE: situacao,
+        VL_TOTAL_ITEM: 100 * seq + p,
+        PRAZO_ENTREGA_ITEM: emissao + 30,
+        'STATUS ITEM': emissao + 30 < HOJE ? 'ABERTO EM ATRASO' : 'ABERTO EM DIA',
+        CD_ORDEM_COMPRA: p % 5 === 0 ? 3 : p % 2 === 0 ? 4500000 + Math.floor(p / 10) : `OC-${Math.floor(p / 10)}`,
+        NF: nf,
+        DESC_MATERIAL: `Mangueira ${seq} <R2>`,
+      });
+    }
+  }
+}
+function planilhaXlsx() {
+  const textos = [];
+  const texto = (t) => {
+    let i = textos.indexOf(t);
+    if (i === -1) i = textos.push(t) - 1;
+    return i;
+  };
+  const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const letra = (i) => String.fromCharCode(65 + i);
+  const linhas = [`<row r="1">${colunasPlanilha.map((c, i) => `<c r="${letra(i)}1" t="s"><v>${texto(c)}</v></c>`).join('')}</row>`];
+  linhasPlanilha.forEach((l, k) => {
+    const r = k + 2;
+    const celulas = colunasPlanilha.map((c, i) => {
+      const v = l[c];
+      const ref = `${letra(i)}${r}`;
+      if (v === null || v === undefined) return '';
+      if (typeof v === 'number') return `<c r="${ref}"><v>${v}</v></c>`;
+      if (c === 'STATUS ITEM') return `<c r="${ref}" t="str"><f>IF(H${r}&lt;TODAY(),"x","y")</f><v>${esc(v)}</v></c>`;
+      if (c === 'DESC_MATERIAL') return `<c r="${ref}" t="inlineStr"><is><t>${esc(v)}</t></is></c>`;
+      return `<c r="${ref}" t="s"><v>${texto(v)}</v></c>`;
+    });
+    linhas.push(`<row r="${r}">${celulas.join('')}</row>`);
+  });
+  const folha = (conteudo) => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${conteudo}</sheetData></worksheet>`;
+  return zip([
+    { nome: 'xl/workbook.xml', texto: '<workbook><sheets><sheet name="Resumo" sheetId="1" r:id="rId1"/><sheet name="Pedidos" sheetId="2" r:id="rId2"/></sheets></workbook>' },
+    { nome: 'xl/_rels/workbook.xml.rels', texto: '<Relationships><Relationship Id="rId1" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Target="/xl/worksheets/sheet2.xml"/></Relationships>' },
+    { nome: 'xl/worksheets/sheet1.xml', texto: folha('<row r="1"><c r="A1"><v>1</v></c></row>') },
+    { nome: 'xl/worksheets/sheet2.xml', texto: folha(linhas.join('')) },
+    { nome: 'xl/sharedStrings.xml', texto: `<sst>${textos.map((t) => `<si><t>${esc(t)}</t></si>`).join('')}</sst>` },
+  ]);
+}
+
+// Roda o código de um nó Code da sincronização como o n8n roda (async, com this.helpers).
+const codigoSync = (nome) => noDe(sincronizacao, nome).parameters.jsCode;
+const diaFixo = { setZone() { return this; }, year: 2026, month: 9, day: 28, toISODate: () => '2026-09-28' };
+function rodarSync(nome, { entrada, arquivo, saidas = [], estatico = {}, modo = 'manual', runIndex = 0, montado } = {}) {
+  const helpers = {
+    async httpRequest(o) {
+      const [, ini, fim] = /bytes=(\d+)-(\d+)/.exec(o.headers.Range).map(Number);
+      return arquivo.subarray(ini, Math.min(fim, arquivo.length - 1) + 1);
+    },
+  };
+  const $ = (no) => ({
+    all: (saida, r) => {
+      if (no !== 'Ler bloco' || r >= saidas.length) throw new Error(`sem a execução ${r} de ${no}`);
+      return [saidas[r]];
+    },
+    first: () => ({ json: { 'Preparar leitura': saidas.preparo, 'Montar base': montado }[no] }),
+  });
+  return new Function('$input', '$', 'DateTime', '$getWorkflowStaticData', '$execution', '$runIndex', `return (async function () {\n${codigoSync(nome)}\n}).call(this);`).call(
+    { helpers },
+    { first: () => ({ json: entrada }) },
+    $,
+    { now: () => diaFixo },
+    () => estatico,
+    { mode: modo },
+    runIndex,
+  );
+}
+// Lê a planilha toda, em etapas pequenas (para exercitar o estado entre as etapas), e monta a base.
+async function sincronizar(arquivo, { trocarNaEtapa } = {}) {
+  let info = { '@microsoft.graph.downloadUrl': 'https://arquivo', size: arquivo.length, name: 'pedidos.xlsx', eTag: '"{A},1"', lastModifiedDateTime: '2026-09-28T11:47:00Z' };
+  const [preparo] = await rodarSync('Preparar leitura', { entrada: info });
+  Object.assign(preparo.json.estado, { orcamento_ms: 1, passo: 2048 });
+  const saidas = [];
+  saidas.preparo = preparo.json;
+  let entrada = preparo.json;
+  for (let volta = 0; volta < 500; volta++) {
+    const [s] = await rodarSync('Ler bloco', { entrada: JSON.parse(JSON.stringify(entrada)), arquivo, saidas, runIndex: volta });
+    saidas.push(JSON.parse(JSON.stringify(s)));
+    if (s.json.terminou) {
+      const [m] = await rodarSync('Montar base', { entrada: { estado: s.json.estado }, saidas });
+      return { base: JSON.parse(Buffer.from(m.binary.data.data, 'base64').toString('utf8')), montado: m.json, saidas, etapas: s.json.estado.etapas, info };
+    }
+    if (trocarNaEtapa === volta) info = { ...info, eTag: '"{A},2"' };
+    entrada = info; // "Novo link": a volta seguinte recebe o link novo (e a versão atual da planilha)
+  }
+  throw new Error('a leitura não terminou');
+}
+const valorDaBase = (base, linha, campo) => {
+  const i = base.campos.indexOf(campo);
+  const v = linha[i];
+  return v !== null && v !== undefined && base.dicionarios[i] ? base.dicionarios[i][v] : v;
+};
+const tempoConsulta = {
+  now: () => ({ setZone: () => ({ year: 2026, month: 9, day: 28 }) }),
+  fromMillis: (ms) => ({ toFormat: () => new Date(ms).toISOString().slice(0, 10).split('-').reverse().join('/') }),
+  fromISO: () => ({ setZone: () => ({ toFormat: () => '28/09/2026 às 08:47' }) }),
+};
+const consultarBase = (base, pedido) =>
+  new Function('$', '$input', 'DateTime', noDe(pedidos, 'Consultar base').parameters.jsCode)(
+    () => ({ first: () => ({ json: pedido }) }),
+    { first: () => ({ json: { data: JSON.stringify(base) } }) },
+    tempoConsulta,
+  )[0].json;
+
+const leitura = sincronizar(planilhaXlsx());
+teste('base de pedidos: lê a planilha em etapas e guarda os itens recentes e os em aberto', async () => {
+  const { base, montado, etapas } = await leitura;
+  assert.ok(etapas > 3, `a leitura deveria ter várias etapas (teve ${etapas})`);
+  assert.equal(base.versao, 2);
+  assert.equal(base.aba, 'Pedidos', 'lê a maior aba');
+  assert.equal(montado.linhas_lidas, linhasPlanilha.length);
+  const fechado = /^(FATURADO|ENVIADO)$|^CANCELADO/;
+  const esperadas = linhasPlanilha.filter((l) => l.DATA_EMISSAO >= HOJE - 120 || !fechado.test(l.ITEM_DESC_CONTROLE.toUpperCase()));
+  assert.equal(base.linhas.length, esperadas.length);
+  base.linhas.forEach((linha, k) => {
+    const l = esperadas[k];
+    for (const campo of ['CD_PEDIDO', 'CLIENTE_FANTASIA', 'ITEM_DESC_CONTROLE', 'CD_ORDEM_COMPRA', 'NF', 'DESC_MATERIAL']) {
+      assert.deepEqual(valorDaBase(base, linha, campo) ?? null, l[campo] ?? null, `${campo} da linha ${k}`);
+    }
+    assert.equal(valorDaBase(base, linha, 'STATUS_ITEM'), l['STATUS ITEM'], 'coluna com espaço no nome e texto de fórmula');
+  });
+  assert.ok(base.dicionarios[base.campos.indexOf('CD_ORDEM_COMPRA')], 'OC do cliente (números e textos) vira dicionário');
 });
-teste('pedidos: repositório sem os ids do arquivo; a Kira tem a ferramenta', () => {
-  assert.match(noDe(pedidos, 'Baixar planilha').parameters.url, /drives\/ID_DO_DRIVE\/items\/ID_DO_ARQUIVO\/content$/);
+teste('base de pedidos: totais por mês e unidade contam cada item uma vez e ignoram cancelados', async () => {
+  const { base } = await leitura;
+  const esperado = {};
+  const vistos = new Set();
+  for (const l of linhasPlanilha) {
+    const chave = `${l.CD_PEDIDO}|${l.SEQUENCIA}`;
+    if (vistos.has(chave)) continue;
+    vistos.add(chave);
+    if (/^CANCELADO/.test(l.ITEM_DESC_CONTROLE)) continue;
+    const mes = new Date((l.DATA_EMISSAO - 25569) * 86400000).toISOString().slice(0, 7);
+    const t = (esperado[`${mes}|${l.DESC_UNIDADE_NEGOCIO}`] ??= [0, 0]);
+    t[0] += 1;
+    t[1] = Math.round((t[1] + l.VL_TOTAL_ITEM) * 100) / 100;
+  }
+  const obtido = Object.fromEntries(base.totais.map(([mes, unidade, itens, valor]) => [`${mes}|${unidade}`, [itens, valor]]));
+  assert.deepEqual(obtido, esperado);
+});
+teste('base de pedidos: se a planilha for salva no meio da leitura, recomeça uma vez e o resultado é o mesmo', async () => {
+  const { base } = await leitura;
+  const outra = await sincronizar(planilhaXlsx(), { trocarNaEtapa: 2 });
+  assert.equal(outra.saidas.at(-1).json.estado.reinicios, 1);
+  assert.deepEqual(outra.base.linhas, base.linhas);
+  assert.deepEqual(outra.base.totais, base.totais);
+});
+teste('base de pedidos: execuções agendadas pulam a leitura se a planilha não mudou', async () => {
+  const { montado, info } = await leitura;
+  const estatico = {};
+  const saidas = [];
+  saidas.preparo = (await rodarSync('Preparar leitura', { entrada: info }))[0].json;
+  const [registro] = await rodarSync('Registrar', { entrada: { name: 'base-pedidos.json', size: 2048 }, saidas, estatico, montado });
+  assert.equal(registro.json.ok, true);
+  assert.deepEqual(await rodarSync('Preparar leitura', { entrada: info, estatico, modo: 'trigger' }), []);
+  assert.equal((await rodarSync('Preparar leitura', { entrada: { ...info, eTag: '"{A},3"' }, estatico, modo: 'trigger' })).length, 1, 'planilha nova é lida');
+  assert.equal((await rodarSync('Preparar leitura', { entrada: info, estatico, modo: 'manual' })).length, 1, '"Atualizar agora" sempre lê');
+});
+teste('pedidos: consulta por número junta as NFs do item e acha a OC do cliente (número ou texto)', async () => {
+  const { base } = await leitura;
+  const r = consultarBase(base, { busca: '700000', tipo: 'pedido', limite: 10 });
+  assert.equal(r.resumo.itens, 2);
+  assert.equal(r.resumo.pedidos, 1);
+  const duasNfs = linhasPlanilha.find((l, k) => l.NF && l.DATA_EMISSAO >= HOJE - 120 && linhasPlanilha[k + 1]?.CD_PEDIDO === l.CD_PEDIDO && linhasPlanilha[k + 1]?.SEQUENCIA === l.SEQUENCIA);
+  assert.ok(duasNfs, 'a planilha de teste tem um item recente com duas NFs');
+  const item = consultarBase(base, { busca: String(duasNfs.CD_PEDIDO) }).itens.find((i) => i.item === String(duasNfs.SEQUENCIA));
+  assert.deepEqual(item.nfs, [String(duasNfs.NF), String(duasNfs.NF + 1)], 'as duas NFs do mesmo item, numa linha só');
+  const porOc = consultarBase(base, { busca: '3', tipo: 'pedido', limite: 25 });
+  assert.ok(porOc.resumo.itens > 0);
+  assert.ok(porOc.itens.every((i) => i.oc_do_cliente === '3'), 'OC pequena não é confundida com posição do dicionário');
+  const oc7 = consultarBase(base, { busca: 'OC-7', tipo: 'pedido', limite: 25 });
+  assert.ok(oc7.resumo.itens > 0);
+  assert.ok(oc7.itens.every((i) => i.oc_do_cliente === 'OC-7'));
+  assert.match(r.fonte, /\(pedidos\.xlsx\), planilha atualizada em 28\/09\/2026 às 08:47/);
+  assert.match(r.cobertura, /últimos 120 dias/);
+});
+teste('pedidos: abertos, atrasados, resumo por nome e totais do mês', async () => {
+  const { base } = await leitura;
+  const abertos = consultarBase(base, { tipo: 'abertos', limite: 25 });
+  assert.ok(abertos.resumo.itens > 0);
+  assert.ok(abertos.itens.every((i) => i.em_aberto === 'sim'));
+  assert.ok(abertos.itens.every((i) => !/^(FATURADO|ENVIADO)$|^CANCELADO/.test(i.situacao_item)), 'FATURADO PARCIAL e ENVIADO PARA SEPARACAO continuam em aberto');
+  const atrasados = consultarBase(base, { tipo: 'atrasados', limite: 25 });
+  assert.ok(atrasados.itens.every((i) => i.atrasado === 'sim'));
+  const beta = consultarBase(base, { busca: 'siderurgica', tipo: 'resumo' });
+  assert.equal(beta.itens.length, 0, 'resumo só traz números');
+  assert.deepEqual(beta.resumo.por_cliente.map((c) => c.valor), ['Siderúrgica Beta & Cia']);
+  const mes = base.totais[0][0];
+  const [ano, m] = mes.split('-');
+  const totais = consultarBase(base, { busca: `${m}/${ano}`, tipo: 'totais' });
+  assert.equal(totais.meses.length, 1);
+  assert.equal(totais.meses[0].itens, base.totais.filter((t) => t[0] === mes).reduce((s, t) => s + t[2], 0));
+  assert.match(totais.explicacao, /não é faturamento/);
+});
+teste('pedidos: base antiga ou vazia vira erro claro (e a Kira explica)', () => {
+  assert.throws(() => consultarBase({ versao: 1, campos: ['CD_PEDIDO'], linhas: [] }, { busca: '1' }), /versão antiga/);
+  assert.throws(() => consultarBase({}, { busca: '1' }), /vazia ou num formato inesperado/);
+  const falha = new Function('$input', noDe(pedidos, 'Explicar falha').parameters.jsCode)({ first: () => ({ json: { error: { message: '404 - itemNotFound' } } }) })[0].json;
+  assert.equal(falha.ok, false);
+});
+teste('pedidos: repositório sem ids da planilha nem chat; sincronização guarda só execuções com erro', () => {
+  assert.match(noDe(sincronizacao, 'Informações da planilha').parameters.url, /drives\/ID_DO_DRIVE\/items\/ID_DO_ARQUIVO$/);
+  assert.match(noDe(sincronizacao, 'Novo link').parameters.url, /drives\/ID_DO_DRIVE\/items\/ID_DO_ARQUIVO$/);
+  assert.equal(noDe(sincronizacao, 'Avisar no Telegram').parameters.chatId, '');
+  assert.match(noDe(sincronizacao, 'Salvar no OneDrive').parameters.url, /\/me\/drive\/root:\/Kira\/base-pedidos\.json:\/content$/);
+  assert.equal(noDe(pedidos, 'Baixar base').parameters.url, noDe(sincronizacao, 'Salvar no OneDrive').parameters.url);
+  for (const w of [sincronizacao, pedidos]) assert.equal(w.settings.saveDataSuccessExecution, 'none', w.name);
   assert.equal(workflow.connections.consultar_pedidos.ai_tool[0][0].node, 'Kira');
   assert.equal(nos.consultar_pedidos.parameters.workflowId.value, '');
+});
+
+// ---------- Rascunho de resposta com assinatura ----------
+const rascunhoResposta = JSON.parse(ler('n8n/workflows/kira-rascunho-resposta.json'));
+const pngDeTeste = (largura, altura) => {
+  const b = Buffer.alloc(33);
+  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(b, 0);
+  b.write('IHDR', 12);
+  b.writeUInt32BE(largura, 16);
+  b.writeUInt32BE(altura, 20);
+  return b;
+};
+function rodarRascunho(nome, { entrada = {}, nosAnteriores = {}, baixar } = {}) {
+  const $ = (no) => ({ first: () => ({ json: nosAnteriores[no] }) });
+  const helpers = { httpRequest: baixar ?? (async () => { throw new Error('sem rede'); }) };
+  return new Function('$input', '$', `return (async function () {\n${noDe(rascunhoResposta, nome).parameters.jsCode}\n}).call(this);`).call(
+    { helpers },
+    { first: () => ({ json: entrada }) },
+    $,
+  );
+}
+const pedidoDeRascunho = { 'Quando pedirem um rascunho de resposta': { id_email: ' AAMk= ', texto: 'Olá, Ana!\nO pedido <1> sai & chega "sexta".\n\nAtenciosamente,\nBráulio', referencia: '<a@t>' } };
+const assinaturaDeTeste = { email: 'dono@empresa.com.br', imagem_onedrive: 'Kira/assinatura.png', largura_maxima: 600 };
+teste('assinatura: texto em HTML seguro, imagem reduzida para 600 px e e-mail embaixo', async () => {
+  const [r] = await rodarRascunho('Montar resposta', {
+    entrada: { '@microsoft.graph.downloadUrl': 'https://x', size: 5000, file: { mimeType: 'image/png' } },
+    nosAnteriores: { ...pedidoDeRascunho, Assinatura: assinaturaDeTeste },
+    baixar: async () => pngDeTeste(1200, 300),
+  });
+  assert.equal(r.json.id_email, 'AAMk=');
+  assert.equal(r.json.referencia, '<a@t>');
+  assert.equal(
+    r.json.comentario,
+    'Olá, Ana!<br>O pedido &lt;1&gt; sai &amp; chega &quot;sexta&quot;.<br><br>Atenciosamente,<br>Bráulio<br><br>' +
+      '<img src="cid:assinatura-kira" alt="Assinatura" width="600" height="150" style="border:0"><br>' +
+      '<a href="mailto:dono@empresa.com.br">dono@empresa.com.br</a>',
+  );
+  assert.deepEqual([r.json.imagem.nome, r.json.imagem.tipo, r.json.aviso], ['assinatura.png', 'image/png', '']);
+});
+teste('assinatura: sem a imagem no OneDrive (ou imagem inválida), sai só o e-mail, com aviso', async () => {
+  const nosAnteriores = { ...pedidoDeRascunho, Assinatura: assinaturaDeTeste };
+  let [r] = await rodarRascunho('Montar resposta', { entrada: { error: { message: '404' } }, nosAnteriores });
+  assert.equal(r.json.imagem, null);
+  assert.ok(r.json.comentario.endsWith('Bráulio<br><br><a href="mailto:dono@empresa.com.br">dono@empresa.com.br</a>'));
+  assert.match(r.json.aviso, /não achei a imagem da assinatura no OneDrive \(Kira\/assinatura\.png\)/);
+  [r] = await rodarRascunho('Montar resposta', { entrada: { '@microsoft.graph.downloadUrl': 'https://x', size: 3e6, file: { mimeType: 'image/png' } }, nosAnteriores });
+  assert.match(r.json.aviso, /passa de 1 MB/);
+  [r] = await rodarRascunho('Montar resposta', { entrada: { '@microsoft.graph.downloadUrl': 'https://x', size: 10, file: { mimeType: 'image/webp' } }, nosAnteriores });
+  assert.match(r.json.aviso, /PNG, JPG ou GIF/);
+  await assert.rejects(rodarRascunho('Montar resposta', { nosAnteriores: { ...nosAnteriores, 'Quando pedirem um rascunho de resposta': { id_email: 'x', texto: ' ' } } }), /Faltou o texto/);
+});
+teste('assinatura: resultado final e falhas explicadas', async () => {
+  const montado = { referencia: 'r', imagem: { nome: 'assinatura.png' }, aviso: '' };
+  const criado = { id: 'AAMkRascunho', webLink: 'https://outlook/x' };
+  let [r] = await rodarRascunho('Rascunho pronto', { entrada: { id: 'anexo' }, nosAnteriores: { 'Montar resposta': montado, 'Criar rascunho': criado } });
+  assert.deepEqual([r.json.ok, r.json.id, r.json.assinatura], [true, 'AAMkRascunho', 'imagem e e-mail']);
+  [r] = await rodarRascunho('Rascunho pronto', { entrada: { error: 'falhou' }, nosAnteriores: { 'Montar resposta': montado, 'Criar rascunho': criado } });
+  assert.match(r.json.mensagem, /confira antes de enviar/);
+  [r] = await rodarRascunho('Explicar falha', { entrada: { error: { message: '404 - ErrorItemNotFound' } }, nosAnteriores: pedidoDeRascunho });
+  assert.deepEqual([r.json.ok, r.json.referencia], [false, '<a@t>']);
+  assert.match(r.json.orientacao, /Não achei esse e-mail/);
+});
+teste('assinatura: só cria rascunho (createReply) com a imagem embutida; repositório sem e-mail', () => {
+  const criar = noDe(rascunhoResposta, 'Criar rascunho').parameters;
+  assert.equal(criar.method, 'POST');
+  assert.match(criar.url, /\/createReply' \}\}$/);
+  assert.match(criar.jsonBody, /comment: \$json\.comentario/);
+  const anexo = noDe(rascunhoResposta, 'Anexar imagem da assinatura').parameters.jsonBody;
+  assert.match(anexo, /isInline: true/);
+  assert.match(anexo, /contentId: \$\('Montar resposta'\)\.first\(\)\.json\.cid/);
+  assert.doesNotMatch(JSON.stringify(rascunhoResposta), /\/send\b|sendMail/);
+  const campos = Object.fromEntries(noDe(rascunhoResposta, 'Assinatura').parameters.assignments.assignments.map((c) => [c.name, c.value]));
+  assert.deepEqual(campos, { email: '', imagem_onedrive: 'Kira/assinatura.png', largura_maxima: 600 });
 });
 
 // ---------- Kira 2.0: ambientes ----------
@@ -782,15 +1103,36 @@ teste('rascunhos: aviso no Telegram em HTML seguro, com alerta para remetente ex
   assert.match(html, /eu não envio nada/);
   assert.doesNotMatch(aviso({ status: 'rascunho', remetente_email: 'a@c.com', assunto: 'x', confirmar: 0, link: 'javascript:alert(1)' }), /href/);
   assert.equal(htmlValidoParaTelegram(aviso({ status: 'erro', remetente_nome: 'Ana', remetente_email: 'a@c.com', assunto: 'x' })), true);
+  const comAviso = aviso({ status: 'rascunho', remetente_email: 'a@c.com', assunto: 'x', confirmar: 0, link: '', aviso_assinatura: 'não achei a imagem <da> assinatura' });
+  assert.equal(htmlValidoParaTelegram(comAviso), true);
+  assert.match(comAviso, /🖊️ Assinatura: não achei a imagem &lt;da&gt; assinatura\./);
+  assert.doesNotMatch(html, /Assinatura/);
+});
+teste('rascunhos: o resultado acha o e-mail pela referência devolvida pelo sub-workflow', () => {
+  const interpretados = [
+    { chave: '<a@t>', assunto: 'A', remetente_email: 'a@c.com', resumo: 'r1', confirmar: 0 },
+    { chave: '<b@t>', assunto: 'B', remetente_email: 'b@c.com', resumo: 'r2', confirmar: 1 },
+  ];
+  const resultado = (json) => executarRA('Resultado do rascunho', { nosAnteriores: { 'Interpretar resposta': interpretados }, json }).json;
+  let r = resultado({ ok: true, id: 'D2', webLink: 'https://outlook/d2', referencia: '<b@t>', aviso: 'sem imagem' });
+  assert.deepEqual([r.chave, r.assunto, r.status, r.link, r.aviso_assinatura], ['<b@t>', 'B', 'rascunho', 'https://outlook/d2', 'sem imagem']);
+  r = resultado({ ok: false, error: '404 - ErrorItemNotFound', referencia: '<b@t>' });
+  assert.deepEqual([r.chave, r.status, r.aviso_assinatura], ['<b@t>', 'erro', '']);
+  assert.match(r.motivo, /404/);
+  r = resultado({ error: { message: 'Workflow is not active' } });
+  assert.deepEqual([r.chave, r.status], ['<a@t>', 'erro'], 'sem referência, usa o item pareado');
 });
 teste('rascunhos: limite de uso da IA não registra (tenta de novo); outros erros registram', () => {
   const falha = (json) => executarRA('Tratar falha da IA', { nosAnteriores: { 'Separar e-mails': { chave: '<a@t>', assunto: 'x' } }, json });
   assert.deepEqual(falha({ error: { message: '[429] RESOURCE_EXHAUSTED' } }), []);
   assert.equal(falha({ error: { message: 'bloqueado pelo filtro' } })[0].json.status, 'erro');
 });
-teste('rascunhos: seg a sex a cada 30 min, só cria rascunho (createReply) e nunca envia', () => {
+teste('rascunhos: seg a sex a cada 30 min, só cria rascunho (sub-workflow com assinatura) e nunca envia', () => {
   assert.equal(noRA('A cada 30 min (seg a sex, 7h às 19h30)').parameters.rule.interval[0].expression, '*/30 7-19 * * 1-5');
-  assert.match(noRA('Criar rascunho').parameters.url, /\/createReply' }}$/);
+  const criar = noRA('Criar rascunho');
+  assert.equal(criar.type, 'n8n-nodes-base.executeWorkflow');
+  assert.equal(criar.parameters.mode, 'each', 'um e-mail por vez');
+  assert.deepEqual(criar.parameters.workflowInputs.value, { id_email: '={{ $json.id }}', texto: '={{ $json.resposta }}', referencia: '={{ $json.chave }}' });
   const textoTodo = JSON.stringify(rascunhosAuto);
   assert.doesNotMatch(textoTodo, /\/send\b|sendMail/);
   for (const n of rascunhosAuto.nodes.filter((x) => x.parameters?.operation === 'sendMessage')) {
@@ -802,6 +1144,7 @@ teste('rascunhos: repositório sem chat_id, data de início ou id do sub-workflo
   assert.equal(cfg.chat_id, '');
   assert.equal(cfg.ativo_desde, '');
   assert.equal(noRA('consultar_pedidos').parameters.workflowId.value, '');
+  assert.equal(noRA('Criar rascunho').parameters.workflowId.value, '');
 });
 
 // ---------- Internet (Busca Google do Gemini) ----------
@@ -879,6 +1222,10 @@ teste('segurança: nenhum token do Telegram, chave do Google ou caminho de webho
     'n8n/sdk/kira-rascunhos-automaticos.workflow.ts',
     'n8n/workflows/kira-pesquisar-internet.json',
     'n8n/sdk/kira-pesquisar-internet.workflow.ts',
+    'n8n/workflows/kira-base-de-pedidos.json',
+    'n8n/sdk/kira-base-de-pedidos.workflow.ts',
+    'n8n/workflows/kira-rascunho-resposta.json',
+    'n8n/sdk/kira-rascunho-resposta.workflow.ts',
   ];
   for (const arquivo of arquivos) {
     const conteudo = ler(arquivo);

@@ -18,7 +18,7 @@ Prefere rodar na VPS? Veja [Rodar na VPS](#rodar-na-vps-opcional) no fim.
 4. [Publicar o workflow](#4-publicar)
 5. [Liberar o seu ID do Telegram](#5-liberar-o-seu-id)
 6. [Fazer o primeiro teste](#6-primeiro-teste-)
-7. Opcionais: [Outlook](#7-outlook-e-mails-agenda-e-rascunhos-de-resposta), [Resumo da manhã às 7h](#8-resumo-da-manhã-às-7h), [Google Drive](#9-google-drive-só-leitura), [LinkedIn](#10-linkedin-rascunhos-e-publicar), [Imagens](#11-imagens-com-ia), [Teams](#12-microsoft-teams), [Pedidos](#13-pedidos-planilha-do-erp), [Ambientes](#14-ambientes-kira-20) e [Rascunhos automáticos](#15-rascunhos-automáticos-de-e-mails-sobre-pedidos)
+7. Opcionais: [Outlook](#7-outlook-e-mails-agenda-e-rascunhos-de-resposta), [Resumo da manhã às 7h](#8-resumo-da-manhã-às-7h), [Google Drive](#9-google-drive-só-leitura), [LinkedIn](#10-linkedin-rascunhos-e-publicar), [Imagens](#11-imagens-com-ia), [Teams](#12-microsoft-teams), [Pedidos](#13-pedidos-planilha-do-erp), [Ambientes](#14-ambientes-kira-20), [Rascunhos automáticos](#15-rascunhos-automáticos-de-e-mails-sobre-pedidos) e [Internet](#16-internet-pesquisa-no-google)
 
 ---
 
@@ -228,6 +228,19 @@ Se o Outlook parar de responder (por exemplo, credencial expirada), a Kira avisa
 
 > São cerca de 26 execuções por dia útil no n8n, quase todas rápidas e sem IA; o Gemini só é chamado para os e-mails que parecem ser sobre pedidos.
 
+## 16. Internet (pesquisa no Google)
+
+A ferramenta **pesquisar_internet** faz a Kira pesquisar no Google quando a resposta depende de informação atual: notícias, cotações, preços, clima, leis e normas, empresas, produtos e eventos. Se você mandar um link, ela também lê a página. A resposta vem com a data da informação e as fontes.
+
+Ela usa a própria Busca Google do Gemini, com a **mesma chave gratuita**: não precisa de outra conta nem de outra chave. O sub-workflow ([`kira-pesquisar-internet.json`](../n8n/workflows/kira-pesquisar-internet.json)) tenta um modelo principal e, se ele falhar, um reserva.
+
+1. Importe o sub-workflow, selecione a credencial do Gemini nos dois nós HTTP, publique e, em **Settings → This workflow can be called by**, escolha só a Kira.
+2. Na Kira, selecione o sub-workflow na ferramenta **pesquisar_internet** e publique.
+
+Teste: "Kira, como fechou o Ibovespa no último pregão?".
+
+> O plano gratuito tem um limite diário de pesquisas com a Busca Google. Quando acaba, a Kira avisa e responde com o que já sabe. As perguntas vão para o Google, por isso a Kira é instruída a nunca colocar nelas dados internos da empresa nem dados pessoais seus.
+
 ## Personalizar
 
 Tudo fica no nó **Configuração da Kira**:
@@ -270,6 +283,7 @@ Durante os testes ficou uma linha de teste em `kira_logs` (usuário "Teste @test
 | O resumo chegou sem o áudio | Limite diário da voz do Gemini | O texto sempre chega; o áudio volta no dia seguinte (veja a execução em **Executions**) |
 | A Kira diz que o assunto é de outro ambiente | O ambiente ativo não é o do assunto | Mande "modo <nome>" (o `/status` mostra o ambiente ativo) |
 | Não apareceu rascunho para um e-mail sobre pedido | Fora do horário, e-mail sem palavras de pedido, já respondido, ou a Kira decidiu que não precisava de resposta | Veja as execuções de **Kira — rascunhos automáticos** e a tabela `kira_emails_auto` (coluna `motivo`) |
+| A Kira diz que não conseguiu pesquisar na internet | Limite diário de pesquisas do plano gratuito ou instabilidade | Tente mais tarde; detalhes nas execuções de **Kira — pesquisar na internet** |
 | A Kira diz que não conseguiu gerar a imagem | Limite diário de imagens do plano gratuito ou pedido recusado pelo filtro do Google | Tente amanhã ou mude a descrição; detalhes nas execuções do sub-workflow **Kira — gerar imagem** |
 | "Não consegui processar o seu áudio" | Transcrição sem credencial do Gemini ou modelo indisponível | Selecione a credencial no nó *Transcrever áudio (Gemini)* e confira o modelo |
 | "Atingi o limite de uso do Gemini" | Limite por minuto ou por dia do plano gratuito | Espere alguns minutos ou ative o faturamento |
@@ -288,5 +302,5 @@ A Kira também roda no n8n instalado na VPS. Pontos de atenção:
    - `kira_logs`: `chat_id`, `user_id`, `usuario`, `tipo_entrada`, `entrada`, `resposta`, `modo_resposta`, `entregue_como`, `status`, `erro`, `execucao_id`, `contexto` (texto) e `latencia_ms` (número)
    - `kira_linkedin` e `kira_imagens`: veja os passos 10 e 11
    - `kira_config`, `kira_tarefas` e `kira_contatos`: veja o passo 14; `kira_emails_auto`: passo 15
-5. Importe [`n8n/workflows/kira-1.0.json`](../n8n/workflows/kira-1.0.json) (**Workflows → Import from file**), crie as credenciais dos passos 1 a 3 e preencha o `perfil_dono`. Importe também os sub-workflows das imagens, do Teams e dos pedidos e o workflow dos rascunhos automáticos (passos 11 a 15).
+5. Importe [`n8n/workflows/kira-1.0.json`](../n8n/workflows/kira-1.0.json) (**Workflows → Import from file**), crie as credenciais dos passos 1 a 3 e preencha o `perfil_dono`. Importe também os sub-workflows das imagens, do Teams, dos pedidos e da internet e o workflow dos rascunhos automáticos (passos 11 a 16).
 6. Desative a Kira do n8n Cloud antes de publicar a da VPS (um bot, um webhook).

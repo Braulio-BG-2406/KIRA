@@ -53,7 +53,8 @@ Os nomes em **negrito** são os nós do workflow [`n8n/workflows/kira-1.0.json`]
    - **rascunho_linkedin**: guarda o post (e o número da imagem, se houver) em `kira_linkedin`;
    - **gerar_imagem** e **anexar_imagem_email**: chamam os sub-workflows de imagem (abaixo);
    - **conversas_teams**, **ler_conversa_teams** e **enviar_mensagem_teams**: sub-workflow do Teams;
-   - **consultar_pedidos**: sub-workflow que lê a planilha de pedidos do ERP no SharePoint.
+   - **consultar_pedidos**: sub-workflow que lê a planilha de pedidos do ERP no SharePoint;
+   - **pesquisar_internet**: sub-workflow que pesquisa com a Busca Google do Gemini e devolve a resposta com as fontes.
 9. **Resposta da Kira** (ou **Resposta de erro**, se a transcrição ou a IA falharem) padroniza a resposta.
 10. **Resposta pronta** decide voz ou texto e prepara o texto falado e a legenda.
     - Voz: **Gerar voz (Gemini)** → **Preparar áudio (WAV)** → **Áudio para arquivo** → **Enviar áudio**.
@@ -66,6 +67,7 @@ Os nomes em **negrito** são os nós do workflow [`n8n/workflows/kira-1.0.json`]
 - **Kira — gerar imagem (ferramenta)**: **Preparar pedido** (descrição, formato e modelo) → **Registrar imagem** (`kira_imagens`, para ter o número) → **Gerar imagem (Gemini)** (se falhar, **Gerar imagem (reserva)** com outro modelo) → **Extrair imagem** → **Imagem para arquivo** → **Enviar imagem** (foto no Telegram, legenda "🖼️ Imagem #N") → **Guardar arquivo** (o `file_id` do Telegram) → **Imagem pronta**. Qualquer falha cai em **Explicar falha**, que devolve à Kira um motivo curto (por exemplo, fim da cota gratuita).
 - **Kira — anexar imagem ao e-mail (ferramenta)**: **Buscar imagem** (só do próprio usuário) → **Baixar imagem** (do Telegram) → **Imagem em base64** → **Anexar ao rascunho** (Microsoft Graph, anexo do rascunho) → **Anexo pronto**.
 - **Kira — Teams (ferramenta)**: **Qual ação?** separa listar, ler e enviar. Listar: **Buscar conversas** (Graph, com participantes e última mensagem) → **Resumir conversas** (tira o dono da lista, filtra por nome, ordena pela mais recente). Ler: **Buscar mensagens** → **Resumir mensagens** (texto limpo, em ordem). Enviar: **Preparar envio** (HTML seguro) → **Enviar mensagem** → **Mensagem enviada**. Erros viram **Explicar falha**.
+- **Kira — pesquisar na internet (ferramenta)**: **Preparar pesquisa** (a pergunta, a data de hoje e as regras; liga a Busca Google e, se houver link, a leitura da página) → **Pesquisar (Gemini + Google)** (se falhar, **Pesquisar (reserva)** com outro modelo) → **Extrair resposta** (o texto final, sem os "pensamentos" do modelo, e até 6 fontes sem repetição). Falhas viram **Explicar falha** (por exemplo, fim da cota gratuita).
 - **Kira — pedidos (ferramenta)**: **Informações do arquivo** (nome e data de atualização) → **Baixar planilha** → **Ler planilha** (xlsx) → **Consultar planilha** (busca por número ou nome, filtros de atrasados, compras, solicitações e produção, resumo por situação, só os campos úteis). Erros viram **Explicar falha**.
 
 ### Rascunhos automáticos (workflow separado)
@@ -107,6 +109,8 @@ Todas as tabelas também têm `id`, `createdAt` e `updatedAt`, criados pelo n8n.
 
 **Rascunhos automáticos, nunca envio.** Um workflow agendado, separado da Kira, prepara respostas para e-mails sobre pedidos. Um filtro por palavras evita chamar a IA para e-mails que não interessam; a IA decide se responde, consulta a planilha e escreve; o Outlook só recebe um rascunho (`createReply`). O e-mail é tratado como texto de terceiros (a Kira ignora instruções dentro dele), remetentes de fora recebem só dados dos pedidos que citaram e, quando o pedido não está na planilha, a resposta não afirma que ele não existe.
 
+**Internet pela Busca Google do próprio Gemini.** Em vez de outro serviço de busca (que pediria outra conta e outra chave), a ferramenta usa o *grounding* com a Busca Google do Gemini, com a mesma chave gratuita: o modelo pesquisa, lê os resultados e responde com as fontes. Fica num sub-workflow para a Kira receber só a resposta e as fontes, já limpas, e para trocar de modelo sem mexer na Kira. As perguntas vão para o Google; por isso as instruções proíbem colocar nelas dados internos da empresa ou dados pessoais.
+
 **Resumo da manhã em workflow separado.** Às 7h, RSS de fontes confiáveis + cotações + Gemini + Telegram. Fica separado da Kira para que uma falha num não afete o outro. O Gemini recebe só a lista de notícias do dia e é instruído a não usar nada de fora dela; se ele falhar, vão os títulos com link. Depois do texto, um segundo pedido ao Gemini transforma o resumo num roteiro curto de rádio e a voz do Gemini o lê (o mesmo caminho de áudio da Kira). As buscas do Google Notícias passam por uma lista de veículos confiáveis.
 
 **Áudio como "arquivo de áudio", não como "mensagem de voz".** O nó do Telegram no n8n não tem a operação de mensagem de voz (*sendVoice*). Chamar a API do Telegram direto exigiria colocar o token do bot dentro do workflow, o que é inseguro. Por isso a resposta sai como áudio tocável (título "Kira") com o texto na legenda.
@@ -132,9 +136,9 @@ Todas as tabelas também têm `id`, `createdAt` e `updatedAt`, criados pelo n8n.
 
 - A voz chega como arquivo de áudio, não como mensagem de voz com a onda sonora.
 - A memória da conversa se perde quando o n8n reinicia (as memórias guardadas não).
-- E-mail e agenda só do Outlook: a Kira lê e prepara rascunhos, mas não envia. No Teams, ela só escreve em conversas que já existem. Dos dados da empresa, só a planilha de pedidos exportada pelo ERP; ainda sem OneDrive e sem busca na internet durante a conversa. A Kira foi instruída a dizer isso em vez de inventar.
+- E-mail e agenda só do Outlook: a Kira lê e prepara rascunhos, mas não envia. No Teams, ela só escreve em conversas que já existem. Dos dados da empresa, só a planilha de pedidos exportada pelo ERP; ainda sem OneDrive. A Kira foi instruída a dizer isso em vez de inventar.
 - O Google Drive é só leitura, e PDFs, Word e imagens do Drive ainda não são lidos.
-- As imagens dependem da cota gratuita diária do Gemini.
+- As imagens e as pesquisas na internet dependem das cotas gratuitas diárias do Gemini.
 - O ambiente ativo vale para você em todos os chats e só muda por mensagem ("modo <nome>").
 - Os rascunhos automáticos rodam de segunda a sexta, das 7h às 19h30, até 5 e-mails por rodada, e só usam a planilha de pedidos.
 - O resumo das 7h é enviado por outro workflow: a Kira da conversa não "lembra" dele.

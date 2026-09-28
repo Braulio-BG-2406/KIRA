@@ -2,7 +2,7 @@
 
 Meu bot particular: a **Kira** é uma assistente pessoal de IA que roda no **n8n**, pensa com o **Google Gemini** e conversa comigo pelo **Telegram**, por texto ou por voz.
 
-> **Status: no ar, já com os ambientes da Kira 2.0** (Trabalho, Negócios e Pessoal, cada um com memórias, tarefas e contatos separados), grátis (chave gratuita do Gemini): Outlook (leitura e rascunhos de resposta), Google Drive (leitura), Microsoft Teams (lê e responde quando você pede), pedidos da empresa (planilha do ERP), rascunhos de posts do LinkedIn, imagens com IA, resumo de notícias às 7h em texto e áudio e rascunhos automáticos para e-mails que perguntam de pedidos. Para montar do zero, siga o [guia de configuração](docs/configuracao.md).
+> **Status: no ar, já com os ambientes da Kira 2.0** (Trabalho, Negócios e Pessoal, cada um com memórias, tarefas e contatos separados), grátis (chave gratuita do Gemini): Outlook (leitura e rascunhos de resposta), Google Drive (leitura), Microsoft Teams (lê e responde quando você pede), pedidos da empresa (planilha do ERP), pesquisa na internet (Busca Google), rascunhos de posts do LinkedIn, imagens com IA, resumo de notícias às 7h em texto e áudio e rascunhos automáticos para e-mails que perguntam de pedidos. Para montar do zero, siga o [guia de configuração](docs/configuracao.md).
 
 ## Como funciona
 
@@ -47,6 +47,7 @@ Meu bot particular: a **Kira** é uma assistente pessoal de IA que roda no **n8n
 | 🖼️ Imagens | Gera imagens com o Gemini ("Nano Banana") quando você pede, manda no Telegram e numera (#1, #2…) para usar no LinkedIn ou em e-mails. |
 | 💬 Teams | Lista e lê suas conversas do Microsoft Teams e escreve ou responde em seu nome **quando você pede** ("responde o João que o pedido sai amanhã"). |
 | 📦 Pedidos | Consulta a planilha de pedidos exportada todo dia pelo ERP (pedido, cliente, material, prazos, atraso, compras, solicitações, produção) e responde citando a fonte e a data de atualização. |
+| 🌐 Internet | Pesquisa no Google quando a resposta depende de informação atualizada (notícias, cotações, preços, clima, leis, empresas) e lê a página quando você manda um link. Responde com a data da informação e as fontes. |
 | 📝 Rascunhos automáticos | De segunda a sexta, a cada 30 minutos, olha os e-mails novos, separa os que perguntam de pedidos, consulta a planilha e deixa a resposta como **rascunho** no Outlook (nunca envia). Depois avisa no Telegram. |
 | ☀️ Resumo da manhã | Todo dia às 7h: Brasil, Mundo, Mercado financeiro, Mineração/petróleo/siderurgia/florestal, Política e Tecnologia, com links das fontes, cotações do dia e **áudio na voz da Kira**. |
 
@@ -61,6 +62,7 @@ Meu bot particular: a **Kira** é uma assistente pessoal de IA que roda no **n8n
 | [`n8n/workflows/kira-anexar-imagem.json`](n8n/workflows/kira-anexar-imagem.json) | Sub-workflow da ferramenta `anexar_imagem_email` (e o SDK em [`n8n/sdk/kira-anexar-imagem.workflow.ts`](n8n/sdk/kira-anexar-imagem.workflow.ts)) |
 | [`n8n/workflows/kira-teams.json`](n8n/workflows/kira-teams.json) | Sub-workflow das ferramentas do Teams (e o SDK em [`n8n/sdk/kira-teams.workflow.ts`](n8n/sdk/kira-teams.workflow.ts)) |
 | [`n8n/workflows/kira-pedidos.json`](n8n/workflows/kira-pedidos.json) | Sub-workflow da ferramenta `consultar_pedidos` (e o SDK em [`n8n/sdk/kira-pedidos.workflow.ts`](n8n/sdk/kira-pedidos.workflow.ts)) |
+| [`n8n/workflows/kira-pesquisar-internet.json`](n8n/workflows/kira-pesquisar-internet.json) | Sub-workflow da ferramenta `pesquisar_internet` (e o SDK em [`n8n/sdk/kira-pesquisar-internet.workflow.ts`](n8n/sdk/kira-pesquisar-internet.workflow.ts)) |
 | [`n8n/workflows/kira-rascunhos-automaticos.json`](n8n/workflows/kira-rascunhos-automaticos.json) | Workflow dos rascunhos automáticos de e-mails sobre pedidos (e o SDK em [`n8n/sdk/kira-rascunhos-automaticos.workflow.ts`](n8n/sdk/kira-rascunhos-automaticos.workflow.ts)) |
 | [`docs/configuracao.md`](docs/configuracao.md) | Passo a passo para ativar, primeiro teste e solução de problemas |
 | [`docs/arquitetura.md`](docs/arquitetura.md) | Como tudo se encaixa, decisões técnicas e próximos passos |
@@ -75,7 +77,7 @@ Com Node.js 18 ou mais recente:
 npm test
 ```
 
-Os testes executam o código dos nós dos workflows (formatação para o Telegram, voz e texto, áudio WAV, comandos, ambientes e troca de ambiente, memórias por ambiente, `/publicar` com e sem imagem, geração e anexo de imagens, Teams, consulta de pedidos, rascunhos automáticos, resumo da manhã com cotações, fontes confiáveis e áudio), conferem que Outlook e Drive só leem (o Outlook só cria rascunhos) e verificam que nenhum token, chave de API ou caminho de webhook foi parar nos arquivos.
+Os testes executam o código dos nós dos workflows (formatação para o Telegram, voz e texto, áudio WAV, comandos, ambientes e troca de ambiente, memórias por ambiente, `/publicar` com e sem imagem, geração e anexo de imagens, Teams, consulta de pedidos, pesquisa na internet, rascunhos automáticos, resumo da manhã com cotações, fontes confiáveis e áudio), conferem que Outlook e Drive só leem (o Outlook só cria rascunhos) e verificam que nenhum token, chave de API ou caminho de webhook foi parar nos arquivos.
 
 ## Segurança
 
@@ -87,5 +89,5 @@ Os testes executam o código dos nós dos workflows (formatação para o Telegra
 ## Roadmap
 
 - **Kira 1.0**: Telegram + Gemini, texto e voz, memória, comandos e logs; Outlook (leitura e rascunhos), Google Drive (leitura), Teams (lê e responde quando você pede), pedidos da empresa, LinkedIn (rascunhos e `/publicar`), imagens com IA e resumo das 7h em texto e áudio.
-- **Kira 2.0** (agora): ambientes **Trabalho**, **Negócios** e **Pessoal**, com memórias, histórico, tarefas e contatos separados, e rascunhos automáticos para e-mails sobre pedidos.
+- **Kira 2.0** (agora): ambientes **Trabalho**, **Negócios** e **Pessoal**, com memórias, histórico, tarefas e contatos separados, rascunhos automáticos para e-mails sobre pedidos e pesquisa na internet.
 - **Próximos**: dados reais de Negócios (clientes, vendas, estoque) e de finanças, memória da conversa que sobrevive a reinícios e um resumo do dia com agenda e tarefas. Detalhes em [arquitetura.md](docs/arquitetura.md#próximos-passos).

@@ -1204,6 +1204,300 @@ teste('internet: a Kira tem a ferramenta e as instruções não dizem mais que e
   assert.match(comando('/status').texto_resposta, /Internet: pesquiso no Google/);
 });
 
+// ---------- Planilha do negócio (vendas, vendedoras, clientes, estoque e precificação) ----------
+const planilhaNegocio = JSON.parse(ler('n8n/workflows/kira-planilha-negocio.json'));
+const codigoPlanilha = (nome) => noDe(planilhaNegocio, nome).parameters.jsCode;
+
+// Planilha fictícia com a mesma estrutura da real: painéis com cartões (R$ e %), precificação,
+// configurações (parâmetros e tabela de banhos no meio da aba), e as quatro bases do sistema de vendas
+// (com linhas de total e de período que precisam ser ignoradas).
+function xlsxDoNegocio() {
+  const textos = [];
+  const txt = (t) => {
+    let i = textos.indexOf(t);
+    if (i === -1) i = textos.push(t) - 1;
+    return i;
+  };
+  const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  // linhas: [número da linha, [[coluna, valor, estilo], ...]]; estilo 1 = R$, 2 = %, 3 = data
+  const folha = (linhas) =>
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${linhas
+      .map(
+        ([r, celulas]) =>
+          `<row r="${r}">${celulas
+            .map(([c, v, s]) => {
+              const ref = `${c}${r}`;
+              const estilo = s ? ` s="${s}"` : '';
+              if (v === null) return `<c r="${ref}"${estilo}/>`;
+              if (v === '#VALUE!') return `<c r="${ref}" t="e"><v>#VALUE!</v></c>`;
+              if (typeof v === 'number') return `<c r="${ref}"${estilo}><v>${v}</v></c>`;
+              if (v.startsWith('~')) return `<c r="${ref}" t="inlineStr"><is><t>${esc(v.slice(1))}</t></is></c>`;
+              return `<c r="${ref}" t="s"><v>${txt(v)}</v></c>`;
+            })
+            .join('')}</row>`,
+      )
+      .join('')}</sheetData></worksheet>`;
+  const linhaDe = (r, colunas, valores) => [r, valores.map((v, i) => [colunas[i], v]).filter(([, v]) => v !== undefined)];
+  const L = (s) => s.split(' ');
+  const abas = [
+    [
+      'PRECIFICAÇÃO',
+      [
+        [2, [['B', 'PRECIFICAÇÃO'], ['F', 'OURO DO DIA (R$/g)'], ['I', 'RÓDIO DO DIA (R$/g)'], ['L', 'MARKUP PADRÃO'], ['N', 'EMBALAGEM / PEÇA']]],
+        [3, [['F', 700, 1], ['I', 3000, 1], ['L', 4], ['N', 8, 1]]],
+        [6, [['B', 'PEÇAS (QTD)'], ['D', 'MARGEM MÉDIA (VAREJO)']]],
+        [7, [['B', 30], ['D', 0.655, 2]]],
+        linhaDe(9, L('B C D E F G H I J K L M N O P Q R S T'), ['Data', 'Fornecedor', 'Código', 'Produto', 'Bruto (R$)', 'Qtd', 'Peso (g)', 'Banho', 'Varejo (R$)', 'Atacado (R$)', 'Consignado (R$)', 'Margem varejo', 'Margem atacado', 'Margem consignado', 'Cotação', 'Markup', 'Custo peça (R$)', 'Custo total (R$)', 'Margem líq. varejo']),
+        [10, [['B', serial('2026-09-01'), 3], ['C', 'Fornecedor A'], ['D', 'AN01'], ['E', 'ANEL SOLITÁRIO'], ['F', 10, 1], ['G', 5], ['H', 2], ['I', '5+CA'], ['J', 100, 1], ['K', 50, 1], ['L', 80, 1], ['M', 0.6, 2], ['N', 0.2, 2], ['O', 0.5, 2], ['P', '🔒 TRAVADO'], ['Q', 4], ['R', 20, 1], ['S', 28, 1], ['T', 0.3, 2]]],
+        [11, [['B', serial('2026-09-10'), 3], ['C', 'Fornecedor B'], ['D', 'BR02'], ['E', 'BRINCO GOTA'], ['F', 4, 1], ['G', 10], ['H', 1], ['I', 'RODIO'], ['J', 60, 1], ['K', 30, 1], ['L', 48, 1], ['M', 0.7, 2], ['N', 0.4, 2], ['O', 0.6, 2], ['P', '🔒 TRAVADO'], ['Q', 4], ['R', 10, 1], ['S', 18, 1], ['T', 0.4, 2]]],
+        [12, [['D', 'X9'], ['F', 5, 1]]],
+      ],
+    ],
+    ['PAINEL VENDAS', [[6, [['B', 'FATURAMENTO'], ['C', 'MARGEM BRUTA'], ['D', 'Peças']]], [7, [['B', 1500.5, 1], ['C', 0.4, 2], ['D', 16]]]]],
+    [
+      'FECHAMENTO VENDEDORAS',
+      [
+        [6, [['B', 'CONSIGNADO LANÇADO'], ['D', 'ACERTOS EM ABERTO']]],
+        [7, [['B', 5000, 1], ['D', 1]]],
+        [10, [...L('B C D E F G H I J K L M N').map((c, i) => [c, ['Ciclo', 'Vendedora', 'Início', 'Fechamento', 'Dias', 'Consignado (R$)', 'Vendido (R$)', '% vendido', 'Comissão %', 'Comissão (R$)', 'A pagar (R$)', 'Status', 'Observação'][i]]), ['P', 'Vendedora'], ['Q', 'Acertos']]],
+        [11, [['B', 'SETEMBRO'], ['C', 'Ana Teste'], ['D', serial('2026-09-01'), 3], ['G', 3000, 1], ['H', 900, 1], ['M', '⏳ EM ABERTO'], ['N', 'acerto no fim do mês'], ['P', 'Ana Teste'], ['Q', 1]]],
+        [12, [['B', 'AGOSTO'], ['C', 'Bia Teste'], ['D', serial('2026-08-01'), 3], ['E', serial('2026-08-31'), 3], ['F', 30], ['G', 2000, 1], ['H', 1000, 1], ['I', 0.5, 2], ['J', 0.25, 2], ['K', 250, 1], ['L', 750, 1], ['M', '✅ FECHADO'], ['P', 'Bia Teste'], ['Q', 1]]],
+      ],
+    ],
+    [
+      'CONFIGURAÇÕES',
+      [
+        [15, [['B', 'Parâmetro'], ['C', 'Valor'], ['D', 'Como é usado']]],
+        [16, [['B', 'Markup padrão (linhas novas)'], ['C', 4]]],
+        [17, [['B', 'Desconto do atacado'], ['C', 0.5, 2]]],
+        [18, [['B', 'Desconto do consignado'], ['C', 0.2, 2]]],
+        [19, [['B', 'Comissão das vendedoras'], ['C', 0.3, 2]]],
+        [20, [['B', 'Margem mínima (alerta)'], ['C', 0.25, 2]]],
+        [21, [['B', 'Embalagem entra no custo das margens?'], ['C', 'SIM']]],
+        [22, [['B', 'Embalagem + insumos por peça (R$)'], ['C', 8, 1]]],
+        [23, [['B', 'Custos fixos mensais (R$)'], ['C', 1000, 1]]],
+        [27, [['B', 'TIPOS DE BANHO']]],
+        linhaDe(29, L('B C D E F G H I'), ['Código', 'Metal', 'Milésimos', 'Mão de obra (milésimos)', 'Verniz', 'Verniz (R$/g)', 'R$/g hoje', 'Descrição']),
+        [30, [['B', '5+CA'], ['C', 'OURO'], ['D', 5], ['E', 3], ['F', 'CA'], ['G', 0.35, 1], ['H', 5.95, 1], ['I', 'Ouro 5 milésimos + verniz']]],
+        [31, [['B', 'RODIO'], ['C', 'RODIO'], ['D', 1], ['E', 0], ['G', 0, 1], ['H', 3, 1], ['I', 'Ródio']]],
+        [32, [['B', 'SEM BANHO'], ['C', 'NENHUM'], ['D', 0], ['E', 0], ['G', 0, 1], ['H', 0, 1], ['I', 'Peça pronta']]],
+        [34, [['B', 'Cartão do dólar'], ['C', '#VALUE!']]],
+        [40, [['B', 'Estoque mínimo por item (alerta)'], ['C', 1]]],
+        [41, [['B', 'Dias sem comprar para cliente inativo'], ['C', 90]]],
+        [42, [['B', 'Data de referência dos clientes'], ['C', serial('2026-09-20'), 3]]],
+      ],
+    ],
+    [
+      'BD NEGOCIO CARTEIRA DE CLIENTE',
+      [
+        [1, [['A', '~Base carregada pelo Power Query. Não edite aqui.']]],
+        linhaDe(2, L('A B C D E F G H I J'), ['Nome da Origem', 'Cliente', 'Última Venda', 'Qtde.Vendas', 'Ticket Médio', 'Vendas Totais', 'Total Recebido', 'Em Atraso', 'A Receber', 'Crédito Disponível']),
+        linhaDe(3, L('A B C D E F G H I J'), ['Relatorio', 'Cliente Alfa', '15/09/2026', 3, 100, 300, 250, 50, 0, -50]),
+        linhaDe(4, L('A B C D E F G H I J'), ['Relatorio', 'Cliente Beta', '01/05/2026', 10, 200, 2000, 2000, 0, 0, 0]),
+        linhaDe(5, L('A B C D E F G H I J'), ['Relatorio', 'Cliente Gama', '10/09/2026', 1, 80, 80, 0, 0, 80, 0]),
+        linhaDe(6, L('A C D E F'), ['Relatorio', 'Totais ', 14, 999, 2380]),
+      ],
+    ],
+    [
+      'BD NEGOCIO POSIÇÃO DE ESTOQUE',
+      [
+        [1, [...L('A B C D E F G H I J').map((c, i) => [c, ['Nome da Origem', 'Produto', 'Cód.Barras', 'Localização', 'Quantidade', 'Custo Unitário (R$)', 'Custo Total (R$)', 'Venda Unitário (R$)', 'Venda Total (R$)', 'Status'][i]]), ['L', 'Base carregada pelo Power Query da pasta do sistema. Para atualizar, troque o relatório e use Dados > Atualizar Tudo.']]],
+        linhaDe(2, L('A B C D E F G H I J'), ['R', 'ANEL SOLITÁRIO | 14', 'AN01', 'Consignação', 1, 20, 20, 100, 100, '🟢 OK']),
+        linhaDe(3, L('A B C D E F G H I J'), ['R', 'ANEL SOLITÁRIO | 14', 'AN01', 'Estoque Padrão', 2, 20, 40, 100, 200, '🟢 OK']),
+        linhaDe(4, L('A B C D E F G H I J'), ['R', 'ANEL SOLITÁRIO | 16', 'AN01', 'Estoque Padrão', 0, 20, 0, 100, 0, '🔥 SEM ESTOQUE']),
+        linhaDe(5, L('A B C D E F G H I J'), ['R', 'BRINCO GOTA', 'BR02', 'Estoque Padrão', 1, 10, 10, 50, 50, '🟡 ÚLTIMAS PEÇAS']),
+        linhaDe(6, L('A B C D E F G H I J'), ['R', 'COLAR ELO', 'CO03', 'Consignação', 0, 30, 0, 120, 0, '🔥 SEM ESTOQUE']),
+        linhaDe(7, L('A D'), ['R', 'Totais ']),
+      ],
+    ],
+    [
+      'BD NEGOCIO TOTAL DE VENDAS',
+      [
+        linhaDe(1, L('A B C D E F G H I J K L'), ['Nome da Origem', 'Categoria', 'Sub-Categoria', 'Produto', 'Qtd.Vendida', 'Valor Médio', 'Subtotal', 'Valor de Vendas', 'Custo Médio', 'Custo Direto', 'Lucratividade', 'Margem de Lucro']),
+        linhaDe(2, L('A E G H K'), ['R', 16, 1500.5, 1500.5, 990.5]),
+        linhaDe(3, L('A B C D E'), ['R', '1500,5', '01/01/2025', '20/09/2026', 16]),
+        linhaDe(4, L('A B C D E H J K'), ['R', 'ANEL', 'Sem subcategoria', 'ANEL SOLITÁRIO', 5, 500, 100, 400]),
+        linhaDe(5, L('A B C D E H J K'), ['R', 'BRINCOS', 'Sem subcategoria', 'BRINCO GOTA', 8, 600, 200, 400]),
+        linhaDe(6, L('A B C D E H J K'), ['R', 'BRINCOS', 'Argolas', 'ARGOLA LISA', 2, 200.5, 150, 50.5]),
+        linhaDe(7, L('A B C D E H J K'), ['R', 'COLAR', 'Sem subcategoria', 'COLAR ELO', 1, 200, 60, 140]),
+        linhaDe(9, L('A B C D'), ['R', 'Total de Vendas', 'De', 'Até']),
+      ],
+    ],
+    [
+      'BD NEGOCIO VENDAS POR VENDEDOR',
+      [
+        linhaDe(1, L('A B C D E F G'), ['Nome da Origem', 'Vendedor', 'Produto', 'Comissão', 'Quantidade', 'Subtotal', 'Valor Total']),
+        linhaDe(2, L('A B C D E F G'), ['R', 'Ana Teste', 'BRINCO GOTA', 60, 4, 300, 300]),
+        linhaDe(3, L('A B C D E F G'), ['R', 'Ana Teste ', 'ANEL SOLITÁRIO', 25, 1, 100, 100]),
+        linhaDe(4, L('A B C D E F G'), ['R', 'Bia Teste', 'BRINCO GOTA', 75, 4, 300, 300]),
+        linhaDe(5, L('A C D E'), ['R', 'Totais ', 160, 9]),
+      ],
+    ],
+  ];
+  const estilos =
+    '<styleSheet><numFmts count="2"><numFmt numFmtId="164" formatCode="&quot;R$&quot;\\ #,##0.00"/><numFmt numFmtId="165" formatCode="dd/mm/yyyy"/></numFmts>' +
+    '<cellXfs count="4"><xf numFmtId="0"/><xf numFmtId="164" applyNumberFormat="1"/><xf numFmtId="10"/><xf numFmtId="165"><alignment horizontal="center"/></xf></cellXfs></styleSheet>';
+  return zip([
+    { nome: 'xl/workbook.xml', texto: `<workbook><sheets>${abas.map(([nome], i) => `<sheet name="${esc(nome)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('')}</sheets></workbook>` },
+    { nome: 'xl/_rels/workbook.xml.rels', texto: `<Relationships>${abas.map((_, i) => `<Relationship Id="rId${i + 1}" Target="worksheets/sheet${i + 1}.xml"/>`).join('')}</Relationships>` },
+    ...abas.map(([, linhas], i) => ({ nome: `xl/worksheets/sheet${i + 1}.xml`, texto: folha(linhas) })),
+    { nome: 'xl/styles.xml', texto: estilos },
+    { nome: 'xl/sharedStrings.xml', texto: `<sst>${textos.map((t) => `<si><t xml:space="preserve">${esc(t)}</t></si>`).join('')}</sst>` },
+  ]);
+}
+const xlsxNegocio = xlsxDoNegocio().toString('base64');
+const consultarNegocio = (tipo, busca = '', limite = 10) =>
+  executar(codigoPlanilha('Consultar planilha'), {
+    nosAnteriores: {
+      'Quando a Kira consultar a planilha': { ambiente: 'NEGOCIOS', tipo, busca, limite },
+      'Escolher planilha': { id: 'arquivo1', name: 'BD NEGOCIO.xlsx', modifiedTime: '2026-09-25T02:35:31.688Z' },
+    },
+    entrada: [{ arquivo_base64: xlsxNegocio }],
+  })[0];
+
+teste('planilha do negócio: escolhe a planilha mais recente com o nome configurado (xlsx ou Planilha Google)', () => {
+  const escolher = (files, nome = 'BD NEGOCIO') => executar(codigoPlanilha('Escolher planilha'), { nosAnteriores: { 'Planilha do negócio': { nome_do_arquivo: nome } }, entrada: [{ files }] })[0];
+  const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  const arquivos = [
+    { id: 'antigo', name: 'BD NEGOCIO v2.xlsx', mimeType: XLSX, modifiedTime: '2026-08-01T10:00:00Z' },
+    { id: 'novo', name: 'Nova BD Negócio v3.xlsx', mimeType: XLSX, modifiedTime: '2026-09-25T02:35:31Z' },
+    { id: 'pdf', name: 'BD NEGOCIO.pdf', mimeType: 'application/pdf', modifiedTime: '2026-09-28T10:00:00Z' },
+    { id: 'outro', name: 'Relatório de vendas.xlsx', mimeType: XLSX, modifiedTime: '2026-09-28T10:00:00Z' },
+  ];
+  let r = escolher(arquivos);
+  assert.equal(r.id, 'novo');
+  assert.equal(r.outras_versoes, 1);
+  assert.match(r.url, /\/files\/novo\?alt=media$/);
+  r = escolher([{ id: 'g1', name: 'BD NEGOCIO', mimeType: 'application/vnd.google-apps.spreadsheet', modifiedTime: '2026-09-29T00:00:00Z' }, ...arquivos]);
+  assert.match(r.url, /\/files\/g1\/export\?mimeType=application%2Fvnd\.openxmlformats/);
+  assert.throws(() => escolher(arquivos, 'OUTRA BASE'), /Não achei no Google Drive nenhuma planilha com "OUTRA BASE"/);
+});
+teste('planilha do negócio: só abre a planilha no modo Negócios; a Kira manda o ambiente pelo workflow', () => {
+  const trava = noDe(planilhaNegocio, 'Só no modo Negócios');
+  const condicao = trava.parameters.conditions.conditions[0];
+  assert.equal(condicao.rightValue, 'NEGOCIOS');
+  assert.match(condicao.leftValue, /\$json\.ambiente/);
+  assert.equal(planilhaNegocio.connections['Só no modo Negócios'].main[0][0].node, 'Planilha do negócio');
+  assert.equal(planilhaNegocio.connections['Só no modo Negócios'].main[1][0].node, 'Fora do modo Negócios');
+  assert.equal(noDe(planilhaNegocio, 'Planilha do negócio').parameters.assignments.assignments[0].value, 'BD NEGOCIO');
+  const ferramenta = nos.consultar_negocio;
+  assert.ok(ferramenta, 'a Kira precisa da ferramenta consultar_negocio');
+  assert.equal(workflow.connections.consultar_negocio.ai_tool[0][0].node, 'Kira');
+  assert.equal(ferramenta.parameters.workflowInputs.value.ambiente, "={{ $('Ambiente atual').first().json.ambiente }}");
+  assert.doesNotMatch(ferramenta.parameters.workflowInputs.value.ambiente, /\$fromAI/);
+  const instrucoes = nos.Kira.parameters.options.systemMessage;
+  assert.match(instrucoes, /# Planilha do negócio \(só no modo Negócios\)/);
+  assert.match(instrucoes, /Em outro ambiente, não consulte/);
+  assert.match(comando('/status').texto_resposta, /Negócio: consulto a planilha do negócio no Google Drive \(só no modo Negócios\)/);
+});
+teste('planilha do negócio: lê o .xlsx (textos compartilhados e diretos, R$, %, datas, erros) e resume os painéis', () => {
+  const r = consultarNegocio('');
+  assert.equal(r.ok, true);
+  assert.equal(r.tipo, 'resumo');
+  assert.equal(r.fonte, 'Planilha "BD NEGOCIO.xlsx" no Google Drive, salva em 24/09/2026 às 23:35');
+  assert.deepEqual(r.periodo_das_vendas, { de: '01/01/2025', ate: '20/09/2026' });
+  assert.equal(r.clientes_referencia, '20/09/2026');
+  assert.deepEqual(r.paineis['PAINEL VENDAS'], { FATURAMENTO: 'R$ 1.500,50', 'MARGEM BRUTA': '40%' });
+  assert.equal(r.paineis['PRECIFICAÇÃO']['OURO DO DIA (R$/g)'], 'R$ 700,00');
+  assert.equal(r.paineis['PRECIFICAÇÃO']['MARGEM MÉDIA (VAREJO)'], '65,5%');
+  assert.equal(r.paineis['FECHAMENTO VENDEDORAS']['ACERTOS EM ABERTO'], '1');
+  assert.equal(r.configuracoes.desconto_atacado_pct, 50);
+  assert.equal(r.configuracoes.custos_fixos_mensais_rs, 1000);
+  assert.equal(r.configuracoes.embalagem_no_custo, 'SIM');
+  assert.equal(consultarNegocio('xpto').ok, false);
+});
+teste('planilha do negócio: vendas por categoria (singular ou plural) e por produto, sem as linhas de total', () => {
+  let r = consultarNegocio('vendas');
+  assert.deepEqual(r.total, { pecas_vendidas: 16, faturamento_rs: 1500.5, custo_rs: 510, lucro_rs: 990.5, margem_pct: 66, ticket_por_peca_rs: 93.78, produtos_diferentes: 4 });
+  assert.deepEqual(r.por_categoria.map((c) => `${c.categoria}:${c.pecas_vendidas}`), ['BRINCOS:10', 'ANEL:5', 'COLAR:1']);
+  assert.equal(r.mais_vendidos[0].produto, 'BRINCO GOTA');
+  r = consultarNegocio('vendas', 'brinco');
+  assert.equal(r.categoria, 'BRINCOS');
+  assert.equal(r.total_encontrado.faturamento_rs, 800.5);
+  r = consultarNegocio('vendas', 'argolas');
+  assert.equal(r.encontrados, 1);
+  assert.equal(r.produtos[0].subcategoria, 'Argolas');
+  assert.match(consultarNegocio('vendas', 'pulseira').aviso, /Nenhum produto/);
+});
+teste('planilha do negócio: estoque soma variações e locais; zerados, últimas peças e reposição', () => {
+  let r = consultarNegocio('estoque');
+  assert.deepEqual(r.total.por_local, { 'Consignação': { pecas: 1, custo_rs: 20, venda_rs: 100 }, 'Estoque Padrão': { pecas: 3, custo_rs: 50, venda_rs: 250 } });
+  assert.equal(r.total.itens_com_saldo, 2);
+  assert.equal(r.total.itens_zerados, 2);
+  assert.equal(r.total.markup, 5);
+  r = consultarNegocio('estoque', 'anel');
+  assert.equal(r.itens[0].produto, 'ANEL SOLITÁRIO | 14');
+  assert.deepEqual(r.itens[0].por_local, { 'Consignação': 1, 'Estoque Padrão': 2 });
+  assert.equal(r.itens[0].status, 'OK');
+  assert.equal(r.itens[0].vendidas_no_periodo, 5);
+  assert.deepEqual(consultarNegocio('sem_estoque').itens.map((i) => i.produto), ['ANEL SOLITÁRIO | 16', 'COLAR ELO']);
+  assert.deepEqual(consultarNegocio('ultimas pecas').itens.map((i) => i.status), ['ÚLTIMAS PEÇAS']);
+  r = consultarNegocio('reposicao');
+  assert.deepEqual(r.repor.map((x) => `${x.produto}:${x.estoque_atual}`), ['BRINCO GOTA:1', 'ARGOLA LISA:0', 'COLAR ELO:0']);
+  assert.equal(r.repor[1].fora_do_relatorio_de_estoque, true);
+});
+teste('planilha do negócio: clientes em atraso, a receber, para reativar e busca por nome', () => {
+  let r = consultarNegocio('clientes');
+  assert.equal(r.total.clientes, 3);
+  assert.equal(r.total.em_atraso_rs, 50);
+  assert.equal(r.total.a_receber_rs, 80);
+  assert.equal(r.dias_contados_ate, '20/09/2026');
+  r = consultarNegocio('clientes', 'reativar');
+  assert.deepEqual(r.para_reativar.map((c) => `${c.cliente}:${c.dias_sem_comprar}`), ['Cliente Beta:142']);
+  r = consultarNegocio('inadimplentes', '');
+  assert.equal(r.em_atraso[0].cliente, 'Cliente Alfa');
+  assert.equal(r.valor_total_rs, 50);
+  r = consultarNegocio('cliente', 'gama');
+  assert.equal(r.clientes[0].a_receber_rs, 80);
+  assert.equal(r.clientes[0].ultima_compra, '10/09/2026');
+});
+teste('planilha do negócio: vendedoras, comissões, acertos em aberto e quem vendeu um produto', () => {
+  let r = consultarNegocio('vendedoras');
+  assert.deepEqual(r.total, { vendedoras: 2, pecas: 9, vendido_rs: 700, comissoes_rs: 160, comissao_media_pct: 22.9 });
+  assert.equal(r.por_vendedora[0].vendedora, 'Ana Teste');
+  assert.equal(r.por_vendedora[0].vendido_rs, 400);
+  assert.equal(r.acertos_em_aberto.length, 1);
+  assert.equal(r.acertos_em_aberto[0].vendido_pct, 30);
+  assert.equal(r.acertos_do_consignado['CONSIGNADO LANÇADO'], 'R$ 5.000,00');
+  r = consultarNegocio('vendedora', 'bia');
+  assert.equal(r.vendedoras[0].comissao_pct, 25);
+  assert.equal(r.vendedoras[0].acertos[0].status, 'FECHADO');
+  assert.equal(r.vendedoras[0].acertos[0].a_pagar_pela_vendedora_rs, 750);
+  r = consultarNegocio('vendedoras', 'brinco gota');
+  assert.deepEqual(r.quem_vendeu.map((v) => `${v.vendedora}:${v.pecas}`), ['Ana Teste:4', 'Bia Teste:4']);
+});
+teste('planilha do negócio: precificação e simulação de preço com as regras da planilha', () => {
+  let r = consultarNegocio('precos');
+  assert.deepEqual(r.tipos_de_banho.map((b) => `${b.codigo}=${b.custo_por_grama_hoje_rs}`), ['5+CA=5.95', 'RODIO=3', 'SEM BANHO=0']);
+  assert.equal(r.linhas_com_margem_de_atacado_abaixo_do_minimo, 1);
+  assert.equal(r.cotacao_do_dia['MARKUP PADRÃO'], '4');
+  r = consultarNegocio('precos', 'gota');
+  assert.equal(r.pecas[0].varejo_rs, 60);
+  assert.equal(r.pecas[0].margem_atacado_pct, 40);
+  assert.equal(r.pecas[0].cotacao, 'TRAVADO');
+  assert.equal(r.pecas[0].data, '10/09/2026');
+  r = consultarNegocio('simular_preco', 'bruto 12,50 peso 3,2 banho 5+CA');
+  assert.deepEqual(r.simulacao, {
+    banho_por_peca_rs: 19.04,
+    custo_peca_rs: 31.54,
+    custo_total_rs: 39.54,
+    varejo_rs: 134.16,
+    atacado_rs: 67.08,
+    consignado_rs: 107.33,
+    margem_varejo_pct: 70.5,
+    margem_atacado_pct: 41.1,
+    margem_consignado_pct: 63.2,
+    margem_liquida_varejo_pct: 40.5,
+  });
+  r = consultarNegocio('simular', 'bruto 5 peso 1 banho rodio markup 3 qtd 10');
+  assert.equal(r.simulacao.varejo_rs, 32);
+  assert.equal(r.simulacao.venda_total_varejo_rs, 320);
+  assert.match(r.alerta, /margem do atacado fica abaixo da mínima \(25%\)/);
+  r = consultarNegocio('simular_preco', 'bruto 10 banho 5+CA');
+  assert.equal(r.ok, false);
+  assert.match(r.erro, /peso \(g\)/);
+});
+
 teste('segurança: nenhum token do Telegram, chave do Google ou caminho de webhook nos arquivos', () => {
   const arquivos = [
     'n8n/workflows/kira-1.0.json',
@@ -1226,6 +1520,8 @@ teste('segurança: nenhum token do Telegram, chave do Google ou caminho de webho
     'n8n/sdk/kira-base-de-pedidos.workflow.ts',
     'n8n/workflows/kira-rascunho-resposta.json',
     'n8n/sdk/kira-rascunho-resposta.workflow.ts',
+    'n8n/workflows/kira-planilha-negocio.json',
+    'n8n/sdk/kira-planilha-negocio.workflow.ts',
   ];
   for (const arquivo of arquivos) {
     const conteudo = ler(arquivo);

@@ -18,7 +18,7 @@ Prefere rodar na VPS? Veja [Rodar na VPS](#rodar-na-vps-opcional) no fim.
 4. [Publicar o workflow](#4-publicar)
 5. [Liberar o seu ID do Telegram](#5-liberar-o-seu-id)
 6. [Fazer o primeiro teste](#6-primeiro-teste-)
-7. Opcionais: [Outlook](#7-outlook-e-mails-agenda-e-rascunhos-de-resposta), [Resumo da manhã às 7h](#8-resumo-da-manhã-às-7h), [Google Drive](#9-google-drive-só-leitura), [LinkedIn](#10-linkedin-rascunhos-e-publicar), [Imagens](#11-imagens-com-ia), [Teams](#12-microsoft-teams), [Pedidos](#13-pedidos-base-oficial-do-erp), [Ambientes](#14-ambientes-kira-20), [Rascunhos automáticos](#15-rascunhos-automáticos-de-e-mails-sobre-pedidos), [Internet](#16-internet-pesquisa-no-google) e [Assinatura nos rascunhos](#17-assinatura-nos-rascunhos-de-resposta)
+7. Opcionais: [Outlook](#7-outlook-e-mails-agenda-e-rascunhos-de-resposta), [Resumo da manhã às 7h](#8-resumo-da-manhã-às-7h), [Google Drive](#9-google-drive-só-leitura), [LinkedIn](#10-linkedin-rascunhos-e-publicar), [Imagens](#11-imagens-com-ia), [Teams](#12-microsoft-teams), [Pedidos](#13-pedidos-base-oficial-do-erp), [Ambientes](#14-ambientes-kira-20), [Rascunhos automáticos](#15-rascunhos-automáticos-de-e-mails-sobre-pedidos), [Internet](#16-internet-pesquisa-no-google), [Assinatura nos rascunhos](#17-assinatura-nos-rascunhos-de-resposta) e [Planilha do negócio](#18-planilha-do-negócio-modo-negócios)
 
 ---
 
@@ -267,6 +267,23 @@ A assinatura que você configura no Outlook não entra nos rascunhos criados pel
 5. Coloque a imagem em `Kira/assinatura.png` no OneDrive (pela pasta do OneDrive no computador ou pelo site).
 
 Teste: "Kira, deixe pronta uma resposta para o último e-mail do fornecedor dizendo que recebi". O rascunho aparece em Rascunhos com a imagem e o e-mail no fim.
+
+## 18. Planilha do negócio (modo Negócios)
+
+No modo **Negócios**, a ferramenta **consultar_negocio** lê a planilha do seu negócio no Google Drive: um .xlsx que junta os relatórios do sistema de vendas (carteira de clientes, posição de estoque, total de vendas e vendas por vendedora, carregados pelo Power Query), a precificação, os painéis e as configurações. O sub-workflow **Kira — planilha do negócio (ferramenta)** ([`kira-planilha-negocio.json`](../n8n/workflows/kira-planilha-negocio.json)) procura no Drive o arquivo mais recente com o nome configurado, baixa, lê o .xlsx no próprio nó Code (JavaScript puro, sem bibliotecas externas) e devolve só o que interessa à pergunta, com a data do arquivo.
+
+- **Só no modo Negócios.** O ambiente vai para o sub-workflow pelo próprio workflow da Kira (não pela IA). Em qualquer outro ambiente, ele recusa sem abrir a planilha, e a Kira pede para você dizer "modo negócios".
+- **Tipos de consulta:** `resumo` (os números dos painéis e os parâmetros), `vendas` (por categoria e produto), `vendedoras` (vendas, comissões e acertos do consignado), `clientes` (carteira, em atraso, a receber e para reativar), `estoque` (por local e status), `sem_estoque`, `ultimas_pecas`, `reposicao` (os mais vendidos com estoque zerado ou no mínimo), `precos` (cotação do dia, regras, tipos de banho e custos de cada peça) e `simular_preco` (por exemplo, "bruto 12,50 peso 3,2 banho 5+CA": calcula varejo, atacado, consignado e margens com as regras e a cotação da planilha).
+- **Estrutura esperada:** as abas das bases têm no nome `CARTEIRA DE CLIENTE`, `POSIÇÃO DE ESTOQUE`, `TOTAL DE VENDAS` e `VENDAS POR VENDEDOR`; as outras são `PRECIFICAÇÃO`, `CONFIGURAÇÕES`, `FECHAMENTO VENDEDORAS` e os painéis (`PAINEL ...`, com os cartões em maiúsculas e o número logo abaixo). As colunas são achadas pelo nome do cabeçalho, então mudar a ordem não quebra nada. Os números saem do valor que o Excel calculou e gravou ao salvar.
+
+1. Suba a planilha para o Google Drive (pode ser o .xlsx ou uma Planilha Google).
+2. Importe o sub-workflow, selecione a credencial do Google Drive em **Procurar planilha** e **Baixar planilha** e, no nó **Planilha do negócio**, troque `nome_do_arquivo` por um trecho do nome do arquivo (por exemplo, `BD NEGOCIO`).
+3. Publique e, em **Settings → This workflow can be called by**, escolha só a Kira.
+4. Na Kira, selecione o sub-workflow na ferramenta **consultar_negocio** e publique.
+
+Para a Kira ver dados novos: na planilha, **Dados → Atualizar Tudo**, salve e substitua o arquivo no Google Drive (ou suba uma versão nova com o mesmo trecho no nome: vale a mais recente). Teste no modo Negócios: "Kira, me dá um resumo do negócio", "o que eu preciso repor?" ou "simula o preço de uma peça com bruto 12,50, peso 3,2 g e banho 5+CA".
+
+> As vendas são o total do período do relatório (não dá para separar por mês) e os "dias sem comprar" dos clientes contam até a data de referência da planilha. Como a planilha tem dados de clientes e vendedoras, o sub-workflow não guarda no histórico as execuções que dão certo. Esses dados passam pelo Gemini; no plano gratuito, o Google pode usar o conteúdo para melhorar os produtos dele.
 
 ## Personalizar
 

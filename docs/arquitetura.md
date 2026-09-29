@@ -15,8 +15,8 @@ A Kira é um **agente central** que roda no n8n e conversa pelo Telegram, por te
            │                     │                     │
      🏢 TRABALHO            💼 NEGÓCIOS            👤 PESSOAL
    Outlook, Teams,        clientes, vendas,      agenda, estudos,
-   pedidos (ERP),         estoque, leads         rotina, notícias,
-   rascunhos              (fontes a conectar)    Google Drive
+   pedidos (ERP),         estoque e preços       rotina, notícias,
+   rascunhos              (planilha do negócio)  Google Drive
            │                     │                     │
            └── memórias, histórico, tarefas e contatos separados ──┘
 
@@ -55,7 +55,8 @@ Os nomes em **negrito** são os nós do workflow [`n8n/workflows/kira-1.0.json`]
    - **gerar_imagem** e **anexar_imagem_email**: chamam os sub-workflows de imagem (abaixo);
    - **conversas_teams**, **ler_conversa_teams** e **enviar_mensagem_teams**: sub-workflow do Teams;
    - **consultar_pedidos**: sub-workflow que lê a base compacta de pedidos, gerada a partir da planilha oficial do ERP (abaixo);
-   - **pesquisar_internet**: sub-workflow que pesquisa com a Busca Google do Gemini e devolve a resposta com as fontes.
+   - **pesquisar_internet**: sub-workflow que pesquisa com a Busca Google do Gemini e devolve a resposta com as fontes;
+   - **consultar_negocio**: sub-workflow que lê a planilha do negócio no Google Drive, só no modo Negócios (abaixo).
 9. **Resposta da Kira** (ou **Resposta de erro**, se a transcrição ou a IA falharem) padroniza a resposta.
 10. **Resposta pronta** decide voz ou texto e prepara o texto falado e a legenda.
     - Voz: **Gerar voz (Gemini)** → **Preparar áudio (WAV)** → **Áudio para arquivo** → **Enviar áudio**.
@@ -70,6 +71,7 @@ Os nomes em **negrito** são os nós do workflow [`n8n/workflows/kira-1.0.json`]
 - **Kira — Teams (ferramenta)**: **Qual ação?** separa listar, ler e enviar. Listar: **Buscar conversas** (Graph, com participantes e última mensagem) → **Resumir conversas** (tira o dono da lista, filtra por nome, ordena pela mais recente). Ler: **Buscar mensagens** → **Resumir mensagens** (texto limpo, em ordem). Enviar: **Preparar envio** (HTML seguro) → **Enviar mensagem** → **Mensagem enviada**. Erros viram **Explicar falha**.
 - **Kira — pesquisar na internet (ferramenta)**: **Preparar pesquisa** (a pergunta, a data de hoje e as regras; liga a Busca Google e, se houver link, a leitura da página) → **Pesquisar (Gemini + Google)** (se falhar, **Pesquisar (reserva)** com outro modelo) → **Extrair resposta** (o texto final, sem os "pensamentos" do modelo, e até 6 fontes sem repetição). Falhas viram **Explicar falha** (por exemplo, fim da cota gratuita).
 - **Kira — pedidos (ferramenta)**: **Baixar base** (a base compacta do OneDrive, como texto) → **Consultar base** (busca por número ou nome; tipos pedido, abertos, atrasados, compra, solicitação, produção, resumo e totais por mês e unidade; junta as linhas do mesmo item, que a planilha repete por NF ou ordem de compra; devolve só os campos úteis, a fonte, a hora da planilha e a cobertura). Erros viram **Explicar falha**.
+- **Kira — planilha do negócio (ferramenta)**: **Só no modo Negócios** (o ambiente vem do workflow da Kira; fora de Negócios, **Fora do modo Negócios** recusa sem abrir nada) → **Planilha do negócio** (trecho do nome do arquivo) → **Procurar planilha** (Google Drive, .xlsx ou Planilha Google) → **Escolher planilha** (a mais recente com o nome) → **Baixar planilha** → **Planilha em base64** → **Consultar planilha** (lê o .xlsx no próprio nó: descompressão em JavaScript puro, abas pelo nome, colunas pelo cabeçalho, formatos de R$, % e data pelo estilo das células; devolve só o que a pergunta pede, com a data do arquivo). Erros viram **Explicar falha**.
 - **Kira — rascunho de resposta com assinatura (ferramenta)**: **Assinatura** (e-mail e caminho da imagem) → **Imagem da assinatura** (dados do arquivo no OneDrive) → **Montar resposta** (baixa a imagem, lê largura e altura do cabeçalho do PNG, JPG ou GIF, limita a 600 px e monta o HTML: texto, imagem pelo `cid` e e-mail) → **Criar rascunho** (`createReply` com o texto) → **Tem imagem?** → **Anexar imagem da assinatura** (anexo *inline* com o mesmo `cid`) → **Rascunho pronto**. Sem a imagem, o rascunho sai só com o e-mail e um aviso. Usado pela Kira e pelos rascunhos automáticos.
 
 ### Base oficial de pedidos (workflow separado)
@@ -115,6 +117,8 @@ Todas as tabelas também têm `id`, `createdAt` e `updatedAt`, criados pelo n8n.
 
 **Pedidos pela base oficial, lida em etapas e guardada compacta.** A planilha oficial de pedidos (todas as unidades) passa de 250 MB: o Excel Online não abre, e baixar e ler tudo a cada pergunta levaria minutos. Por isso a leitura pesada fica num workflow agendado, que roda só quando a planilha muda e guarda no OneDrive uma base compacta (itens dos últimos 120 dias, todos os em aberto e os totais mensais por unidade). A ferramenta da Kira só baixa essa base e filtra (poucos segundos) e manda ao Gemini só as linhas e colunas da pergunta, com a hora da planilha para ela citar. Tudo com a mesma credencial do Teams e sem serviço pago: a descompressão é JavaScript puro dentro do nó Code, e o limite de 60 segundos por nó é contornado com voltas de ~35 segundos que passam o estado adiante.
 
+**Planilha do negócio lida na hora, só no modo Negócios.** A planilha do negócio tem menos de 1 MB, então a ferramenta baixa e lê o arquivo a cada consulta (poucos segundos) e a Kira sempre vê a versão mais recente que você salvou no Drive, sem sincronização. A leitura reaproveita o descompressor em JavaScript puro da base de pedidos; as abas são achadas pelo nome e as colunas pelo cabeçalho, e os números vêm do valor que o Excel gravou ao salvar (inclusive os cartões dos painéis, já com R$ e %). A simulação de preço refaz no código as fórmulas da precificação, para a IA não fazer conta de cabeça. A trava do ambiente fica no sub-workflow e o ambiente vem do workflow da Kira, então nem uma instrução confusa faz a planilha aparecer em outro ambiente; as execuções que dão certo não ficam no histórico, porque levam dados de clientes.
+
 **Assinatura nos rascunhos por um sub-workflow.** A assinatura do Outlook não entra em rascunhos criados pela API. O sub-workflow monta o texto com a imagem (anexo *inline*, referenciado por `cid`) e o e-mail do dono, e é o mesmo para os rascunhos que você pede e para os automáticos. A imagem fica no OneDrive, para você trocar sem mexer no n8n.
 
 **Ambientes separados (Kira 2.0).** O ambiente ativo fica em `kira_config` e só muda por uma mensagem curta de troca ("modo pessoal"), reconhecida por código, sem IA: assim a troca é previsível e barata. A separação vale em várias camadas: a memória da conversa usa uma chave por ambiente, as memórias de longo prazo são filtradas antes de chegar à IA, e as ferramentas de tarefas, contatos e conversas filtram por usuário e ambiente com valores que vêm do workflow, nunca da IA. As instruções completam o resto: a Kira não usa dados de outro ambiente sem autorização na mesma mensagem. A lista de ambientes fica num nó próprio (**Ambientes da Kira**), separado da configuração geral.
@@ -149,6 +153,7 @@ Todas as tabelas também têm `id`, `createdAt` e `updatedAt`, criados pelo n8n.
 - A voz chega como arquivo de áudio, não como mensagem de voz com a onda sonora.
 - A memória da conversa se perde quando o n8n reinicia (as memórias guardadas não).
 - E-mail e agenda só do Outlook: a Kira lê e prepara rascunhos, mas não envia. No Teams, ela só escreve em conversas que já existem. Dos dados da empresa, só a base oficial de pedidos (itens dos últimos 120 dias, os em aberto e os totais mensais); os demais arquivos do OneDrive ainda não. A Kira foi instruída a dizer isso em vez de inventar.
+- A planilha do negócio mostra os números da última vez que foi atualizada e salva no Drive; as vendas são o total do período do relatório (não por mês).
 - O Google Drive é só leitura, e PDFs, Word e imagens do Drive ainda não são lidos.
 - As imagens e as pesquisas na internet dependem das cotas gratuitas diárias do Gemini.
 - O ambiente ativo vale para você em todos os chats e só muda por mensagem ("modo <nome>").
@@ -160,8 +165,8 @@ Todas as tabelas também têm `id`, `createdAt` e `updatedAt`, criados pelo n8n.
 
 ## Próximos passos
 
-1. **Dados reais de Negócios e Pessoal**: clientes, vendas e estoque (fontes a definir) e finanças, cada um no seu ambiente e com permissões mínimas.
+1. **Mais dados de Negócios e Pessoal**: leads e CRM, o segundo negócio e finanças, cada um no seu ambiente e com permissões mínimas.
 2. **Memória persistente da conversa** (por exemplo, *Postgres Chat Memory*), para não perder o contexto em reinícios.
 3. **Kira proativa**: juntar ao resumo das 7h a agenda do dia e as tarefas abertas de cada ambiente.
 4. **Fotos e documentos**, aproveitando que o Gemini é multimodal.
-5. **Privacidade**: e-mails, Teams e pedidos já passam pelo Gemini no plano gratuito, por escolha do dono; o plano pago evita que o Google use esse conteúdo. Este repositório deve ficar privado se passar a guardar qualquer coisa sensível.
+5. **Privacidade**: e-mails, Teams, pedidos e a planilha do negócio já passam pelo Gemini no plano gratuito, por escolha do dono; o plano pago evita que o Google use esse conteúdo. Este repositório deve ficar privado se passar a guardar qualquer coisa sensível.

@@ -1,0 +1,410 @@
+{
+  "name": "Kira — planilha do negócio (ferramenta)",
+  "nodes": [
+    {
+      "id": "debdfcbd-df97-4014-adc5-53ad3f151444",
+      "name": "Quando a Kira consultar a planilha",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "ambiente",
+              "type": "string"
+            },
+            {
+              "name": "tipo",
+              "type": "string"
+            },
+            {
+              "name": "busca",
+              "type": "string"
+            },
+            {
+              "name": "limite",
+              "type": "number"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "9d268736-1c37-4b74-a575-919197049ddd",
+      "name": "Só no modo Negócios",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        220,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-ambiente",
+              "leftValue": "={{ String($json.ambiente ?? '').trim().toUpperCase() }}",
+              "rightValue": "NEGOCIOS",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "a14ce4d5-26e7-4da5-ab93-48802683f212",
+      "name": "Planilha do negócio",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        440,
+        300
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "pl-nome",
+              "name": "nome_do_arquivo",
+              "value": "BD NEGOCIO",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "c0c7a916-e649-435c-a77b-2bb80f0f4477",
+      "name": "Procurar planilha",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        300
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://www.googleapis.com/drive/v3/files",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendQuery": true,
+        "specifyQuery": "keypair",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "={{ \"name contains '\" + String($json.nome_do_arquivo).replace(/'/g, \"\\\\'\") + \"' and trashed = false and (mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' or mimeType = 'application/vnd.google-apps.spreadsheet')\" }}"
+            },
+            {
+              "name": "orderBy",
+              "value": "modifiedTime desc"
+            },
+            {
+              "name": "pageSize",
+              "value": "20"
+            },
+            {
+              "name": "fields",
+              "value": "files(id,name,mimeType,modifiedTime,size)"
+            },
+            {
+              "name": "supportsAllDrives",
+              "value": "true"
+            },
+            {
+              "name": "includeItemsFromAllDrives",
+              "value": "true"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "credentials": {},
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "52ea2194-895a-4a3a-a9cc-b05a66e1c27a",
+      "name": "Escolher planilha",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Escolhe, entre os arquivos achados no Google Drive, a planilha do negócio mais recente\n// (Excel .xlsx ou Planilha Google) com o trecho configurado no nó \"Planilha do negócio\" no nome.\nconst config = $('Planilha do negócio').first().json;\nconst XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';\nconst PLANILHA_GOOGLE = 'application/vnd.google-apps.spreadsheet';\nconst semAcento = (s) =>\n  String(s ?? '')\n    .normalize('NFD')\n    .replace(/[\\u0300-\\u036f]/g, '')\n    .toLowerCase()\n    .replace(/[^a-z0-9]+/g, ' ')\n    .trim();\nconst trecho = semAcento(config.nome_do_arquivo);\nconst arquivos = ($input.first().json.files || [])\n  .filter((f) => (f.mimeType === XLSX || f.mimeType === PLANILHA_GOOGLE) && (!trecho || semAcento(f.name).includes(trecho)))\n  .sort((a, b) => String(b.modifiedTime).localeCompare(String(a.modifiedTime)));\nif (!arquivos.length) {\n  throw new Error(`Não achei no Google Drive nenhuma planilha com \"${config.nome_do_arquivo}\" no nome.`);\n}\nconst f = arquivos[0];\nif (Number(f.size) > 25 * 1024 * 1024) {\n  throw new Error(`A planilha \"${f.name}\" passou de 25 MB e ficou grande demais para ler aqui.`);\n}\nconst url =\n  f.mimeType === PLANILHA_GOOGLE\n    ? `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(f.id)}/export?mimeType=${encodeURIComponent(XLSX)}`\n    : `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(f.id)}?alt=media`;\nreturn [{ json: { id: f.id, name: f.name, mimeType: f.mimeType, modifiedTime: f.modifiedTime, outras_versoes: arquivos.length - 1, url } }];\n"
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "40bdd142-3cc5-4c3a-a5a3-849f802eb260",
+      "name": "Baixar planilha",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        300
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.url }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "options": {
+          "timeout": 60000,
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          }
+        }
+      },
+      "credentials": {},
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "bb644559-f1cc-4553-a314-17bd3654f9a4",
+      "name": "Planilha em base64",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        1320,
+        300
+      ],
+      "parameters": {
+        "operation": "binaryToPropery",
+        "binaryPropertyName": "data",
+        "destinationKey": "arquivo_base64",
+        "options": {}
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "d3144222-0088-4b9d-a8d7-b99fe9bd8a71",
+      "name": "Consultar planilha",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Descompressão DEFLATE em JavaScript puro: trecho de leitura do fflate 0.8.2.\n// (c) 2023 Arjun Barrett, licença MIT — https://github.com/101arrowz/fflate\nconst fflate = (() => {\nvar u8 = Uint8Array, u16 = Uint16Array, i32 = Int32Array;\n// fixed length extra bits\nvar fleb = new u8([0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 0, /* unused */ 0, 0, /* impossible */ 0]);\n// fixed distance extra bits\nvar fdeb = new u8([0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13, /* unused */ 0, 0]);\n// code length index map\nvar clim = new u8([16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15]);\n// get base, reverse index map from extra bits\nvar freb = function (eb, start) {\n    var b = new u16(31);\n    for (var i = 0; i < 31; ++i) {\n        b[i] = start += 1 << eb[i - 1];\n    }\n    // numbers here are at max 18 bits\n    var r = new i32(b[30]);\n    for (var i = 1; i < 30; ++i) {\n        for (var j = b[i]; j < b[i + 1]; ++j) {\n            r[j] = ((j - b[i]) << 5) | i;\n        }\n    }\n    return { b: b, r: r };\n};\nvar _a = freb(fleb, 2), fl = _a.b, revfl = _a.r;\n// we can ignore the fact that the other numbers are wrong; they never happen anyway\nfl[28] = 258, revfl[258] = 28;\nvar _b = freb(fdeb, 0), fd = _b.b, revfd = _b.r;\n// map of value to reverse (assuming 16 bits)\nvar rev = new u16(32768);\nfor (var i = 0; i < 32768; ++i) {\n    // reverse table algorithm from SO\n    var x = ((i & 0xAAAA) >> 1) | ((i & 0x5555) << 1);\n    x = ((x & 0xCCCC) >> 2) | ((x & 0x3333) << 2);\n    x = ((x & 0xF0F0) >> 4) | ((x & 0x0F0F) << 4);\n    rev[i] = (((x & 0xFF00) >> 8) | ((x & 0x00FF) << 8)) >> 1;\n}\n// create huffman tree from u8 \"map\": index -> code length for code index\n// mb (max bits) must be at most 15\n// TODO: optimize/split up?\nvar hMap = (function (cd, mb, r) {\n    var s = cd.length;\n    // index\n    var i = 0;\n    // u16 \"map\": index -> # of codes with bit length = index\n    var l = new u16(mb);\n    // length of cd must be 288 (total # of codes)\n    for (; i < s; ++i) {\n        if (cd[i])\n            ++l[cd[i] - 1];\n    }\n    // u16 \"map\": index -> minimum code for bit length = index\n    var le = new u16(mb);\n    for (i = 1; i < mb; ++i) {\n        le[i] = (le[i - 1] + l[i - 1]) << 1;\n    }\n    var co;\n    if (r) {\n        // u16 \"map\": index -> number of actual bits, symbol for code\n        co = new u16(1 << mb);\n        // bits to remove for reverser\n        var rvb = 15 - mb;\n        for (i = 0; i < s; ++i) {\n            // ignore 0 lengths\n            if (cd[i]) {\n                // num encoding both symbol and bits read\n                var sv = (i << 4) | cd[i];\n                // free bits\n                var r_1 = mb - cd[i];\n                // start value\n                var v = le[cd[i] - 1]++ << r_1;\n                // m is end value\n                for (var m = v | ((1 << r_1) - 1); v <= m; ++v) {\n                    // every 16 bit value starting with the code yields the same result\n                    co[rev[v] >> rvb] = sv;\n                }\n            }\n        }\n    }\n    else {\n        co = new u16(s);\n        for (i = 0; i < s; ++i) {\n            if (cd[i]) {\n                co[i] = rev[le[cd[i] - 1]++] >> (15 - cd[i]);\n            }\n        }\n    }\n    return co;\n});\n// fixed length tree\nvar flt = new u8(288);\nfor (var i = 0; i < 144; ++i)\n    flt[i] = 8;\nfor (var i = 144; i < 256; ++i)\n    flt[i] = 9;\nfor (var i = 256; i < 280; ++i)\n    flt[i] = 7;\nfor (var i = 280; i < 288; ++i)\n    flt[i] = 8;\n// fixed distance tree\nvar fdt = new u8(32);\nfor (var i = 0; i < 32; ++i)\n    fdt[i] = 5;\n// fixed length map\nvar flm = hMap(flt, 9, 0), flrm = hMap(flt, 9, 1);\n// fixed distance map\nvar fdm = hMap(fdt, 5, 0), fdrm = hMap(fdt, 5, 1);\n// find max of array\nvar max = function (a) {\n    var m = a[0];\n    for (var i = 1; i < a.length; ++i) {\n        if (a[i] > m)\n            m = a[i];\n    }\n    return m;\n};\n// read d, starting at bit p and mask with m\nvar bits = function (d, p, m) {\n    var o = (p / 8) | 0;\n    return ((d[o] | (d[o + 1] << 8)) >> (p & 7)) & m;\n};\n// read d, starting at bit p continuing for at least 16 bits\nvar bits16 = function (d, p) {\n    var o = (p / 8) | 0;\n    return ((d[o] | (d[o + 1] << 8) | (d[o + 2] << 16)) >> (p & 7));\n};\n// get end of byte\nvar shft = function (p) { return ((p + 7) / 8) | 0; };\n// typed array slice - allows garbage collector to free original reference,\n// while being more compatible than .slice\nvar slc = function (v, s, e) {\n    if (s == null || s < 0)\n        s = 0;\n    if (e == null || e > v.length)\n        e = v.length;\n    // can't use .constructor in case user-supplied\n    return new u8(v.subarray(s, e));\n};\n/**\n * Codes for errors generated within this library\n */\nvar ec = [\n    'unexpected EOF',\n    'invalid block type',\n    'invalid length/literal',\n    'invalid distance',\n    'stream finished',\n    'no stream handler',\n    ,\n    'no callback',\n    'invalid UTF-8 data',\n    'extra field too long',\n    'date not in range 1980-2099',\n    'filename too long',\n    'stream finishing',\n    'invalid zip data'\n    // determined by unknown compression method\n];\n;\nvar err = function (ind, msg, nt) {\n    var e = new Error(msg || ec[ind]);\n    e.code = ind;\n    if (Error.captureStackTrace)\n        Error.captureStackTrace(e, err);\n    if (!nt)\n        throw e;\n    return e;\n};\n// expands raw DEFLATE data\nvar inflt = function (dat, st, buf, dict) {\n    // source length       dict length\n    var sl = dat.length, dl = dict ? dict.length : 0;\n    if (!sl || st.f && !st.l)\n        return buf || new u8(0);\n    var noBuf = !buf;\n    // have to estimate size\n    var resize = noBuf || st.i != 2;\n    // no state\n    var noSt = st.i;\n    // Assumes roughly 33% compression ratio average\n    if (noBuf)\n        buf = new u8(sl * 3);\n    // ensure buffer can fit at least l elements\n    var cbuf = function (l) {\n        var bl = buf.length;\n        // need to increase size to fit\n        if (l > bl) {\n            // Double or set to necessary, whichever is greater\n            var nbuf = new u8(Math.max(bl * 2, l));\n            nbuf.set(buf);\n            buf = nbuf;\n        }\n    };\n    //  last chunk         bitpos           bytes\n    var final = st.f || 0, pos = st.p || 0, bt = st.b || 0, lm = st.l, dm = st.d, lbt = st.m, dbt = st.n;\n    // total bits\n    var tbts = sl * 8;\n    do {\n        if (!lm) {\n            // BFINAL - this is only 1 when last chunk is next\n            final = bits(dat, pos, 1);\n            // type: 0 = no compression, 1 = fixed huffman, 2 = dynamic huffman\n            var type = bits(dat, pos + 1, 3);\n            pos += 3;\n            if (!type) {\n                // go to end of byte boundary\n                var s = shft(pos) + 4, l = dat[s - 4] | (dat[s - 3] << 8), t = s + l;\n                if (t > sl) {\n                    if (noSt)\n                        err(0);\n                    break;\n                }\n                // ensure size\n                if (resize)\n                    cbuf(bt + l);\n                // Copy over uncompressed data\n                buf.set(dat.subarray(s, t), bt);\n                // Get new bitpos, update byte count\n                st.b = bt += l, st.p = pos = t * 8, st.f = final;\n                continue;\n            }\n            else if (type == 1)\n                lm = flrm, dm = fdrm, lbt = 9, dbt = 5;\n            else if (type == 2) {\n                //  literal                            lengths\n                var hLit = bits(dat, pos, 31) + 257, hcLen = bits(dat, pos + 10, 15) + 4;\n                var tl = hLit + bits(dat, pos + 5, 31) + 1;\n                pos += 14;\n                // length+distance tree\n                var ldt = new u8(tl);\n                // code length tree\n                var clt = new u8(19);\n                for (var i = 0; i < hcLen; ++i) {\n                    // use index map to get real code\n                    clt[clim[i]] = bits(dat, pos + i * 3, 7);\n                }\n                pos += hcLen * 3;\n                // code lengths bits\n                var clb = max(clt), clbmsk = (1 << clb) - 1;\n                // code lengths map\n                var clm = hMap(clt, clb, 1);\n                for (var i = 0; i < tl;) {\n                    var r = clm[bits(dat, pos, clbmsk)];\n                    // bits read\n                    pos += r & 15;\n                    // symbol\n                    var s = r >> 4;\n                    // code length to copy\n                    if (s < 16) {\n                        ldt[i++] = s;\n                    }\n                    else {\n                        //  copy   count\n                        var c = 0, n = 0;\n                        if (s == 16)\n                            n = 3 + bits(dat, pos, 3), pos += 2, c = ldt[i - 1];\n                        else if (s == 17)\n                            n = 3 + bits(dat, pos, 7), pos += 3;\n                        else if (s == 18)\n                            n = 11 + bits(dat, pos, 127), pos += 7;\n                        while (n--)\n                            ldt[i++] = c;\n                    }\n                }\n                //    length tree                 distance tree\n                var lt = ldt.subarray(0, hLit), dt = ldt.subarray(hLit);\n                // max length bits\n                lbt = max(lt);\n                // max dist bits\n                dbt = max(dt);\n                lm = hMap(lt, lbt, 1);\n                dm = hMap(dt, dbt, 1);\n            }\n            else\n                err(1);\n            if (pos > tbts) {\n                if (noSt)\n                    err(0);\n                break;\n            }\n        }\n        // Make sure the buffer can hold this + the largest possible addition\n        // Maximum chunk size (practically, theoretically infinite) is 2^17\n        if (resize)\n            cbuf(bt + 131072);\n        var lms = (1 << lbt) - 1, dms = (1 << dbt) - 1;\n        var lpos = pos;\n        for (;; lpos = pos) {\n            // bits read, code\n            var c = lm[bits16(dat, pos) & lms], sym = c >> 4;\n            pos += c & 15;\n            if (pos > tbts) {\n                if (noSt)\n                    err(0);\n                break;\n            }\n            if (!c)\n                err(2);\n            if (sym < 256)\n                buf[bt++] = sym;\n            else if (sym == 256) {\n                lpos = pos, lm = null;\n                break;\n            }\n            else {\n                var add = sym - 254;\n                // no extra bits needed if less\n                if (sym > 264) {\n                    // index\n                    var i = sym - 257, b = fleb[i];\n                    add = bits(dat, pos, (1 << b) - 1) + fl[i];\n                    pos += b;\n                }\n                // dist\n                var d = dm[bits16(dat, pos) & dms], dsym = d >> 4;\n                if (!d)\n                    err(3);\n                pos += d & 15;\n                var dt = fd[dsym];\n                if (dsym > 3) {\n                    var b = fdeb[dsym];\n                    dt += bits16(dat, pos) & (1 << b) - 1, pos += b;\n                }\n                if (pos > tbts) {\n                    if (noSt)\n                        err(0);\n                    break;\n                }\n                if (resize)\n                    cbuf(bt + 131072);\n                var end = bt + add;\n                if (bt < dt) {\n                    var shift = dl - dt, dend = Math.min(dt, end);\n                    if (shift + bt < 0)\n                        err(3);\n                    for (; bt < dend; ++bt)\n                        buf[bt] = dict[shift + bt];\n                }\n                for (; bt < end; ++bt)\n                    buf[bt] = buf[bt - dt];\n            }\n        }\n        st.l = lm, st.p = lpos, st.b = bt, st.f = final;\n        if (lm)\n            final = 1, st.m = lbt, st.d = dm, st.n = dbt;\n    } while (!final);\n    // don't reallocate for streams or user buffers\n    return bt != buf.length && noBuf ? slc(buf, 0, bt) : buf.subarray(0, bt);\n};\n// starting at p, write the minimum number of bits that can hold v to d\nvar Inflate = (function () {\n    function Inflate(opts, cb) {\n        // no StrmOpt here to avoid adding to workerizer\n        if (typeof opts == 'function')\n            cb = opts, opts = {};\n        this.ondata = cb;\n        var dict = opts && opts.dictionary && opts.dictionary.subarray(-32768);\n        this.s = { i: 0, b: dict ? dict.length : 0 };\n        this.o = new u8(32768);\n        this.p = new u8(0);\n        if (dict)\n            this.o.set(dict);\n    }\n    Inflate.prototype.e = function (c) {\n        if (!this.ondata)\n            err(5);\n        if (this.d)\n            err(4);\n        if (!this.p.length)\n            this.p = c;\n        else if (c.length) {\n            var n = new u8(this.p.length + c.length);\n            n.set(this.p), n.set(c, this.p.length), this.p = n;\n        }\n    };\n    Inflate.prototype.c = function (final) {\n        this.s.i = +(this.d = final || false);\n        var bts = this.s.b;\n        var dt = inflt(this.p, this.s, this.o);\n        this.ondata(slc(dt, bts, this.s.b), this.d);\n        this.o = slc(dt, this.s.b - 32768), this.s.b = this.o.length;\n        this.p = slc(this.p, (this.s.p / 8) | 0), this.s.p &= 7;\n    };\n    /**\n     * Pushes a chunk to be inflated\n     * @param chunk The chunk to push\n     * @param final Whether this is the final chunk\n     */\n    Inflate.prototype.push = function (chunk, final) {\n        this.e(chunk), this.c(final);\n    };\n    return Inflate;\n}());\nfunction inflateSync(data, opts) {\n    return inflt(data, { i: 2 }, opts && opts.out, opts && opts.dictionary);\n}\nreturn { Inflate: Inflate, inflateSync: inflateSync, fixos: { l: flrm, d: fdrm } };\n})();\n\n// Leitor de planilhas do Excel (.xlsx) em JavaScript puro, para o nó Code do n8n.\n// Um .xlsx é um ZIP de arquivos XML: acha cada aba pelo nome, descompacta com o fflate (acima)\n// e devolve as células já com o valor calculado (o Excel grava o resultado das fórmulas).\nfunction abrirXlsx(buf) {\n  const u32 = (p) => buf.readUInt32LE(p);\n  const u16 = (p) => buf.readUInt16LE(p);\n\n  // Diretório central do ZIP: fica no fim do arquivo.\n  let fim = -1;\n  for (let i = buf.length - 22; i >= Math.max(0, buf.length - 65557); i--) {\n    if (u32(i) === 0x06054b50) {\n      fim = i;\n      break;\n    }\n  }\n  if (fim < 0) throw new Error('O arquivo não é uma planilha .xlsx válida (ZIP sem diretório central).');\n  let total = u16(fim + 10);\n  let p = u32(fim + 16);\n  // ZIP64 (arquivos muito grandes ou com muitas entradas)\n  if ((p === 0xffffffff || total === 0xffff) && fim >= 20 && u32(fim - 20) === 0x07064b50) {\n    const p64 = Number(buf.readBigUInt64LE(fim - 12));\n    if (u32(p64) === 0x06064b50) {\n      total = Number(buf.readBigUInt64LE(p64 + 32));\n      p = Number(buf.readBigUInt64LE(p64 + 48));\n    }\n  }\n\n  const entradas = {};\n  for (let k = 0; k < total && u32(p) === 0x02014b50; k++) {\n    const metodo = u16(p + 10);\n    let comp = u32(p + 20);\n    let tam = u32(p + 24);\n    const nl = u16(p + 28);\n    const el = u16(p + 30);\n    const cl = u16(p + 32);\n    let local = u32(p + 42);\n    const nome = buf.toString('utf8', p + 46, p + 46 + nl);\n    // campos ZIP64 no \"extra\" (só aparecem quando o valor normal é 0xffffffff)\n    let e = p + 46 + nl;\n    const eFim = e + el;\n    while (e + 4 <= eFim) {\n      const id = u16(e);\n      const n = u16(e + 2);\n      if (id === 1) {\n        let q = e + 4;\n        if (tam === 0xffffffff) (tam = Number(buf.readBigUInt64LE(q))), (q += 8);\n        if (comp === 0xffffffff) (comp = Number(buf.readBigUInt64LE(q))), (q += 8);\n        if (local === 0xffffffff) local = Number(buf.readBigUInt64LE(q));\n      }\n      e += 4 + n;\n    }\n    entradas[nome] = { metodo, comp, tam, local };\n    p += 46 + nl + el + cl;\n  }\n\n  const decodificador = new TextDecoder('utf-8');\n  const lerArquivo = (nome) => {\n    const en = entradas[nome];\n    if (!en) return null;\n    const ini = en.local + 30 + u16(en.local + 26) + u16(en.local + 28);\n    const dados = buf.subarray(ini, ini + en.comp);\n    if (en.metodo === 0) return decodificador.decode(dados);\n    if (en.metodo !== 8) throw new Error(`Compressão ${en.metodo} não suportada em ${nome}.`);\n    return decodificador.decode(fflate.inflateSync(dados, { out: new Uint8Array(en.tam) }));\n  };\n\n  const entidades = { amp: '&', lt: '<', gt: '>', quot: '\"', apos: \"'\" };\n  const textoXml = (s) =>\n    s\n      .replace(/&(#x[0-9a-f]+|#\\d+|[a-z]+);/gi, (m, c) =>\n        c[0] === '#' ? String.fromCodePoint(c[1] === 'x' || c[1] === 'X' ? parseInt(c.slice(2), 16) : parseInt(c.slice(1), 10)) : entidades[c] ?? m,\n      )\n      .replace(/_x([0-9A-F]{4})_/g, (m, h) => String.fromCharCode(parseInt(h, 16)));\n  const atributo = (tag, nome) => {\n    const m = new RegExp(`\\\\s${nome}=\"([^\"]*)\"`).exec(tag);\n    return m ? textoXml(m[1]) : undefined;\n  };\n  // Texto de um <si> ou <is>: junta os <t> (inclusive de trechos formatados), sem a guia fonética.\n  const juntarTextos = (xml) => {\n    let s = '';\n    const semFonetica = xml.replace(/<rPh\\b[\\s\\S]*?<\\/rPh>/g, '');\n    for (const m of semFonetica.matchAll(/<t(?:\\s[^>]*)?>([\\s\\S]*?)<\\/t>|<t(?:\\s[^>]*)?\\/>/g)) s += m[1] ? textoXml(m[1]) : '';\n    return s;\n  };\n\n  // Abas: nome -> caminho do XML.\n  const livro = lerArquivo('xl/workbook.xml') || '';\n  const relacoes = lerArquivo('xl/_rels/workbook.xml.rels') || '';\n  const alvos = {};\n  for (const m of relacoes.matchAll(/<Relationship\\b[^>]*>/g)) {\n    const id = atributo(m[0], 'Id');\n    const alvo = atributo(m[0], 'Target') || '';\n    alvos[id] = alvo.startsWith('/') ? alvo.slice(1) : 'xl/' + alvo.replace(/^\\.\\//, '');\n  }\n  const abas = [];\n  for (const m of livro.matchAll(/<sheet\\b[^>]*>/g)) {\n    abas.push({ nome: atributo(m[0], 'name') || '', caminho: alvos[atributo(m[0], 'r:id')] });\n  }\n\n  // Textos compartilhados (a maioria dos textos das células fica aqui).\n  let compartilhados = null;\n  const textos = () => {\n    if (!compartilhados) {\n      compartilhados = [];\n      for (const m of (lerArquivo('xl/sharedStrings.xml') || '').matchAll(/<si>([\\s\\S]*?)<\\/si>|<si\\/>/g)) {\n        compartilhados.push(m[1] ? juntarTextos(m[1]) : '');\n      }\n    }\n    return compartilhados;\n  };\n\n  // Formato de número de cada estilo: porcentagem, moeda, data ou número.\n  let formatos = null;\n  const formatoDoEstilo = (s) => {\n    if (!formatos) {\n      formatos = [];\n      const estilos = lerArquivo('xl/styles.xml') || '';\n      const codigos = {};\n      for (const m of estilos.matchAll(/<numFmt\\b[^>]*>/g)) codigos[atributo(m[0], 'numFmtId')] = atributo(m[0], 'formatCode') || '';\n      const xfs = (/<cellXfs\\b[^>]*>([\\s\\S]*?)<\\/cellXfs>/.exec(estilos) || [])[1] || '';\n      for (const m of xfs.matchAll(/<xf\\b[^>]*>/g)) {\n        const id = Number(atributo(m[0], 'numFmtId') || 0);\n        const codigo = codigos[id];\n        let f = 'numero';\n        if (id === 9 || id === 10) f = 'porcentagem';\n        else if ((id >= 14 && id <= 22) || (id >= 27 && id <= 36) || (id >= 45 && id <= 47) || (id >= 50 && id <= 58)) f = 'data';\n        else if ((id >= 5 && id <= 8) || id === 44 || id === 42) f = 'moeda';\n        else if (codigo) {\n          const limpo = codigo.replace(/\"[^\"]*\"|\\\\.|\\[[^\\]]*\\]/g, '');\n          if (/%/.test(limpo)) f = 'porcentagem';\n          else if (/R\\$|\\[\\$R\\$/.test(codigo) || /[$€£¥]/.test(limpo)) f = 'moeda';\n          else if (/[dmy]/i.test(limpo) && !/^general$/i.test(limpo.trim())) f = 'data';\n        }\n        formatos.push(f);\n      }\n    }\n    return formatos[s] || 'numero';\n  };\n\n  const colunaNumero = (letras) => {\n    let n = 0;\n    for (const ch of letras) n = n * 26 + (ch.charCodeAt(0) - 64);\n    return n;\n  };\n\n  // Lê uma aba: devolve as linhas (número da linha -> { coluna: { v, f } }). Para abas grandes,\n  // ateLinha limita a leitura às primeiras linhas.\n  const cacheAbas = {};\n  const lerAba = (aba, ateLinha) => {\n    const chave = aba.caminho + '|' + (ateLinha || '');\n    if (cacheAbas[chave]) return cacheAbas[chave];\n    const xml = lerArquivo(aba.caminho);\n    if (xml === null) throw new Error(`A aba \"${aba.nome}\" não foi encontrada dentro do arquivo.`);\n    const inicioDados = xml.indexOf('<sheetData');\n    const linhas = new Map();\n    const reLinha = /<row\\b([^>]*?)(?:\\/>|>([\\s\\S]*?)<\\/row>)/g;\n    reLinha.lastIndex = inicioDados < 0 ? 0 : inicioDados;\n    let numeroLinha = 0;\n    let m;\n    while ((m = reLinha.exec(xml))) {\n      const r = Number(atributo(m[1], 'r')) || numeroLinha + 1;\n      numeroLinha = r;\n      if (ateLinha && r > ateLinha) break;\n      if (!m[2]) continue;\n      const celulas = {};\n      let coluna = 0;\n      for (const c of m[2].matchAll(/<c\\b([^>]*?)(?:\\/>|>([\\s\\S]*?)<\\/c>)/g)) {\n        const ref = atributo(c[1], 'r');\n        coluna = ref ? colunaNumero(/^[A-Z]+/.exec(ref)[0]) : coluna + 1;\n        if (!c[2]) continue;\n        const t = atributo(c[1], 't');\n        let v;\n        if (t === 'inlineStr') v = juntarTextos((/<is>([\\s\\S]*?)<\\/is>/.exec(c[2]) || [])[1] || '');\n        else {\n          const bruto = /<v>([\\s\\S]*?)<\\/v>/.exec(c[2]);\n          if (!bruto) continue;\n          if (t === 's') v = textos()[Number(bruto[1])] ?? '';\n          else if (t === 'str') v = textoXml(bruto[1]);\n          else if (t === 'b') v = bruto[1] === '1';\n          else if (t === 'e') v = null;\n          else v = Number(bruto[1]);\n        }\n        if (v === null || v === '' || v === undefined || (typeof v === 'number' && !Number.isFinite(v))) continue;\n        const s = Number(atributo(c[1], 's') || 0);\n        celulas[coluna] = { v, f: typeof v === 'number' ? formatoDoEstilo(s) : 'texto' };\n      }\n      linhas.set(r, celulas);\n    }\n    cacheAbas[chave] = linhas;\n    return linhas;\n  };\n\n  const semAcento = (s) =>\n    String(s ?? '')\n      .normalize('NFD')\n      .replace(/[\\u0300-\\u036f]/g, '')\n      .toUpperCase()\n      .replace(/[^A-Z0-9]+/g, ' ')\n      .trim();\n\n  // Acha a aba pelo nome exato (sem acentos) ou pelo trecho do nome.\n  const acharAba = (nome) => {\n    const alvo = semAcento(nome);\n    return abas.find((a) => semAcento(a.nome) === alvo) || abas.find((a) => semAcento(a.nome).includes(alvo)) || null;\n  };\n\n  return { abas, acharAba, lerAba, semAcento };\n}\n\n// Converte a data serial do Excel (dias desde 30/12/1899) em AAAA-MM-DD.\nfunction dataDoExcel(n) {\n  if (typeof n !== 'number' || n < 20000 || n > 80000) return null;\n  return new Date(Math.round((n - 25569) * 86400000)).toISOString().slice(0, 10);\n}\n\n// Consulta a planilha do negócio (base de vendas, estoque, clientes, vendedoras e precificação, salva no\n// Google Drive do dono) e devolve só o que interessa à pergunta, com a data do arquivo.\n// tipo: resumo, vendas, vendedoras, clientes, estoque, sem_estoque, ultimas_pecas, reposicao, precos ou simular_preco.\nconst entrada = $('Quando a Kira consultar a planilha').first().json;\nconst arquivo = $('Escolher planilha').first().json;\nconst base64 = $input.first().json.arquivo_base64;\nif (!base64) throw new Error('A planilha veio vazia do Google Drive.');\nconst xlsx = abrirXlsx(Buffer.from(base64, 'base64'));\n\n// ---------- utilidades ----------\nconst normal = (s) => xlsx.semAcento(s).toLowerCase();\nconst vazio = (v) => v === undefined || v === null || String(v).trim() === '';\nconst texto = (v) => (vazio(v) ? '' : String(v).trim());\nconst num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);\nconst soma = (lista, f) => lista.reduce((t, x) => t + (num(f(x)) || 0), 0);\nconst r2 = (n) => (num(n) === null ? null : Math.round(n * 100) / 100);\nconst pct = (n) => (num(n) === null ? null : Math.round(n * 1000) / 10);\nconst dividir = (a, b) => (num(a) !== null && num(b) ? a / b : null);\nconst milhar = (n, casas) => {\n  const [i, d] = Math.abs(n).toFixed(casas).split('.');\n  return (n < 0 ? '-' : '') + i.replace(/\\B(?=(\\d{3})+(?!\\d))/g, '.') + (d ? ',' + d : '');\n};\nconst dataBr = (iso) => (iso ? iso.slice(8, 10) + '/' + iso.slice(5, 7) + '/' + iso.slice(0, 4) : null);\n// Data da planilha: número serial do Excel ou texto dd/mm/aaaa -> AAAA-MM-DD\nconst dataIso = (v) => {\n  if (typeof v === 'number') return dataDoExcel(v);\n  const m = /^(\\d{1,2})\\/(\\d{1,2})\\/(\\d{4})/.exec(texto(v));\n  return m ? `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}` : null;\n};\nconst limpar = (o) => {\n  for (const k of Object.keys(o)) if (o[k] === null || o[k] === undefined || o[k] === '') delete o[k];\n  return o;\n};\nconst dias = (de, ate) => (de && ate ? Math.round((Date.parse(ate) - Date.parse(de)) / 86400000) : null);\nconst hoje = new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10); // horário de Brasília\nconst semEmoji = (s) => texto(s).replace(/[^\\p{L}\\p{N} %/().,-]/gu, '').trim();\n\n// Valor de um cartão do painel já formatado como no Excel (R$, %, número ou data).\nconst formatar = ({ v, f }) => {\n  if (typeof v !== 'number') return texto(v);\n  if (f === 'moeda') return 'R$ ' + milhar(v, 2);\n  if (f === 'porcentagem') return milhar(v * 100, 1).replace(/,0$/, '') + '%';\n  if (f === 'data') return dataBr(dataDoExcel(v)) || String(v);\n  return Number.isInteger(v) ? milhar(v, 0) : milhar(v, 2);\n};\n\n// Busca: todas as palavras (sem acento, singular ou plural) precisam aparecer.\nconst PARADAS = new Set(['de', 'da', 'do', 'das', 'dos', 'e', 'com', 'para', 'a', 'o', 'as', 'os', 'em', 'no', 'na', 'nos', 'nas', 'um', 'uma']);\nconst termosDe = (s) => normal(s).split(' ').filter((t) => t && !PARADAS.has(t));\nconst variantes = (t) => {\n  const v = new Set([t]);\n  if (t.length > 3) {\n    if (/(oes|aes)$/.test(t)) v.add(t.slice(0, -3) + 'ao');\n    if (/eis$/.test(t)) v.add(t.slice(0, -3) + 'el');\n    if (/ais$/.test(t)) v.add(t.slice(0, -3) + 'al');\n    if (/(res|zes)$/.test(t)) v.add(t.slice(0, -2));\n    if (/ns$/.test(t)) v.add(t.slice(0, -2) + 'm');\n    if (/s$/.test(t)) v.add(t.slice(0, -1));\n  }\n  return [...v];\n};\nconst casa = (alvo, termos) => {\n  const h = normal(alvo);\n  return termos.every((t) => variantes(t).some((v) => h.includes(v)));\n};\n\n// Nome de coluna comparável: sem acento, minúsculo, sem \"R$\", \"%\" vira \"pct\".\nconst nomeColuna = (s) =>\n  normal(String(s).replace(/R\\$/g, ' ').replace(/%/g, ' pct '))\n    .replace(/ /g, '_');\n\n// Lê uma tabela: acha o cabeçalho (nas primeiras linhas) que tem todas as colunas pedidas e devolve\n// as linhas como objetos. Só vale o bloco de colunas contínuo que começa no cabeçalho; com pararNoVazio,\n// a tabela termina na primeira linha sem a primeira coluna (tabelas pequenas no meio de uma aba).\nfunction tabela(nomeAba, obrigatorias, { ateLinha = 20, pararNoVazio = false } = {}) {\n  const aba = xlsx.acharAba(nomeAba);\n  if (!aba) throw new Error(`Não achei a aba \"${nomeAba}\" na planilha.`);\n  const linhas = xlsx.lerAba(aba);\n  const alvo = obrigatorias.map(nomeColuna);\n  let colunas = null;\n  let linhaCab = 0;\n  for (const [r, cel] of linhas) {\n    if (r > ateLinha) break;\n    const posicoes = Object.keys(cel).map(Number).sort((a, b) => a - b);\n    for (const inicio of posicoes) {\n      const bloco = {};\n      for (let c = inicio; cel[c] && typeof cel[c].v === 'string'; c++) {\n        const n = nomeColuna(cel[c].v);\n        if (n && n.length <= 40 && !(n in bloco)) bloco[n] = c;\n      }\n      if (alvo.every((a) => a in bloco)) {\n        colunas = Object.entries(bloco);\n        linhaCab = r;\n        break;\n      }\n    }\n    if (colunas) break;\n  }\n  if (!colunas) throw new Error(`A aba \"${aba.nome}\" não tem as colunas esperadas (${obrigatorias.join(', ')}).`);\n  const saida = [];\n  const primeira = colunas[0][1];\n  for (const [r, cel] of linhas) {\n    if (r <= linhaCab) continue;\n    if (pararNoVazio && (!cel[primeira] || r !== linhaCab + saida.length + 1)) break;\n    const o = {};\n    let algum = false;\n    for (const [nome, c] of colunas) {\n      if (cel[c]) {\n        o[nome] = cel[c].v;\n        algum = true;\n      }\n    }\n    if (algum) saida.push(o);\n  }\n  return saida;\n}\n\n// Cartões dos painéis: rótulo em MAIÚSCULAS com o número logo abaixo (nas primeiras linhas da aba).\nfunction cartoes(nomeAba, ateLinha = 13) {\n  const aba = xlsx.acharAba(nomeAba);\n  if (!aba) return null;\n  const linhas = xlsx.lerAba(aba, ateLinha + 1);\n  const saida = {};\n  for (const [r, cel] of linhas) {\n    for (const [c, o] of Object.entries(cel)) {\n      const abaixo = linhas.get(r + 1)?.[c];\n      const rotulo = typeof o.v === 'string' ? o.v.replace(/\\([^)]*\\)/g, '') : '';\n      if (/\\p{Lu}/u.test(rotulo) && rotulo === rotulo.toUpperCase() && abaixo && typeof abaixo.v === 'number') {\n        saida[o.v.replace(/\\s+/g, ' ').trim()] = formatar(abaixo);\n      }\n    }\n  }\n  return saida;\n}\n\n// Parâmetros da aba de configurações: rótulo numa coluna e o valor na primeira célula preenchida à direita.\nlet linhasConfig = null;\nfunction parametro(rotulo) {\n  if (!linhasConfig) {\n    const aba = xlsx.acharAba('CONFIGURAÇÕES');\n    linhasConfig = aba ? xlsx.lerAba(aba) : new Map();\n  }\n  const alvo = normal(rotulo);\n  for (const cel of linhasConfig.values()) {\n    const cols = Object.keys(cel).map(Number).sort((a, b) => a - b);\n    for (let i = 0; i < cols.length - 1; i++) {\n      const o = cel[cols[i]];\n      if (typeof o.v === 'string' && normal(o.v).startsWith(alvo)) return cel[cols[i + 1]];\n    }\n  }\n  return null;\n}\nconst valorParametro = (rotulo, padrao = null) => {\n  const p = parametro(rotulo);\n  return p && typeof p.v === 'number' ? p.v : padrao;\n};\n\n// ---------- bases ----------\nfunction lerVendas() {\n  const linhas = tabela('TOTAL DE VENDAS', ['Categoria', 'Produto', 'Qtd.Vendida', 'Valor de Vendas']);\n  let periodo = null;\n  const produtos = [];\n  for (const l of linhas) {\n    const de = dataIso(l.sub_categoria);\n    const ate = dataIso(l.produto);\n    if (de && ate && !periodo) periodo = { de: dataBr(de), ate: dataBr(ate) };\n    const categoria = texto(l.categoria);\n    const produto = texto(l.produto);\n    if (!categoria || !produto || /^[\\d.,]+$/.test(categoria) || dataIso(produto) || num(l.qtd_vendida) === null) continue;\n    const faturamento = num(l.valor_de_vendas) ?? 0;\n    const lucro = num(l.lucratividade) ?? 0;\n    produtos.push({\n      produto,\n      categoria,\n      subcategoria: /^sem subcategoria$/i.test(texto(l.sub_categoria)) ? '' : texto(l.sub_categoria),\n      pecas: l.qtd_vendida,\n      faturamento,\n      custo: num(l.custo_direto) ?? 0,\n      lucro,\n    });\n  }\n  return { periodo, produtos };\n}\nconst vendaResumo = (p) => ({\n  produto: p.produto,\n  categoria: p.categoria,\n  ...(p.subcategoria ? { subcategoria: p.subcategoria } : {}),\n  pecas_vendidas: p.pecas,\n  faturamento_rs: r2(p.faturamento),\n  lucro_rs: r2(p.lucro),\n  margem_pct: pct(dividir(p.lucro, p.faturamento)),\n});\nconst totaisVendas = (lista) => {\n  const fat = soma(lista, (p) => p.faturamento);\n  const lucro = soma(lista, (p) => p.lucro);\n  const pecas = soma(lista, (p) => p.pecas);\n  return {\n    pecas_vendidas: pecas,\n    faturamento_rs: r2(fat),\n    custo_rs: r2(soma(lista, (p) => p.custo)),\n    lucro_rs: r2(lucro),\n    margem_pct: pct(dividir(lucro, fat)),\n    ticket_por_peca_rs: r2(dividir(fat, pecas)),\n    produtos_diferentes: lista.length,\n  };\n};\n\nfunction lerEstoque() {\n  const linhas = tabela('POSIÇÃO DE ESTOQUE', ['Produto', 'Localização', 'Quantidade']);\n  const minimo = valorParametro('Estoque mínimo por item', 1);\n  const itens = new Map();\n  for (const l of linhas) {\n    const produto = texto(l.produto);\n    if (!produto || num(l.quantidade) === null) continue;\n    let item = itens.get(produto);\n    if (!item) {\n      item = { produto, codigo: texto(l.cod_barras), locais: {}, valores: {}, total: 0, custo: 0, venda: 0, custo_unitario: num(l.custo_unitario), venda_unitario: num(l.venda_unitario), status: '' };\n      itens.set(produto, item);\n    }\n    const local = texto(l.localizacao) || '(sem local)';\n    const custo = num(l.custo_total) ?? l.quantidade * (item.custo_unitario || 0);\n    const venda = num(l.venda_total) ?? l.quantidade * (item.venda_unitario || 0);\n    item.locais[local] = (item.locais[local] || 0) + l.quantidade;\n    const v = (item.valores[local] = item.valores[local] || { custo: 0, venda: 0 });\n    v.custo += custo;\n    v.venda += venda;\n    item.total += l.quantidade;\n    item.custo += custo;\n    item.venda += venda;\n    if (!item.status && texto(l.status)) item.status = semEmoji(l.status);\n  }\n  for (const item of itens.values()) {\n    if (!item.status) item.status = item.total <= 0 ? 'SEM ESTOQUE' : item.total <= minimo ? 'ÚLTIMAS PEÇAS' : 'OK';\n  }\n  return { itens: [...itens.values()], minimo };\n}\nconst itemResumo = (i, vendidas) => ({\n  produto: i.produto,\n  ...(i.codigo ? { codigo: i.codigo } : {}),\n  pecas: i.total,\n  por_local: i.locais,\n  status: i.status,\n  custo_unitario_rs: r2(i.custo_unitario),\n  venda_unitario_rs: r2(i.venda_unitario),\n  ...(vendidas !== undefined ? { vendidas_no_periodo: vendidas } : {}),\n});\nconst totaisEstoque = (itens) => {\n  const locais = {};\n  for (const i of itens) {\n    for (const [local, q] of Object.entries(i.locais)) {\n      const l = (locais[local] = locais[local] || { pecas: 0, custo_rs: 0, venda_rs: 0 });\n      l.pecas += q;\n      l.custo_rs += i.valores[local].custo;\n      l.venda_rs += i.valores[local].venda;\n    }\n  }\n  for (const l of Object.values(locais)) (l.custo_rs = r2(l.custo_rs)), (l.venda_rs = r2(l.venda_rs));\n  const custo = soma(itens, (i) => i.custo);\n  const venda = soma(itens, (i) => i.venda);\n  const status = {};\n  for (const i of itens) status[i.status] = (status[i.status] || 0) + 1;\n  return {\n    pecas: soma(itens, (i) => i.total),\n    custo_rs: r2(custo),\n    valor_de_venda_rs: r2(venda),\n    markup: r2(dividir(venda, custo)),\n    itens_com_saldo: itens.filter((i) => i.total > 0).length,\n    itens_zerados: itens.filter((i) => i.total <= 0).length,\n    itens_por_status: status,\n    por_local: locais,\n  };\n};\n// Peças vendidas de cada item do estoque (o relatório de vendas usa o nome do produto; o estoque, nome + variação).\nfunction vendidasPorItem(itens, produtosVendidos) {\n  const porNome = new Map(produtosVendidos.map((p) => [normal(p.produto), p.pecas]));\n  const mapa = new Map();\n  for (const i of itens) {\n    const n = normal(i.produto);\n    let v = porNome.get(n);\n    if (v === undefined) {\n      const base = normal(i.produto.split('|')[0]);\n      v = porNome.get(base);\n    }\n    mapa.set(i.produto, v ?? 0);\n  }\n  return mapa;\n}\n\nfunction lerClientes() {\n  const linhas = tabela('CARTEIRA DE CLIENTE', ['Cliente', 'Vendas Totais']);\n  const clientes = linhas\n    .filter((l) => texto(l.cliente))\n    .map((l) => ({\n      cliente: texto(l.cliente),\n      ultima: dataIso(l.ultima_venda),\n      compras: num(l.qtde_vendas) ?? 0,\n      ticket: num(l.ticket_medio),\n      vendas: num(l.vendas_totais) ?? 0,\n      recebido: num(l.total_recebido) ?? 0,\n      atraso: num(l.em_atraso) ?? 0,\n      receber: num(l.a_receber) ?? 0,\n      credito: num(l.credito_disponivel) ?? 0,\n    }));\n  const refConfig = parametro('Data de referência dos clientes');\n  const ultimas = clientes.map((c) => c.ultima).filter(Boolean).sort();\n  const referencia = (refConfig && dataIso(refConfig.v)) || ultimas[ultimas.length - 1] || hoje;\n  const inativo = valorParametro('Dias sem comprar para cliente inativo', 90);\n  for (const c of clientes) c.dias = dias(c.ultima, referencia);\n  return { clientes, referencia, inativo };\n}\nconst clienteResumo = (c) => ({\n  cliente: c.cliente,\n  ultima_compra: dataBr(c.ultima),\n  dias_sem_comprar: c.dias,\n  compras: c.compras,\n  ticket_medio_rs: r2(c.ticket ?? dividir(c.vendas, c.compras)),\n  vendas_totais_rs: r2(c.vendas),\n  recebido_rs: r2(c.recebido),\n  em_atraso_rs: r2(c.atraso),\n  a_receber_rs: r2(c.receber),\n  ...(c.credito ? { credito_disponivel_rs: r2(c.credito) } : {}),\n});\n\nfunction lerVendedoras() {\n  const linhas = tabela('VENDAS POR VENDEDOR', ['Vendedor', 'Produto', 'Quantidade', 'Valor Total']);\n  const vendas = linhas\n    .filter((l) => texto(l.vendedor) && num(l.quantidade) !== null)\n    .map((l) => ({ vendedora: texto(l.vendedor), produto: texto(l.produto), pecas: l.quantidade, valor: num(l.valor_total) ?? num(l.subtotal) ?? 0, comissao: num(l.comissao) ?? 0 }));\n  let acertos = [];\n  try {\n    acertos = tabela('FECHAMENTO VENDEDORAS', ['Vendedora', 'Início', 'Status'])\n      .filter((l) => texto(l.vendedora))\n      .map((l) => ({\n        vendedora: texto(l.vendedora),\n        ciclo: texto(l.ciclo),\n        inicio: dataIso(l.inicio),\n        fechamento: dataIso(l.fechamento),\n        consignado: num(l.consignado),\n        vendido: num(l.vendido),\n        comissao_pct: num(l.comissao_pct),\n        comissao: num(l.comissao),\n        a_pagar: num(l.a_pagar),\n        status: semEmoji(l.status),\n        observacao: texto(l.observacao).slice(0, 160),\n      }));\n  } catch (e) {\n    // a aba de acertos é opcional\n  }\n  return { vendas, acertos };\n}\nconst acertoResumo = (a) => limpar({\n  vendedora: a.vendedora,\n  ...(a.ciclo ? { ciclo: a.ciclo } : {}),\n  inicio: dataBr(a.inicio),\n  ...(a.fechamento ? { fechamento: dataBr(a.fechamento) } : { dias_em_aberto: dias(a.inicio, hoje) }),\n  consignado_rs: r2(a.consignado),\n  vendido_rs: r2(a.vendido),\n  ...(a.consignado && a.vendido !== null ? { vendido_pct: pct(dividir(a.vendido, a.consignado)) } : {}),\n  ...(a.comissao_pct !== null ? { comissao_pct: pct(a.comissao_pct) } : {}),\n  ...(a.comissao !== null ? { comissao_rs: r2(a.comissao) } : {}),\n  ...(a.a_pagar !== null ? { a_pagar_pela_vendedora_rs: r2(a.a_pagar) } : {}),\n  status: a.status,\n  ...(a.observacao ? { observacao: a.observacao } : {}),\n});\nfunction porVendedora(vendas) {\n  const grupos = new Map();\n  for (const v of vendas) {\n    const chave = normal(v.vendedora);\n    const g = grupos.get(chave) || { vendedora: v.vendedora, pecas: 0, vendido: 0, comissao: 0, produtos: new Map() };\n    g.pecas += v.pecas;\n    g.vendido += v.valor;\n    g.comissao += v.comissao;\n    const p = g.produtos.get(v.produto) || { produto: v.produto, pecas: 0, vendido: 0, comissao: 0 };\n    p.pecas += v.pecas;\n    p.vendido += v.valor;\n    p.comissao += v.comissao;\n    g.produtos.set(v.produto, p);\n    grupos.set(chave, g);\n  }\n  const total = soma([...grupos.values()], (g) => g.vendido);\n  return [...grupos.values()]\n    .sort((a, b) => b.vendido - a.vendido)\n    .map((g) => ({\n      ...g,\n      resumo: {\n        vendedora: g.vendedora,\n        pecas: g.pecas,\n        vendido_rs: r2(g.vendido),\n        comissao_rs: r2(g.comissao),\n        comissao_pct: pct(dividir(g.comissao, g.vendido)),\n        ticket_por_peca_rs: r2(dividir(g.vendido, g.pecas)),\n        participacao_pct: pct(dividir(g.vendido, total)),\n      },\n    }));\n}\n\nfunction lerPrecos() {\n  const linhas = tabela('PRECIFICAÇÃO', ['Produto', 'Bruto', 'Banho', 'Varejo']);\n  return linhas\n    .filter((l) => (texto(l.produto) || texto(l.codigo)) && (num(l.bruto) !== null || num(l.varejo) !== null))\n    .map((l) => ({\n      data: dataIso(l.data),\n      fornecedor: texto(l.fornecedor),\n      codigo: texto(l.codigo),\n      produto: texto(l.produto),\n      bruto: num(l.bruto),\n      qtd: num(l.qtd),\n      peso: num(l.peso_g),\n      banho: texto(l.banho),\n      varejo: num(l.varejo),\n      atacado: num(l.atacado),\n      consignado: num(l.consignado),\n      margem_varejo: num(l.margem_varejo),\n      margem_atacado: num(l.margem_atacado),\n      margem_consignado: num(l.margem_consignado),\n      margem_liquida: num(l.margem_liq_varejo),\n      custo_peca: num(l.custo_peca),\n      custo_total: num(l.custo_total),\n      markup: num(l.markup),\n      cotacao: semEmoji(l.cotacao),\n      ouro: num(l.ouro_g),\n      rodio: num(l.rodio_g),\n      banho_por_peca: num(l.banho_peca),\n    }));\n}\nconst precoResumo = (p) => {\n  const o = {\n    produto: p.produto || '(sem nome)',\n    ...(p.codigo ? { codigo: p.codigo } : {}),\n    ...(p.fornecedor ? { fornecedor: p.fornecedor } : {}),\n    ...(p.data ? { data: dataBr(p.data) } : {}),\n    bruto_rs: r2(p.bruto),\n    qtd: p.qtd,\n    peso_g: r2(p.peso),\n    banho: p.banho || '(sem banho)',\n    banho_por_peca_rs: r2(p.banho_por_peca),\n    custo_peca_rs: r2(p.custo_peca),\n    custo_total_rs: r2(p.custo_total),\n    markup: r2(p.markup),\n    varejo_rs: r2(p.varejo),\n    atacado_rs: r2(p.atacado),\n    consignado_rs: r2(p.consignado),\n    margem_varejo_pct: pct(p.margem_varejo),\n    margem_atacado_pct: pct(p.margem_atacado),\n    margem_consignado_pct: pct(p.margem_consignado),\n    margem_liquida_varejo_pct: pct(p.margem_liquida),\n    cotacao: p.cotacao,\n  };\n  return limpar(o);\n};\n\n// Tipos de banho da aba de configurações (código, metal, milésimos, mão de obra, verniz, R$/g hoje).\nfunction tiposDeBanho() {\n  try {\n    return tabela('CONFIGURAÇÕES', ['Código', 'Metal', 'Milésimos'], { ateLinha: 300, pararNoVazio: true })\n      .filter((l) => texto(l.codigo))\n      .map((l) => ({\n        codigo: texto(l.codigo),\n        metal: texto(l.metal),\n        milesimos: num(l.milesimos),\n        mao_de_obra: num(l.mao_de_obra_milesimos) ?? num(l.mao_de_obra),\n        verniz_g: num(l.verniz_g) ?? 0,\n        custo_g_hoje: num(l.g_hoje),\n        descricao: texto(l.descricao),\n      }));\n  } catch (e) {\n    return [];\n  }\n}\nfunction configuracoes() {\n  const c = {\n    markup_padrao: valorParametro('Markup padrão'),\n    desconto_atacado_pct: pct(valorParametro('Desconto do atacado')),\n    desconto_consignado_pct: pct(valorParametro('Desconto do consignado')),\n    comissao_vendedoras_pct: pct(valorParametro('Comissão das vendedoras')),\n    margem_minima_pct: pct(valorParametro('Margem mínima')),\n    embalagem_no_custo: texto(parametro('Embalagem entra no custo')?.v),\n    embalagem_insumos_por_peca_rs: r2(valorParametro('Embalagem + insumos por peça')),\n    custos_fixos_mensais_rs: r2(valorParametro('Custos fixos mensais')),\n    cliente_inativo_apos_dias: valorParametro('Dias sem comprar para cliente inativo'),\n    estoque_minimo_por_item: valorParametro('Estoque mínimo por item'),\n  };\n  return limpar(c);\n}\n\n// ---------- consulta ----------\nconst TIPOS = {\n  resumo: ['resumo', 'geral', 'visao geral', 'painel', 'paineis', 'tudo'],\n  vendas: ['vendas', 'venda', 'vendidos', 'categorias', 'categoria', 'faturamento', 'produtos vendidos'],\n  vendedoras: ['vendedoras', 'vendedora', 'vendedores', 'vendedor', 'comissoes', 'comissao', 'acertos', 'acerto', 'fechamento', 'consignado'],\n  clientes: ['clientes', 'cliente', 'carteira', 'inadimplentes', 'atrasados', 'reativar'],\n  estoque: ['estoque', 'produto', 'produtos', 'posicao de estoque'],\n  sem_estoque: ['sem estoque', 'sem_estoque', 'zerados', 'esgotados', 'zerado', 'esgotado'],\n  ultimas_pecas: ['ultimas pecas', 'ultimas_pecas', 'baixo estoque', 'acabando'],\n  reposicao: ['reposicao', 'repor', 'comprar', 'recompra'],\n  precos: ['precos', 'preco', 'precificacao', 'custos', 'custo', 'banho', 'cotacao', 'margens', 'margem'],\n  simular_preco: ['simular preco', 'simular_preco', 'simular', 'calcular preco', 'calcular_preco'],\n};\nconst tipoPedido = normal(String(entrada.tipo || '').replace(/_/g, ' '));\nconst tipo = !tipoPedido ? 'resumo' : Object.keys(TIPOS).find((t) => TIPOS[t].some((a) => normal(a) === tipoPedido)) || null;\nconst busca = texto(entrada.busca);\nconst termos = termosDe(busca);\nconst limite = Math.min(Math.max(Math.round(Number(entrada.limite) || 10), 1), 30);\nconst salvaEm = arquivo.modifiedTime ? new Date(Date.parse(arquivo.modifiedTime) - 3 * 3600000).toISOString() : null;\nconst fonte = `Planilha \"${arquivo.name || 'do negócio'}\" no Google Drive${salvaEm ? `, salva em ${dataBr(salvaEm)} às ${salvaEm.slice(11, 16)}` : ''}`;\nconst saida = { ok: true, tipo, busca, fonte };\nconst resultado = (extra) => [{ json: { ...saida, ...extra } }];\n\nif (!tipo) {\n  return [{ json: { ok: false, tipo: entrada.tipo, fonte, erro: `Tipo de consulta desconhecido. Use: ${Object.keys(TIPOS).join(', ')}.` } }];\n}\n\nif (tipo === 'resumo') {\n  const paineis = {};\n  for (const aba of xlsx.abas) {\n    const n = normal(aba.nome);\n    if (/^(painel|fechamento)/.test(n) || n === 'precificacao') {\n      const c = cartoes(aba.nome);\n      if (c && Object.keys(c).length) paineis[aba.nome] = c;\n    }\n  }\n  let periodo = null;\n  try {\n    periodo = lerVendas().periodo;\n  } catch (e) {\n    // sem a aba de vendas, o resumo sai só com os painéis\n  }\n  const ref = parametro('Data de referência dos clientes');\n  return resultado({\n    periodo_das_vendas: periodo,\n    ...(ref ? { clientes_referencia: dataBr(dataIso(ref.v)) } : {}),\n    configuracoes: configuracoes(),\n    paineis,\n    observacao: 'Números dos painéis da planilha, do jeito que estavam quando o arquivo foi salvo no Drive.',\n  });\n}\n\nif (tipo === 'vendas') {\n  const { periodo, produtos } = lerVendas();\n  const base = { periodo_das_vendas: periodo };\n  if (!termos.length) {\n    const cats = new Map();\n    for (const p of produtos) {\n      const c = cats.get(p.categoria) || [];\n      c.push(p);\n      cats.set(p.categoria, c);\n    }\n    const total = totaisVendas(produtos);\n    return resultado({\n      ...base,\n      total,\n      por_categoria: [...cats.entries()]\n        .map(([categoria, lista]) => {\n          const t = totaisVendas(lista);\n          return { categoria, pecas_vendidas: t.pecas_vendidas, faturamento_rs: t.faturamento_rs, lucro_rs: t.lucro_rs, margem_pct: t.margem_pct, participacao_pct: pct(dividir(t.faturamento_rs, total.faturamento_rs)) };\n        })\n        .sort((a, b) => b.faturamento_rs - a.faturamento_rs),\n      mais_vendidos: [...produtos].sort((a, b) => b.pecas - a.pecas || b.faturamento - a.faturamento).slice(0, limite).map(vendaResumo),\n      menores_margens: produtos\n        .filter((p) => p.faturamento > 0)\n        .sort((a, b) => dividir(a.lucro, a.faturamento) - dividir(b.lucro, b.faturamento))\n        .slice(0, 5)\n        .map(vendaResumo),\n    });\n  }\n  const alvoCategoria = termos.join(' ');\n  const mesmaCategoria = (c) => c === alvoCategoria || variantes(c).includes(alvoCategoria) || variantes(alvoCategoria).includes(c);\n  const daCategoria = produtos.filter((p) => mesmaCategoria(normal(p.categoria)));\n  const achados = daCategoria.length ? daCategoria : produtos.filter((p) => casa(`${p.produto} ${p.categoria} ${p.subcategoria}`, termos));\n  return resultado({\n    ...base,\n    ...(daCategoria.length ? { categoria: daCategoria[0].categoria } : {}),\n    encontrados: achados.length,\n    total_encontrado: totaisVendas(achados),\n    produtos: [...achados].sort((a, b) => b.pecas - a.pecas || b.faturamento - a.faturamento).slice(0, limite).map(vendaResumo),\n    ...(achados.length > limite ? { mais_produtos: achados.length - limite } : {}),\n    ...(!achados.length ? { aviso: 'Nenhum produto vendido com esse nome no período do relatório.' } : {}),\n  });\n}\n\nif (tipo === 'vendedoras') {\n  const { vendas, acertos } = lerVendedoras();\n  let periodo = null;\n  try {\n    periodo = lerVendas().periodo;\n  } catch (e) {\n    // o período vem do relatório de vendas (opcional aqui)\n  }\n  const grupos = porVendedora(vendas);\n  const emAberto = acertos.filter((a) => /aberto/i.test(a.status));\n  if (!termos.length) {\n    return resultado({\n      periodo_das_vendas: periodo,\n      total: {\n        vendedoras: grupos.length,\n        pecas: soma(grupos, (g) => g.pecas),\n        vendido_rs: r2(soma(grupos, (g) => g.vendido)),\n        comissoes_rs: r2(soma(grupos, (g) => g.comissao)),\n        comissao_media_pct: pct(dividir(soma(grupos, (g) => g.comissao), soma(grupos, (g) => g.vendido))),\n      },\n      por_vendedora: grupos.slice(0, Math.max(limite, 15)).map((g) => g.resumo),\n      acertos_do_consignado: cartoes('FECHAMENTO VENDEDORAS') || undefined,\n      acertos_em_aberto: emAberto.map(acertoResumo),\n    });\n  }\n  const escolhidas = grupos.filter((g) => casa(g.vendedora, termos));\n  if (escolhidas.length) {\n    return resultado({\n      periodo_das_vendas: periodo,\n      vendedoras: escolhidas.slice(0, 3).map((g) => ({\n        ...g.resumo,\n        produtos_mais_vendidos: [...g.produtos.values()]\n          .sort((a, b) => b.pecas - a.pecas || b.vendido - a.vendido)\n          .slice(0, limite)\n          .map((p) => ({ produto: p.produto, pecas: p.pecas, vendido_rs: r2(p.vendido), comissao_rs: r2(p.comissao) })),\n        acertos: acertos\n          .filter((a) => casa(a.vendedora, termos))\n          .sort((a, b) => String(b.inicio).localeCompare(String(a.inicio)))\n          .slice(0, 6)\n          .map(acertoResumo),\n      })),\n    });\n  }\n  // Não é nome de vendedora: procura o produto e mostra quem vendeu.\n  const doProduto = vendas.filter((v) => casa(v.produto, termos));\n  return resultado({\n    periodo_das_vendas: periodo,\n    produto_buscado: busca,\n    encontrados: doProduto.length,\n    quem_vendeu: porVendedora(doProduto)\n      .slice(0, limite)\n      .map((g) => ({ vendedora: g.vendedora, pecas: g.pecas, vendido_rs: r2(g.vendido), comissao_rs: r2(g.comissao) })),\n    ...(!doProduto.length ? { aviso: 'Nenhuma vendedora nem produto com esse nome no relatório de vendas por vendedora.' } : {}),\n  });\n}\n\nif (tipo === 'clientes') {\n  const { clientes, referencia, inativo } = lerClientes();\n  const base = { dias_contados_ate: dataBr(referencia), cliente_inativo_apos_dias: inativo };\n  const emAtraso = clientes.filter((c) => c.atraso > 0).sort((a, b) => b.atraso - a.atraso);\n  const aReceber = clientes.filter((c) => c.receber > 0).sort((a, b) => b.receber - a.receber);\n  const paraReativar = clientes.filter((c) => c.dias !== null && c.dias > inativo).sort((a, b) => b.vendas - a.vendas);\n  const pedido = normal(busca) || (['inadimplentes', 'atrasados', 'reativar'].includes(tipoPedido) ? tipoPedido : '');\n  const lista = (nome, itens, total) => resultado({ ...base, [nome]: itens.slice(0, limite).map(clienteResumo), total_de_clientes: itens.length, ...(total !== undefined ? { valor_total_rs: r2(total) } : {}) });\n  if (/^(em )?atras|inadimpl|devendo|cobrar|cobranca/.test(pedido)) return lista('em_atraso', emAtraso, soma(emAtraso, (c) => c.atraso));\n  if (/receber/.test(pedido)) return lista('a_receber', aReceber, soma(aReceber, (c) => c.receber));\n  if (/reativ|inativ|sumid|parad|sem comprar/.test(pedido)) return lista('para_reativar', paraReativar);\n  if (/^(melhores|maiores|top|principais)/.test(pedido)) return lista('maiores_clientes', [...clientes].sort((a, b) => b.vendas - a.vendas));\n  if (!termos.length) {\n    const vendas = soma(clientes, (c) => c.vendas);\n    const compras = soma(clientes, (c) => c.compras);\n    return resultado({\n      ...base,\n      total: {\n        clientes: clientes.length,\n        vendas_totais_rs: r2(vendas),\n        compras,\n        ticket_medio_por_compra_rs: r2(dividir(vendas, compras)),\n        recebido_rs: r2(soma(clientes, (c) => c.recebido)),\n        em_atraso_rs: r2(soma(emAtraso, (c) => c.atraso)),\n        clientes_com_atraso: emAtraso.length,\n        a_receber_rs: r2(soma(aReceber, (c) => c.receber)),\n        clientes_para_reativar: paraReativar.length,\n      },\n      em_atraso: emAtraso.slice(0, limite).map(clienteResumo),\n      a_receber: aReceber.slice(0, limite).map(clienteResumo),\n      maiores_clientes: [...clientes].sort((a, b) => b.vendas - a.vendas).slice(0, Math.min(limite, 10)).map(clienteResumo),\n      para_reativar: paraReativar.slice(0, Math.min(limite, 10)).map(clienteResumo),\n    });\n  }\n  const achados = clientes.filter((c) => casa(c.cliente, termos));\n  return resultado({\n    ...base,\n    encontrados: achados.length,\n    clientes: achados.slice(0, limite).map(clienteResumo),\n    ...(!achados.length ? { aviso: 'Nenhum cliente com esse nome na carteira.' } : {}),\n  });\n}\n\nif (tipo === 'estoque' || tipo === 'sem_estoque' || tipo === 'ultimas_pecas' || tipo === 'reposicao') {\n  const { itens, minimo } = lerEstoque();\n  let vendidos = [];\n  let periodo = null;\n  try {\n    const v = lerVendas();\n    vendidos = v.produtos;\n    periodo = v.periodo;\n  } catch (e) {\n    // sem o relatório de vendas, segue só com o estoque\n  }\n  const vendidas = vendidasPorItem(itens, vendidos);\n  const filtrados = termos.length ? itens.filter((i) => casa(`${i.produto} ${i.codigo}`, termos)) : itens;\n  const base = { estoque_minimo_por_item: minimo, ...(periodo ? { periodo_das_vendas: periodo } : {}) };\n\n  if (tipo === 'reposicao') {\n    // Mais vendidos com estoque zerado ou no mínimo (soma de todas as variações e locais).\n    const estoquePorNome = new Map();\n    for (const i of itens) {\n      for (const chave of new Set([normal(i.produto), normal(i.produto.split('|')[0])])) {\n        estoquePorNome.set(chave, (estoquePorNome.get(chave) || 0) + i.total);\n      }\n    }\n    const candidatos = vendidos\n      .filter((p) => !termos.length || casa(`${p.produto} ${p.categoria}`, termos))\n      .map((p) => ({ p, estoque: estoquePorNome.get(normal(p.produto)) ?? null }))\n      .filter((x) => x.estoque === null || x.estoque <= minimo)\n      .sort((a, b) => b.p.pecas - a.p.pecas || b.p.faturamento - a.p.faturamento);\n    return resultado({\n      ...base,\n      criterio: `Produtos vendidos no período com ${minimo} peça(s) ou menos em estoque, somando variações e locais; os mais vendidos primeiro. estoque_atual 0 com fora_do_relatorio_de_estoque = o produto nem aparece no relatório de estoque.`,\n      encontrados: candidatos.length,\n      repor: candidatos.slice(0, limite).map((x) => ({\n        produto: x.p.produto,\n        categoria: x.p.categoria,\n        vendidas_no_periodo: x.p.pecas,\n        faturamento_rs: r2(x.p.faturamento),\n        estoque_atual: x.estoque ?? 0,\n        ...(x.estoque === null ? { fora_do_relatorio_de_estoque: true } : {}),\n      })),\n    });\n  }\n  if (tipo === 'sem_estoque' || tipo === 'ultimas_pecas') {\n    const alvo = tipo === 'sem_estoque' ? (i) => i.total <= 0 : (i) => i.total > 0 && i.total <= minimo;\n    const lista = filtrados.filter(alvo).sort((a, b) => vendidas.get(b.produto) - vendidas.get(a.produto) || a.produto.localeCompare(b.produto));\n    return resultado({\n      ...base,\n      encontrados: lista.length,\n      itens: lista.slice(0, limite).map((i) => itemResumo(i, vendidas.get(i.produto))),\n      ...(lista.length > limite ? { mais_itens: lista.length - limite } : {}),\n      ordem: 'Os mais vendidos no período primeiro.',\n    });\n  }\n  if (!termos.length) {\n    return resultado({\n      ...base,\n      total: totaisEstoque(itens),\n      onde_esta_o_dinheiro: [...itens].sort((a, b) => b.venda - a.venda).slice(0, limite).map((i) => ({ ...itemResumo(i), valor_de_venda_rs: r2(i.venda), custo_rs: r2(i.custo) })),\n    });\n  }\n  const ordenados = [...filtrados].sort((a, b) => b.total - a.total || a.produto.localeCompare(b.produto));\n  return resultado({\n    ...base,\n    encontrados: filtrados.length,\n    total_encontrado: filtrados.length ? totaisEstoque(filtrados) : undefined,\n    itens: ordenados.slice(0, limite).map((i) => itemResumo(i, vendidas.get(i.produto))),\n    ...(filtrados.length > limite ? { mais_itens: filtrados.length - limite } : {}),\n    ...(!filtrados.length ? { aviso: 'Nenhum produto com esse nome ou código no estoque.' } : {}),\n  });\n}\n\nif (tipo === 'precos') {\n  const precos = lerPrecos();\n  const cot = cartoes('PRECIFICAÇÃO', 4) || {};\n  const cotacao = {};\n  for (const [rotulo, valor] of Object.entries(cot)) if (/OURO DO DIA|RODIO DO DIA|RÓDIO DO DIA|MARKUP PADR|EMBALAGEM/i.test(rotulo)) cotacao[rotulo] = valor;\n  const minima = valorParametro('Margem mínima');\n  if (!termos.length) {\n    const abaixo = minima === null ? [] : precos.filter((p) => p.margem_atacado !== null && p.margem_atacado < minima);\n    return resultado({\n      cotacao_do_dia: cotacao,\n      configuracoes: configuracoes(),\n      tipos_de_banho: tiposDeBanho().map((b) => ({ codigo: b.codigo, custo_por_grama_hoje_rs: r2(b.custo_g_hoje), descricao: b.descricao })),\n      regras: [\n        'Banho por grama = cotação do metal (ouro ou ródio, R$/g) × (milésimos + mão de obra) ÷ 1000 + verniz.',\n        'Custo da peça = bruto + peso × banho por grama + custo extra.',\n        'Varejo = custo da peça × markup + embalagem + acréscimo.',\n        'Atacado = varejo − desconto do atacado; consignado = varejo − desconto do consignado.',\n        'Margem = (preço − custo total) ÷ preço; custo total = custo da peça + embalagem (se a embalagem entra no custo).',\n        'Margem líquida do varejo = margem do varejo − comissão das vendedoras.',\n      ],\n      indicadores: cartoes('PRECIFICAÇÃO', 8) || undefined,\n      linhas_com_margem_de_atacado_abaixo_do_minimo: abaixo.length,\n      exemplos_abaixo_do_minimo: abaixo.slice(0, 5).map(precoResumo),\n    });\n  }\n  const achados = precos.filter((p) => casa(`${p.produto} ${p.codigo} ${p.fornecedor} ${p.banho}`, termos));\n  return resultado({\n    cotacao_do_dia: cotacao,\n    encontrados: achados.length,\n    pecas: [...achados].sort((a, b) => String(b.data).localeCompare(String(a.data))).slice(0, limite).map(precoResumo),\n    ...(achados.length > limite ? { mais_pecas: achados.length - limite } : {}),\n    ...(!achados.length ? { aviso: 'Nenhuma peça com esse nome, código ou fornecedor na precificação.' } : {}),\n  });\n}\n\nif (tipo === 'simular_preco') {\n  // busca no formato: \"bruto 12,50 peso 3,2 banho 5+CA markup 4 acrescimo 0 qtd 10\"\n  const valorDe = (rotulo) => {\n    const m = new RegExp(`${rotulo}\\\\s*[:=]?\\\\s*(?:r\\\\$\\\\s*)?(-?\\\\d+(?:[.,]\\\\d+)?)`, 'i').exec(busca);\n    return m ? Number(m[1].replace(',', '.')) : null;\n  };\n  const banhos = tiposDeBanho();\n  const textoBanho = (/banho\\s*[:=]?\\s*([^\\s,;]+(?:\\s*-\\s*[^\\s,;]+)?)/i.exec(busca) || [])[1] || '';\n  const banho =\n    banhos.find((b) => normal(b.codigo) === normal(textoBanho)) ||\n    banhos.find((b) => normal(textoBanho).length > 1 && normal(b.codigo).startsWith(normal(textoBanho))) ||\n    (/sem banho/i.test(busca) ? banhos.find((b) => /sem banho/i.test(b.codigo)) : null);\n  const bruto = valorDe('bruto');\n  const peso = valorDe('peso');\n  const faltando = [bruto === null && 'bruto (R$)', peso === null && 'peso (g)', !banho && `banho (${banhos.map((b) => b.codigo).join(', ')})`].filter(Boolean);\n  if (faltando.length) {\n    return [{ json: { ...saida, ok: false, erro: `Para simular, informe ${faltando.join(', ')}. Exemplo de busca: \"bruto 12,50 peso 3,2 banho 5+CA\".` } }];\n  }\n  const markup = valorDe('markup') ?? valorParametro('Markup padrão', 4);\n  const acrescimo = valorDe('acr[eé]scimo') ?? 0;\n  const extra = valorDe('extra') ?? 0;\n  const qtd = valorDe('qtd') ?? valorDe('quantidade') ?? 1;\n  const embalagem = valorParametro('Embalagem + insumos por peça', 0);\n  const embNoCusto = !/^n/i.test(texto(parametro('Embalagem entra no custo')?.v));\n  const porGrama = banho.custo_g_hoje ?? 0;\n  const banhoPeca = porGrama ? peso * porGrama : 0;\n  const custoPeca = bruto + banhoPeca + extra;\n  const varejo = custoPeca * markup + embalagem + acrescimo;\n  const atacado = varejo * (1 - valorParametro('Desconto do atacado', 0.5));\n  const consignado = varejo * (1 - valorParametro('Desconto do consignado', 0.2));\n  const custoTotal = custoPeca + (embNoCusto ? embalagem : 0);\n  const margem = (preco) => pct(dividir(preco - custoTotal, preco));\n  const minima = valorParametro('Margem mínima');\n  const margemAtacado = dividir(atacado - custoTotal, atacado);\n  return resultado({\n    entrada: { bruto_rs: bruto, peso_g: peso, banho: banho.codigo, markup, acrescimo_rs: acrescimo, custo_extra_rs: extra, qtd },\n    usado: { banho_por_grama_hoje_rs: r2(porGrama), embalagem_rs: r2(embalagem), embalagem_no_custo: embNoCusto ? 'SIM' : 'NÃO' },\n    simulacao: {\n      banho_por_peca_rs: r2(banhoPeca),\n      custo_peca_rs: r2(custoPeca),\n      custo_total_rs: r2(custoTotal),\n      varejo_rs: r2(varejo),\n      atacado_rs: r2(atacado),\n      consignado_rs: r2(consignado),\n      margem_varejo_pct: margem(varejo),\n      margem_atacado_pct: margem(atacado),\n      margem_consignado_pct: margem(consignado),\n      margem_liquida_varejo_pct: pct(dividir(varejo - custoTotal, varejo) - (valorParametro('Comissão das vendedoras', 0) || 0)),\n      ...(qtd > 1 ? { compra_total_rs: r2(custoPeca * qtd), venda_total_varejo_rs: r2(varejo * qtd) } : {}),\n    },\n    ...(minima !== null && margemAtacado !== null && margemAtacado < minima ? { alerta: `A margem do atacado fica abaixo da mínima (${pct(minima)}%).` } : {}),\n    observacao: 'Simulação com a cotação e os parâmetros de hoje da planilha; nada foi gravado.',\n  });\n}\n\nreturn [{ json: { ...saida, ok: false, erro: 'Tipo de consulta não tratado.' } }];\n"
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "7c2c8aae-b1ad-430e-a09f-dcf193bd2373",
+      "name": "Fora do modo Negócios",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        440,
+        520
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "fora-ok",
+              "name": "ok",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "fora-erro",
+              "name": "erro",
+              "value": "A planilha do negócio só pode ser consultada no modo Negócios.",
+              "type": "string"
+            },
+            {
+              "id": "fora-orientacao",
+              "name": "orientacao",
+              "value": "Diga ao dono, em uma frase, que esses dados são do ambiente Negócios e que ele pode trocar dizendo \"modo negócios\". Não use nem invente dados da planilha aqui.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "c1a4c1ef-3cd3-4ad0-a85f-61488b33b85a",
+      "name": "Explicar falha",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        560
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Resume o erro para a Kira explicar ao dono (sem travar a conversa).\nconst item = $input.first().json;\nconst bruto = item.error ?? item;\nconst textos = [];\nconst coletar = (valor, profundidade = 0) => {\n  if (!valor || profundidade > 4) return;\n  if (typeof valor === 'string') {\n    textos.push(valor);\n    return;\n  }\n  if (typeof valor === 'object') {\n    for (const chave of ['message', 'description']) {\n      if (typeof valor[chave] === 'string') textos.push(valor[chave]);\n    }\n    coletar(valor.error, profundidade + 1);\n  }\n};\ncoletar(bruto);\nconst erro = [...new Set(textos.map((t) => t.trim()).filter(Boolean))].join(' — ').slice(0, 600) || 'erro desconhecido';\nconst naoAchou = /não achei no google drive|404|not found/i.test(erro);\n\nreturn [\n  {\n    json: {\n      ok: false,\n      erro,\n      orientacao: naoAchou\n        ? 'A planilha do negócio não foi encontrada no Google Drive (ou mudou de nome). Explique isso ao dono em poucas palavras e peça para ele subir o arquivo de novo. Não invente dados.'\n        : 'Não consegui ler a planilha do negócio agora. Explique o erro ao dono em poucas palavras e não invente dados.',\n    },\n  },\n];\n"
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Quando a Kira consultar a planilha": {
+      "main": [
+        [
+          {
+            "node": "Só no modo Negócios",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Só no modo Negócios": {
+      "main": [
+        [
+          {
+            "node": "Planilha do negócio",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fora do modo Negócios",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Planilha do negócio": {
+      "main": [
+        [
+          {
+            "node": "Procurar planilha",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Procurar planilha": {
+      "main": [
+        [
+          {
+            "node": "Escolher planilha",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Explicar falha",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Escolher planilha": {
+      "main": [
+        [
+          {
+            "node": "Baixar planilha",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Explicar falha",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Baixar planilha": {
+      "main": [
+        [
+          {
+            "node": "Planilha em base64",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Explicar falha",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Planilha em base64": {
+      "main": [
+        [
+          {
+            "node": "Consultar planilha",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Explicar falha",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consultar planilha": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Explicar falha",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Sao_Paulo",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "all"
+  },
+  "tags": []
+}

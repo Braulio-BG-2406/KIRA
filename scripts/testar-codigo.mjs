@@ -1028,13 +1028,19 @@ const noRA = (nome) => {
   return n;
 };
 // Executa um nó Code com $json e $('Nó').item (modo "uma vez por item") ou first/all.
+// No modo "uma vez por item", o n8n aceita um objeto ou null (descarta o item), nunca uma lista.
 function executarRA(nome, { nosAnteriores = {}, json = {} } = {}) {
   const $ = (no) => {
     const valor = nosAnteriores[no];
     const lista = [].concat(valor ?? []).map((j) => ({ json: j }));
     return { first: () => lista[0], all: () => lista, item: lista[0] };
   };
-  return new Function('$', '$json', '$input', 'DateTime', noRA(nome).parameters.jsCode)($, json, { all: () => [] }, luxon.DateTime);
+  const no = noRA(nome);
+  const resultado = new Function('$', '$json', '$input', 'DateTime', no.parameters.jsCode)($, json, { all: () => [] }, luxon.DateTime);
+  if (no.parameters.mode === 'runOnceForEachItem' && Array.isArray(resultado)) {
+    throw new Error(`${nome}: no modo "uma vez por item" o n8n recusa lista ("A 'json' property isn't an object")`);
+  }
+  return resultado;
 }
 const luxon = { DateTime: { fromISO: (iso) => ({ setZone: () => ({ toFormat: () => `data de ${iso}` }) }) } };
 const emailRA = (o) => ({
@@ -1124,8 +1130,9 @@ teste('rascunhos: o resultado acha o e-mail pela referência devolvida pelo sub-
 });
 teste('rascunhos: limite de uso da IA não registra (tenta de novo); outros erros registram', () => {
   const falha = (json) => executarRA('Tratar falha da IA', { nosAnteriores: { 'Separar e-mails': { chave: '<a@t>', assunto: 'x' } }, json });
-  assert.deepEqual(falha({ error: { message: '[429] RESOURCE_EXHAUSTED' } }), []);
-  assert.equal(falha({ error: { message: 'bloqueado pelo filtro' } })[0].json.status, 'erro');
+  assert.equal(falha({ error: { message: '[429] RESOURCE_EXHAUSTED' } }), null);
+  assert.equal(falha({ error: 'Service unavailable - try again later' }), null);
+  assert.equal(falha({ error: { message: 'bloqueado pelo filtro' } }).json.status, 'erro');
 });
 teste('rascunhos: seg a sex a cada 30 min, só cria rascunho (sub-workflow com assinatura) e nunca envia', () => {
   assert.equal(noRA('A cada 30 min (seg a sex, 7h às 19h30)').parameters.rule.interval[0].expression, '*/30 7-19 * * 1-5');
@@ -1496,6 +1503,16 @@ teste('planilha do negócio: precificação e simulação de preço com as regra
   r = consultarNegocio('simular_preco', 'bruto 10 banho 5+CA');
   assert.equal(r.ok, false);
   assert.match(r.erro, /peso \(g\)/);
+});
+
+teste('nós Code "uma vez por item" não devolvem lista (o n8n recusa e a execução cai)', () => {
+  const arquivos = ['kira-1.0', 'kira-resumo-da-manha', 'kira-gerar-imagem', 'kira-anexar-imagem', 'kira-teams', 'kira-pedidos', 'kira-base-de-pedidos', 'kira-rascunho-resposta', 'kira-rascunhos-automaticos', 'kira-pesquisar-internet', 'kira-planilha-negocio'];
+  for (const arquivo of arquivos) {
+    const w = JSON.parse(ler(`n8n/workflows/${arquivo}.json`));
+    for (const n of w.nodes.filter((x) => x.type === 'n8n-nodes-base.code' && x.parameters.mode === 'runOnceForEachItem')) {
+      assert.doesNotMatch(n.parameters.jsCode, /^return \[/m, `${arquivo} → ${n.name}: devolva um objeto ou null`);
+    }
+  }
 });
 
 teste('segurança: nenhum token do Telegram, chave do Google ou caminho de webhook nos arquivos', () => {

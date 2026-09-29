@@ -356,6 +356,7 @@ teste('outlook: rascunho de resposta vai pelo sub-workflow com assinatura e nunc
   assert.equal(workflow.connections.criar_rascunho_resposta.ai_tool[0][0].node, 'Kira');
   assert.doesNotMatch(JSON.stringify(workflow), /\/send'|sendMail|\/reply'/);
   assert.match(nos.Kira.parameters.options.systemMessage, /A assinatura dele \(imagem e e-mail\) entra sozinha/);
+  assert.match(nos.Kira.parameters.options.systemMessage, /a imagem fica no Google Drive dele/);
 });
 
 // ---------- Imagens: ferramentas e sub-workflows ----------
@@ -870,23 +871,25 @@ const pngDeTeste = (largura, altura) => {
   b.writeUInt32BE(altura, 20);
   return b;
 };
-function rodarRascunho(nome, { entrada = {}, nosAnteriores = {}, baixar } = {}) {
+function rodarRascunho(nome, { entrada = {}, nosAnteriores = {} } = {}) {
   const $ = (no) => ({ first: () => ({ json: nosAnteriores[no] }) });
-  const helpers = { httpRequest: baixar ?? (async () => { throw new Error('sem rede'); }) };
-  return new Function('$input', '$', `return (async function () {\n${noDe(rascunhoResposta, nome).parameters.jsCode}\n}).call(this);`).call(
-    { helpers },
+  return new Function('$input', '$', `return (async function () {\n${noDe(rascunhoResposta, nome).parameters.jsCode}\n}).call(this);`)(
     { first: () => ({ json: entrada }) },
     $,
   );
 }
 const pedidoDeRascunho = { 'Quando pedirem um rascunho de resposta': { id_email: ' AAMk= ', texto: 'Olá, Ana!\nO pedido <1> sai & chega "sexta".\n\nAtenciosamente,\nBráulio', referencia: '<a@t>' } };
-const assinaturaDeTeste = { email: 'dono@empresa.com.br', imagem_onedrive: 'Kira/assinatura.png', largura_maxima: 600 };
-teste('assinatura: texto em HTML seguro, imagem reduzida para 600 px e e-mail embaixo', async () => {
-  const [r] = await rodarRascunho('Montar resposta', {
-    entrada: { '@microsoft.graph.downloadUrl': 'https://x', size: 5000, file: { mimeType: 'image/png' } },
-    nosAnteriores: { ...pedidoDeRascunho, Assinatura: assinaturaDeTeste },
-    baixar: async () => pngDeTeste(1200, 300),
+const assinaturaDeTeste = { email: 'dono@empresa.com.br', imagem_drive: 'assinatura', largura_maxima: 600 };
+const imagemAchada = (mimeType, size) => ({ files: [{ id: 'img1', name: 'assinatura.png', mimeType, size: String(size) }] });
+// procura = saída de "Procurar imagem da assinatura"; "Montar resposta" recebe a imagem em base64
+// (ou a própria procura, quando não houve download).
+const montarRascunho = (procura, entrada, outros = {}) =>
+  rodarRascunho('Montar resposta', {
+    entrada: entrada ?? procura,
+    nosAnteriores: { ...pedidoDeRascunho, Assinatura: assinaturaDeTeste, 'Procurar imagem da assinatura': procura, ...outros },
   });
+teste('assinatura: texto em HTML seguro, imagem reduzida para 600 px e e-mail embaixo', async () => {
+  const [r] = await montarRascunho(imagemAchada('image/png', 5000), { imagem_base64: pngDeTeste(1200, 300).toString('base64') });
   assert.equal(r.json.id_email, 'AAMk=');
   assert.equal(r.json.referencia, '<a@t>');
   assert.equal(
@@ -897,17 +900,21 @@ teste('assinatura: texto em HTML seguro, imagem reduzida para 600 px e e-mail em
   );
   assert.deepEqual([r.json.imagem.nome, r.json.imagem.tipo, r.json.aviso], ['assinatura.png', 'image/png', '']);
 });
-teste('assinatura: sem a imagem no OneDrive (ou imagem inválida), sai só o e-mail, com aviso', async () => {
-  const nosAnteriores = { ...pedidoDeRascunho, Assinatura: assinaturaDeTeste };
-  let [r] = await rodarRascunho('Montar resposta', { entrada: { error: { message: '404' } }, nosAnteriores });
+teste('assinatura: sem a imagem no Google Drive (ou imagem inválida), sai só o e-mail, com aviso', async () => {
+  let [r] = await montarRascunho({ files: [] });
   assert.equal(r.json.imagem, null);
   assert.ok(r.json.comentario.endsWith('Bráulio<br><br><a href="mailto:dono@empresa.com.br">dono@empresa.com.br</a>'));
-  assert.match(r.json.aviso, /não achei a imagem da assinatura no OneDrive \(Kira\/assinatura\.png\)/);
-  [r] = await rodarRascunho('Montar resposta', { entrada: { '@microsoft.graph.downloadUrl': 'https://x', size: 3e6, file: { mimeType: 'image/png' } }, nosAnteriores });
+  assert.match(r.json.aviso, /não achei no Google Drive a imagem da assinatura \(PNG, JPG ou GIF com "assinatura" no nome\)/);
+  [r] = await montarRascunho({ error: { message: '401 Unauthorized' } });
+  assert.match(r.json.aviso, /não consegui procurar a imagem da assinatura no Google Drive \(401 Unauthorized\)/);
+  [r] = await montarRascunho(imagemAchada('image/png', 3e6));
   assert.match(r.json.aviso, /passa de 1 MB/);
-  [r] = await rodarRascunho('Montar resposta', { entrada: { '@microsoft.graph.downloadUrl': 'https://x', size: 10, file: { mimeType: 'image/webp' } }, nosAnteriores });
+  [r] = await montarRascunho(imagemAchada('image/webp', 10));
   assert.match(r.json.aviso, /PNG, JPG ou GIF/);
-  await assert.rejects(rodarRascunho('Montar resposta', { nosAnteriores: { ...nosAnteriores, 'Quando pedirem um rascunho de resposta': { id_email: 'x', texto: ' ' } } }), /Faltou o texto/);
+  [r] = await montarRascunho(imagemAchada('image/png', 5000), { error: { message: 'timeout' } });
+  assert.match(r.json.aviso, /não consegui baixar a imagem da assinatura do Google Drive \(timeout\)/);
+  assert.equal(r.json.imagem, null);
+  await assert.rejects(montarRascunho({ files: [] }, undefined, { 'Quando pedirem um rascunho de resposta': { id_email: 'x', texto: ' ' } }), /Faltou o texto/);
 });
 teste('assinatura: resultado final e falhas explicadas', async () => {
   const montado = { referencia: 'r', imagem: { nome: 'assinatura.png' }, aviso: '' };
@@ -920,6 +927,25 @@ teste('assinatura: resultado final e falhas explicadas', async () => {
   assert.deepEqual([r.json.ok, r.json.referencia], [false, '<a@t>']);
   assert.match(r.json.orientacao, /Não achei esse e-mail/);
 });
+teste('assinatura: imagem mais recente do Google Drive (PNG, JPG ou GIF de até 1 MB), baixada só se couber', () => {
+  const procurar = noDe(rascunhoResposta, 'Procurar imagem da assinatura');
+  assert.equal(procurar.parameters.nodeCredentialType, 'googleDriveOAuth2Api');
+  const consulta = Object.fromEntries(procurar.parameters.queryParameters.parameters.map((p) => [p.name, p.value]));
+  assert.match(consulta.q, /\$json\.imagem_drive/);
+  assert.match(consulta.q, /trashed = false/);
+  assert.match(consulta.q, /image\/png.*image\/jpeg.*image\/gif/);
+  assert.equal(consulta.orderBy, 'modifiedTime desc');
+  assert.equal(procurar.onError, 'continueRegularOutput', 'sem a imagem, o rascunho sai só com o e-mail');
+  assert.match(noDe(rascunhoResposta, 'Achou a imagem?').parameters.conditions.conditions[0].leftValue, /size \|\| 0\) <= 1048576/);
+  const baixar = noDe(rascunhoResposta, 'Baixar imagem da assinatura');
+  assert.equal(baixar.parameters.nodeCredentialType, 'googleDriveOAuth2Api');
+  assert.match(baixar.parameters.url, /\?alt=media' \}\}$/);
+  assert.equal(noDe(rascunhoResposta, 'Imagem em base64').parameters.destinationKey, 'imagem_base64');
+  assert.deepEqual(
+    rascunhoResposta.connections['Achou a imagem?'].main.map((saida) => saida.map((c) => c.node)),
+    [['Baixar imagem da assinatura'], ['Montar resposta']],
+  );
+});
 teste('assinatura: só cria rascunho (createReply) com a imagem embutida; repositório sem e-mail', () => {
   const criar = noDe(rascunhoResposta, 'Criar rascunho').parameters;
   assert.equal(criar.method, 'POST');
@@ -930,7 +956,7 @@ teste('assinatura: só cria rascunho (createReply) com a imagem embutida; reposi
   assert.match(anexo, /contentId: \$\('Montar resposta'\)\.first\(\)\.json\.cid/);
   assert.doesNotMatch(JSON.stringify(rascunhoResposta), /\/send\b|sendMail/);
   const campos = Object.fromEntries(noDe(rascunhoResposta, 'Assinatura').parameters.assignments.assignments.map((c) => [c.name, c.value]));
-  assert.deepEqual(campos, { email: '', imagem_onedrive: 'Kira/assinatura.png', largura_maxima: 600 });
+  assert.deepEqual(campos, { email: '', imagem_drive: 'assinatura', largura_maxima: 600 });
 });
 
 // ---------- Kira 2.0: ambientes ----------

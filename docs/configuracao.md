@@ -256,15 +256,15 @@ Teste: "Kira, como fechou o Ibovespa no último pregão?".
 
 A assinatura que você configura no Outlook não entra nos rascunhos criados pela Kira (eles são criados pelo Microsoft Graph, fora do Outlook). Por isso os rascunhos de resposta, os que você pede e os automáticos, passam por um sub-workflow próprio: **Kira — rascunho de resposta com assinatura** ([`kira-rascunho-resposta.json`](../n8n/workflows/kira-rascunho-resposta.json)). Ele cria o rascunho com o texto da Kira, a sua assinatura logo abaixo (a **imagem** e o seu **e-mail**) e o e-mail original citado, como o botão Responder. Nada é enviado.
 
-- A imagem fica no seu OneDrive, em **`Kira/assinatura.png`** (PNG, JPG ou GIF de até 1 MB; aparece com no máximo 600 px de largura). Para trocar a assinatura, é só trocar o arquivo.
-- Sem a imagem no OneDrive, o rascunho sai só com o e-mail: a Kira avisa na conversa e, nos rascunhos automáticos, o aviso do Telegram traz uma linha sobre isso.
+- A imagem fica no seu Google Drive, em qualquer pasta: o sub-workflow procura a imagem mais recente com um trecho do nome que você escolhe (PNG, JPG ou GIF de até 1 MB; aparece com no máximo 600 px de largura). Para trocar a assinatura, suba a imagem nova com o mesmo trecho no nome: vale a mais recente.
+- Sem a imagem no Google Drive, o rascunho sai só com o e-mail: a Kira avisa na conversa (dizendo o nome que procurou) e, nos rascunhos automáticos, o aviso do Telegram traz uma linha sobre isso.
 - A Kira termina o texto com a despedida e o seu nome e não repete e-mail, telefone ou cargo, que já estão na assinatura.
 
-1. Importe o sub-workflow. Selecione a credencial *Microsoft Outlook* em **Criar rascunho** e **Anexar imagem da assinatura** e a do Teams em **Imagem da assinatura** (ela lê o OneDrive).
-2. No nó **Assinatura**, preencha o seu `email` (e, se quiser, outro caminho em `imagem_onedrive` ou outra `largura_maxima`).
+1. Importe o sub-workflow. Selecione a credencial *Microsoft Outlook* em **Criar rascunho** e **Anexar imagem da assinatura** e a do Google Drive (passo 9) em **Procurar imagem da assinatura** e **Baixar imagem da assinatura**.
+2. No nó **Assinatura**, preencha o seu `email` e, em `imagem_drive`, um trecho do nome da imagem (por exemplo, `ASSINATURA`); se quiser, mude a `largura_maxima`.
 3. Publique e, em **Settings → This workflow can be called by**, libere a Kira e os rascunhos automáticos.
 4. Na Kira, selecione o sub-workflow em **criar_rascunho_resposta**; nos rascunhos automáticos, no nó **Criar rascunho**. Publique os dois.
-5. Coloque a imagem em `Kira/assinatura.png` no OneDrive (pela pasta do OneDrive no computador ou pelo site).
+5. Suba a imagem para o Google Drive (pelo site ou pelo Google Drive no computador), com o trecho do passo 2 no nome.
 
 Teste: "Kira, deixe pronta uma resposta para o último e-mail do fornecedor dizendo que recebi". O rascunho aparece em Rascunhos com a imagem e o e-mail no fim.
 
@@ -326,7 +326,7 @@ Durante os testes ficou uma linha de teste em `kira_logs` (usuário "Teste @test
 | A Kira diz que não consegue ler o Teams ou a base de pedidos | Credencial do Teams expirou, a planilha mudou de lugar ou a sincronização ainda não rodou | Reconecte a credencial *Microsoft Teams*, confira os ids da planilha e rode **Atualizar agora** na sincronização (passos 12 e 13) |
 | A Kira diz que a base de pedidos está numa versão antiga | A base foi gerada por uma versão anterior da sincronização | Rode **Atualizar agora** em **Kira — base de pedidos (sincronização)** |
 | Chegou no Telegram "Não consegui atualizar a base de pedidos" | A planilha estava sendo salva, mudou de colunas ou a credencial expirou | A Kira segue com a última base; veja a execução com erro e tente **Atualizar agora** |
-| O rascunho saiu sem a imagem da assinatura | A imagem não está em `Kira/assinatura.png` no OneDrive, passa de 1 MB ou não é PNG, JPG ou GIF | Coloque a imagem no lugar certo (passo 17); o próximo rascunho já sai com ela |
+| O rascunho saiu sem a imagem da assinatura | No Google Drive não há imagem com o trecho de `imagem_drive` no nome, ou ela passa de 1 MB ou não é PNG, JPG ou GIF | Suba a imagem com esse trecho no nome (passo 17); o próximo rascunho já sai com ela |
 | O resumo chegou sem o áudio | Limite diário da voz do Gemini | O texto sempre chega; o áudio volta no dia seguinte (veja a execução em **Executions**) |
 | A Kira diz que o assunto é de outro ambiente | O ambiente ativo não é o do assunto | Mande "modo <nome>" (o `/status` mostra o ambiente ativo) |
 | Não apareceu rascunho para um e-mail sobre pedido | Fora do horário, e-mail sem palavras de pedido, já respondido, ou a Kira decidiu que não precisava de resposta | Veja as execuções de **Kira — rascunhos automáticos** e a tabela `kira_emails_auto` (coluna `motivo`) |

@@ -861,6 +861,48 @@ teste('pedidos: repositório sem ids da planilha nem chat; sincronização guard
   assert.equal(nos.consultar_pedidos.parameters.workflowId.value, '');
 });
 
+// ---------- Histórico quebrado ----------
+teste('histórico quebrado: no "Bad request" do Gemini, reinicia o histórico e repete a pergunta uma vez', () => {
+  const destino = (origem, saida = 0) => (workflow.connections[origem]?.main?.[saida] ?? []).map((c) => c.node);
+  assert.deepEqual(destino('Kira', 1), ['Histórico quebrado?']);
+  assert.deepEqual(destino('Histórico quebrado?', 0), ['Últimas conversas']);
+  assert.deepEqual(destino('Histórico quebrado?', 1), ['Resposta de erro']);
+  assert.deepEqual(destino('Últimas conversas'), ['Resumo das últimas conversas']);
+  assert.deepEqual(destino('Resumo das últimas conversas'), ['Reiniciar histórico']);
+  assert.deepEqual(destino('Reiniciar histórico'), ['Repetir a pergunta']);
+  assert.deepEqual(destino('Repetir a pergunta'), ['Kira']);
+  const condicao = nos['Histórico quebrado?'].parameters.conditions.conditions[0].leftValue;
+  assert.match(condicao, /\$runIndex === 0/, 'repete só na primeira falha');
+  assert.match(condicao, /bad request/);
+  const reiniciar = nos['Reiniciar histórico'].parameters;
+  assert.deepEqual([reiniciar.mode, reiniciar.insertMode], ['insert', 'override']);
+  assert.deepEqual(reiniciar.messages.messageValues.map((m) => m.type), ['user', 'ai']);
+  assert.equal(workflow.connections['Memória da conversa (para reiniciar)'].ai_memory[0][0].node, 'Reiniciar histórico');
+  assert.equal(nos['Memória da conversa (para reiniciar)'].parameters.sessionKey, nos['Memória da conversa'].parameters.sessionKey);
+  const ultimas = nos['Últimas conversas'];
+  assert.deepEqual(ultimas.parameters.filters.conditions.map((c) => c.keyName), ['chat_id', 'contexto', 'status']);
+  assert.equal(ultimas.alwaysOutputData, true);
+  assert.match(nos['Resposta da Kira'].parameters.assignments.assignments.find((a) => a.name === 'erro').value, /histórico reiniciado/);
+});
+teste('histórico quebrado: resumo das últimas trocas, da mais antiga para a mais recente, e a pergunta repetida', () => {
+  const [r] = executar(codigoDo('Resumo das últimas conversas'), {
+    entrada: [
+      { entrada: 'e a segunda opção?', resposta: 'A segunda é a serra.', tipo_entrada: 'voz' },
+      { entrada: '/status', resposta: 'status', tipo_entrada: 'comando' },
+      { entrada: 'me dá duas opções   de\nviagem', resposta: 'x'.repeat(700), tipo_entrada: 'texto' },
+    ],
+  });
+  assert.equal(r.trocas, 2);
+  const [, primeira, segunda] = r.resumo.split('\n\n');
+  assert.equal(primeira.split('\n')[0], 'Ele: me dá duas opções de viagem');
+  assert.equal(primeira.split('\n')[1].length, 'Você: '.length + 600);
+  assert.equal(segunda, 'Ele: e a segunda opção?\nVocê: A segunda é a serra.');
+  const [vazio] = executar(codigoDo('Resumo das últimas conversas'), { entrada: [{}] });
+  assert.equal(vazio.resumo, 'Contexto: o histórico desta conversa foi reiniciado e não há mensagens anteriores.');
+  const contextoDaConversa = { pergunta: 'oi', canal: 'texto' };
+  assert.deepEqual(executar(codigoDo('Repetir a pergunta'), { nosAnteriores: { 'Contexto da conversa': contextoDaConversa } }), [contextoDaConversa]);
+});
+
 // ---------- Rascunho de resposta com assinatura ----------
 const rascunhoResposta = JSON.parse(ler('n8n/workflows/kira-rascunho-resposta.json'));
 const pngDeTeste = (largura, altura) => {
@@ -991,13 +1033,33 @@ for (const [frase, esperado] of [
   ['troca pra vendas', 'NEGOCIOS'],
   ['Ok Kira, ativar modo escritório!', 'TRABALHO'],
   ['ambiente pessoal', 'PESSOAL'],
+  // áudios: a transcrição às vezes escreve "moto" e "Okira"
+  ['Quero moto pessoal.', 'PESSOAL'],
+  ['quero o modo negócios', 'NEGOCIOS'],
+  ['Kira, quero ir para o modo pessoal', 'PESSOAL'],
+  ['Okira, modo pessoal', 'PESSOAL'],
+  ['modo trabalho por favor', 'TRABALHO'],
+  ['volta pro modo negócios', 'NEGOCIOS'],
 ]) {
   teste(`ambientes: "${frase}" troca para ${esperado}`, () => assert.equal(trocaDe(frase), esperado));
 }
 teste('ambientes: conversa normal não troca de ambiente', () => {
-  for (const frase of ['Kira, como está minha meta pessoal?', 'modo avião', '/modo', 'Kira, preciso responder aquele e-mail do trabalho sobre o pedido 123 ainda hoje']) {
+  for (const frase of [
+    'Kira, como está minha meta pessoal?',
+    'modo avião',
+    '/modo',
+    'Kira, preciso responder aquele e-mail do trabalho sobre o pedido 123 ainda hoje',
+    'quero uma moto',
+    'queria uma moto pessoal nova',
+    'quero modo',
+    'o que você acha do modo pessoal de viver',
+  ]) {
     assert.equal(trocaDe(frase), '', frase);
   }
+});
+
+teste('ambientes: a Kira nunca diz que trocou de ambiente (só a mensagem curta troca)', () => {
+  assert.match(nos.Kira.parameters.options.systemMessage, /Você não troca de ambiente: quem troca é o sistema/);
 });
 
 teste('ambientes: a Kira só vê as memórias do ambiente ativo e as gerais', () => {

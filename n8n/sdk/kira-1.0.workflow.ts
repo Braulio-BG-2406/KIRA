@@ -261,6 +261,21 @@ const memoriaLimpeza = memory({
   },
 });
 
+const memoriaReinicio = memory({
+  type: '@n8n/n8n-nodes-langchain.memoryBufferWindow',
+  version: 1.4,
+  config: {
+    name: 'Memória da conversa (para reiniciar)',
+    parameters: {
+      sessionIdType: 'customKey',
+      sessionKey: expr("{{ 'kira-' + $('Normalizar entrada').first().json.chat_id + '-' + $('Ambiente atual').first().json.ambiente }}"),
+      contextWindowLength: 20,
+    },
+    notes: 'Mesma Session Key do nó "Memória da conversa": é assim que o histórico quebrado é reiniciado. Se mudar lá, mude aqui também.',
+    position: [3740, 1420],
+  },
+});
+
 const ehLimpar = ifElse({
   version: 2.3,
   config: {
@@ -538,7 +553,7 @@ const detectarTroca = node({
   version: 2,
   config: {
     name: 'Detectar troca de ambiente',
-    parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: "// Troca de ambiente por comando: \"modo negócios\", \"/pessoal\", \"/modo trabalho\",\n// \"Kira, mude para o ambiente pessoal\". Só vale para mensagens curtas, para não\n// confundir com uma conversa normal.\nconst config = $('Ambientes da Kira').first().json;\nconst pergunta = String($('Pergunta').first().json.pergunta ?? '');\n\nfunction lerAmbientes(texto) {\n  try {\n    const lista = JSON.parse(texto || '[]');\n    const validos = (Array.isArray(lista) ? lista : [])\n      .filter((a) => a && a.codigo)\n      .map((a) => ({ ...a, codigo: String(a.codigo).toUpperCase() }));\n    if (validos.length) return validos;\n  } catch (e) {\n    // configuração inválida: sem troca de ambiente\n  }\n  return [];\n}\n\nconst normalizar = (s) =>\n  String(s ?? '')\n    .toLowerCase()\n    .normalize('NFD')\n    .replace(/[\\u0300-\\u036f]/g, '')\n    .replace(/[^a-z0-9/ ]+/g, ' ')\n    .replace(/\\s+/g, ' ')\n    .trim();\n\nconst texto = normalizar(pergunta).replace(/^((ok|oi|ola|ei) )?kira /, '');\nconst verbos = '(mude|muda|mudar|troque|troca|trocar|va|vai|ir|vamos|passe|passa|passar|entre|entra|entrar|ative|ativa|ativar|use|usa|usar)';\n\nlet escolhido = null;\nif (texto.length <= 60) {\n  for (const ambiente of lerAmbientes(config.ambientes)) {\n    const nomes = [ambiente.codigo, ambiente.nome, ...(ambiente.apelidos || [])].map(normalizar).filter(Boolean);\n    const pediu = nomes.some((nome) =>\n      [\n        `^/${nome}$`,\n        `^/?modo ${nome}$`,\n        `^(o )?ambiente ${nome}$`,\n        `^${verbos}( para| pro| pra| no| na| em)?( o| a)? (modo|ambiente) ${nome}$`,\n        `^${verbos}( para| pro| pra)( o| a)? ${nome}$`,\n      ].some((padrao) => new RegExp(padrao).test(texto)),\n    );\n    if (pediu) {\n      escolhido = ambiente;\n      break;\n    }\n  }\n}\n\nreturn [\n  {\n    json: {\n      troca: escolhido ? escolhido.codigo : '',\n      ambiente_nome: escolhido ? escolhido.nome || escolhido.codigo : '',\n      ambiente_descricao: escolhido ? escolhido.descricao || '' : '',\n    },\n  },\n];\n" },
+    parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: "// Troca de ambiente por comando: \"modo negócios\", \"/pessoal\", \"/modo trabalho\",\n// \"Kira, mude para o ambiente pessoal\", \"quero o modo pessoal\". Só vale para mensagens\n// curtas, para não confundir com uma conversa normal. Nos áudios, a transcrição às vezes\n// escreve \"moto\" no lugar de \"modo\" e \"Akira\" ou \"Okira\" no lugar de \"Kira\".\nconst config = $('Ambientes da Kira').first().json;\nconst pergunta = String($('Pergunta').first().json.pergunta ?? '');\n\nfunction lerAmbientes(texto) {\n  try {\n    const lista = JSON.parse(texto || '[]');\n    const validos = (Array.isArray(lista) ? lista : [])\n      .filter((a) => a && a.codigo)\n      .map((a) => ({ ...a, codigo: String(a.codigo).toUpperCase() }));\n    if (validos.length) return validos;\n  } catch (e) {\n    // configuração inválida: sem troca de ambiente\n  }\n  return [];\n}\n\nconst normalizar = (s) =>\n  String(s ?? '')\n    .toLowerCase()\n    .normalize('NFD')\n    .replace(/[\\u0300-\\u036f]/g, '')\n    .replace(/[^a-z0-9/ ]+/g, ' ')\n    .replace(/\\s+/g, ' ')\n    .trim();\n\nconst texto = normalizar(pergunta)\n  .replace(/^((ok|oi|ola|ei|o|a) )?(kira|akira|okira) /, '')\n  .replace(/ (por favor|agora|ai|ta|ok)$/, '');\nconst desejo = '((eu )?(quero|queria|vou|vamos|pode|preciso) )?';\nconst verbos = '(mude|muda|mudar|troque|troca|trocar|va|vai|ir|vamos|passe|passa|passar|entre|entra|entrar|ative|ativa|ativar|use|usa|usar|coloque|coloca|colocar|volte|volta|voltar|abra|abre|abrir)';\nconst modo = '(modo|moto|ambiente)';\n\nlet escolhido = null;\nif (texto.length <= 60) {\n  for (const ambiente of lerAmbientes(config.ambientes)) {\n    const nomes = [ambiente.codigo, ambiente.nome, ...(ambiente.apelidos || [])].map(normalizar).filter(Boolean);\n    const pediu = nomes.some((nome) =>\n      [\n        `^/${nome}$`,\n        `^/?modo ${nome}$`,\n        `^${desejo}(o )?${modo} ${nome}$`,\n        `^${desejo}${verbos}( para| pro| pra| no| na| em)?( o| a)? ${modo} ${nome}$`,\n        `^${desejo}${verbos}( para| pro| pra)( o| a)? ${nome}$`,\n      ].some((padrao) => new RegExp(padrao).test(texto)),\n    );\n    if (pediu) {\n      escolhido = ambiente;\n      break;\n    }\n  }\n}\n\nreturn [\n  {\n    json: {\n      troca: escolhido ? escolhido.codigo : '',\n      ambiente_nome: escolhido ? escolhido.nome || escolhido.codigo : '',\n      ambiente_descricao: escolhido ? escolhido.descricao || '' : '',\n    },\n  },\n];\n" },
     position: [2072, 464],
   },
   output: [{ troca: '', ambiente_nome: '', ambiente_descricao: '' }],
@@ -1704,6 +1719,7 @@ const instrucoesKira =
   '- Regra fundamental: nunca misture informações entre ambientes sem autorização dele. Use só as memórias, conversas, tarefas, contatos e ferramentas que pertencem ao ambiente ativo (veja a descrição de cada um). Memórias GERAL valem para todos.\n' +
   '- Se ele pedir algo que é claramente de outro ambiente, diga de qual ambiente é e peça para ele trocar dizendo "modo <nome>". Só use dados de outro ambiente se ele autorizar explicitamente naquela mensagem.\n' +
   '- Para trocar de ambiente ele diz "modo <nome>", "/<nome>" ou "mude para o ambiente <nome>".\n' +
+  '- Você não troca de ambiente: quem troca é o sistema, quando ele manda só essa mensagem curta, e aí chega a confirmação da troca. Se ele pedir a troca de outro jeito, nunca diga que trocou; peça para ele mandar só "modo <nome>".\n' +
   '- Imagens, posts do LinkedIn e pesquisas na internet podem ser feitos em qualquer ambiente, mas só com informações do ambiente ativo.\n' +
   '\n' +
   '# Memória de longo prazo\n' +
@@ -1792,7 +1808,7 @@ const respostaKira = node({
           { id: 'rk-texto', name: 'texto_resposta', value: expr('{{ $json.output }}'), type: 'string' },
           { id: 'rk-modo', name: 'modo_resposta', value: expr("{{ $('Contexto da conversa').first().json.canal }}"), type: 'string' },
           { id: 'rk-status', name: 'status', value: 'ok', type: 'string' },
-          { id: 'rk-erro', name: 'erro', value: '', type: 'string' },
+          { id: 'rk-erro', name: 'erro', value: expr("{{ $('Histórico quebrado?').isExecuted ? 'histórico reiniciado' : '' }}"), type: 'string' },
           { id: 'rk-entrada', name: 'entrada', value: expr("{{ $('Contexto da conversa').first().json.pergunta }}"), type: 'string' },
         ],
       },
@@ -1833,6 +1849,106 @@ const respostaErro = node({
     position: [3300, 720],
   },
   output: [{ texto_resposta: 'Desculpe, tive um problema técnico e não consegui responder agora. 😕 Tente de novo em instantes.', modo_resposta: 'texto', status: 'erro', erro: 'The service is receiving too many requests', entrada: 'oi' }],
+});
+
+// A memória da conversa guarda também as chamadas de ferramenta e manda para o Gemini só as últimas 20
+// interações. Se o corte cair no meio de uma chamada, o Gemini recusa o pedido ("Bad request") e, como a
+// mensagem que falha não entra no histórico, todas as seguintes falhariam do mesmo jeito. Na primeira falha
+// desse tipo, o histórico é reiniciado com um resumo das últimas trocas e a pergunta volta para a Kira.
+const historicoQuebrado = ifElse({
+  version: 2.3,
+  config: {
+    name: 'Histórico quebrado?',
+    parameters: {
+      conditions: {
+        options: { caseSensitive: true, leftValue: '', typeValidation: 'strict', version: 2 },
+        conditions: [
+          {
+            id: 'cond-historico',
+            leftValue: expr("{{ $runIndex === 0 && /bad request|function (call|response) turn/i.test(String($json.error ?? '')) }}"),
+            rightValue: '',
+            operator: { type: 'boolean', operation: 'true', singleValue: true },
+          },
+        ],
+        combinator: 'and',
+      },
+      options: {},
+    },
+    position: [3080, 1200],
+  },
+});
+
+const ultimasConversas = node({
+  type: 'n8n-nodes-base.dataTable',
+  version: 1.1,
+  config: {
+    name: 'Últimas conversas',
+    parameters: {
+      resource: 'row',
+      operation: 'get',
+      dataTableId: { __rl: true, mode: 'name', value: 'kira_logs' },
+      matchType: 'allConditions',
+      filters: {
+        conditions: [
+          { keyName: 'chat_id', condition: 'eq', keyValue: expr("{{ String($('Normalizar entrada').first().json.chat_id) }}") },
+          { keyName: 'contexto', condition: 'eq', keyValue: expr("{{ $('Ambiente atual').first().json.ambiente }}") },
+          { keyName: 'status', condition: 'eq', keyValue: 'ok' },
+        ],
+      },
+      limit: 6,
+      orderBy: true,
+      orderByColumn: 'createdAt',
+      orderByDirection: 'DESC',
+    },
+    alwaysOutputData: true,
+    onError: 'continueRegularOutput',
+    position: [3300, 1200],
+  },
+  output: [{ chat_id: '123', contexto: 'TRABALHO', tipo_entrada: 'texto', entrada: 'Oi, Kira!', resposta: 'Oi! Como posso ajudar?', status: 'ok' }],
+});
+
+const resumoConversas = node({
+  type: 'n8n-nodes-base.code',
+  version: 2,
+  config: {
+    name: 'Resumo das últimas conversas',
+    parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: "// O histórico da conversa quebrou (o Gemini recusou o pedido) e vai ser reiniciado. Para a Kira não perder\n// o fio, o histórico novo começa com um resumo das últimas trocas deste chat neste ambiente (tabela kira_logs).\nconst corta = (texto, maximo) => {\n  const t = String(texto ?? '').replace(/\\s+/g, ' ').trim();\n  return t.length > maximo ? t.slice(0, maximo - 1) + '…' : t;\n};\nconst trocas = $input\n  .all()\n  .map((item) => item.json)\n  .filter((linha) => linha.entrada && linha.resposta && linha.tipo_entrada !== 'comando')\n  .reverse()\n  .map((linha) => `Ele: ${corta(linha.entrada, 400)}\\nVocê: ${corta(linha.resposta, 600)}`);\n\nconst resumo = trocas.length\n  ? 'Contexto: o histórico desta conversa foi reiniciado. Estas foram as últimas mensagens, da mais antiga para a mais recente:\\n\\n' + trocas.join('\\n\\n')\n  : 'Contexto: o histórico desta conversa foi reiniciado e não há mensagens anteriores.';\nreturn [{ json: { resumo, trocas: trocas.length } }];\n" },
+    position: [3520, 1200],
+  },
+  output: [{ resumo: 'Contexto: o histórico desta conversa foi reiniciado e não há mensagens anteriores.', trocas: 0 }],
+});
+
+const reiniciarHistorico = node({
+  type: '@n8n/n8n-nodes-langchain.memoryManager',
+  version: 1.1,
+  config: {
+    name: 'Reiniciar histórico',
+    parameters: {
+      mode: 'insert',
+      insertMode: 'override',
+      messages: {
+        messageValues: [
+          { type: 'user', message: expr('{{ $json.resumo }}') },
+          { type: 'ai', message: 'Certo, vou considerar esse contexto.' },
+        ],
+      },
+    },
+    subnodes: { memory: memoriaReinicio },
+    onError: 'continueRegularOutput',
+    position: [3740, 1200],
+  },
+  output: [{ success: true }],
+});
+
+const repetirPergunta = node({
+  type: 'n8n-nodes-base.code',
+  version: 2,
+  config: {
+    name: 'Repetir a pergunta',
+    parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: "// Com o histórico reiniciado, a mesma pergunta volta para a Kira (uma vez só: \"Histórico quebrado?\" só repete\n// na primeira falha).\nreturn $('Contexto da conversa').all().map((item) => ({ json: item.json }));\n" },
+    position: [3960, 1200],
+  },
+  output: [{ pergunta: 'Oi, Kira!', canal: 'texto' }],
 });
 
 const respostaAcessoNegado = node({
@@ -2149,7 +2265,7 @@ export default workflow('kira-1-0', 'Kira 1.0 — Assistente pessoal (Telegram +
   .to(respostaKira)
   .to(respostaPronta)
   .add(transcrever.onError(respostaErro))
-  .add(kira.onError(respostaErro))
+  .add(kira.onError(historicoQuebrado.onTrue(ultimasConversas.to(resumoConversas).to(reiniciarHistorico).to(repetirPergunta).to(kira)).onFalse(respostaErro)))
   .add(respostaErro)
   .to(respostaPronta)
   .add(respostaAcessoNegado)
@@ -2180,8 +2296,14 @@ export default workflow('kira-1-0', 'Kira 1.0 — Assistente pessoal (Telegram +
   .group('Voz para texto', [baixarAudio, transcrever], {
     description: 'Baixa o áudio do Telegram e transcreve com o Gemini.',
   })
-  .group('Cérebro da Kira', [buscarMemorias, memoriasAmbiente, contexto, kira, geminiPrincipal, geminiReserva, memoriaConversa, salvarMemoria, apagarMemoria, emailsRecentes, buscarEmails, lerEmail, agenda, criarRascunhoResposta, buscarArquivosDrive, lerArquivoDrive, rascunhoLinkedin, buscarConversas, criarTarefa, listarTarefas, concluirTarefa, salvarContato, buscarContatos, gerarImagem, anexarImagemEmail, conversasTeams, lerConversaTeams, enviarMensagemTeams, consultarPedidos, pesquisarInternet, consultarPlanilhaNegocio], {
+  .group('Memórias e contexto', [buscarMemorias, memoriasAmbiente, contexto], {
+    description: 'Busca as memórias do ambiente ativo e monta o contexto da conversa: nome, perfil, data, ambiente e canal (texto ou voz).',
+  })
+  .group('Cérebro da Kira', [kira, geminiPrincipal, geminiReserva, memoriaConversa, salvarMemoria, apagarMemoria, emailsRecentes, buscarEmails, lerEmail, agenda, criarRascunhoResposta, buscarArquivosDrive, lerArquivoDrive, rascunhoLinkedin, buscarConversas, criarTarefa, listarTarefas, concluirTarefa, salvarContato, buscarContatos, gerarImagem, anexarImagemEmail, conversasTeams, lerConversaTeams, enviarMensagemTeams, consultarPedidos, pesquisarInternet, consultarPlanilhaNegocio], {
     description: 'A Kira (Gemini) responde no ambiente ativo: memórias, tarefas, contatos, Outlook, Drive, Teams, pedidos, negócio, internet, LinkedIn e imagens.',
+  })
+  .group('Histórico quebrado', [ultimasConversas, resumoConversas, reiniciarHistorico, memoriaReinicio, repetirPergunta], {
+    description: 'Se o Gemini recusar o histórico, reinicia a conversa com um resumo das últimas trocas e repete a pergunta (uma vez).',
   })
   .group('Entrega da resposta', [respostaPronta, responderEmVoz, gerarVoz, prepararAudio, converterAudio, enviarAudio, dividirMensagem, enviarTexto, enviarTextoSimples, registrar], {
     description: 'Responde por voz (Gemini, grátis) ou por texto e registra tudo na tabela kira_logs.',

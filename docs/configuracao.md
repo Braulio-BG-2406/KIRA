@@ -207,7 +207,7 @@ Com isso, "Kira, qual o status do pedido 12345?", "quantos itens estão atrasado
 
 A Kira trabalha em um ambiente por vez: **Trabalho**, **Negócios** ou **Pessoal**. Cada ambiente tem suas memórias, seu histórico de conversa, suas tarefas e seus contatos, e a Kira não mistura informações entre eles sem você autorizar. As memórias marcadas como GERAL valem para todos.
 
-- **Trocar:** mande "modo pessoal", "/negocios" ou "Kira, mude para o ambiente trabalho". Ela responde "🗂️ Modo Pessoal ativado." e o ambiente fica salvo até a próxima troca. O `/status` mostra o ambiente ativo.
+- **Trocar:** mande "modo pessoal", "quero o modo negócios", "/negocios" ou "Kira, mude para o ambiente trabalho" (por texto ou áudio). Ela responde "🗂️ Modo Pessoal ativado." e o ambiente fica salvo até a próxima troca. O `/status` mostra o ambiente ativo. Sem essa confirmação, o ambiente não mudou: a Kira não troca de ambiente no meio de outra conversa e pede o comando curto.
 - **Se você pedir algo de outro ambiente**, ela diz de qual ambiente é e pede para trocar (ou para você autorizar naquela mensagem).
 - **Tarefas e contatos:** "Kira, anota: ligar para o fornecedor amanhã", "quais são minhas tarefas?", "guarda o contato do Pedro, da loja X". Tudo fica no ambiente ativo.
 - **Conversas antigas:** "o que combinamos com aquele cliente?" faz a Kira procurar no histórico do ambiente.
@@ -335,6 +335,7 @@ Durante os testes ficou uma linha de teste em `kira_logs` (usuário "Teste @test
 | "Não consegui processar o seu áudio" | Transcrição sem credencial do Gemini ou modelo indisponível | Selecione a credencial no nó *Transcrever áudio (Gemini)* e confira o modelo |
 | "Atingi o limite de uso do Gemini" | Limite por minuto ou por dia do plano gratuito | Espere alguns minutos ou ative o faturamento |
 | "Tive um problema técnico" | Credencial ou modelo do Gemini com problema | Abra a execução com erro em **Executions** |
+| "Tive um problema técnico" em toda mensagem, depois de uma conversa longa | Histórico da conversa quebrado (o Gemini recusa o pedido com "Bad request") | A Kira reinicia o histórico sozinha e responde; em `kira_logs`, a resposta fica com a nota "histórico reiniciado". Se continuar, mande `/limpar` |
 | Ela esqueceu a conversa de agora há pouco | O n8n reiniciou (a memória da conversa fica na memória do n8n) | Normal na 1.0; as memórias guardadas em `kira_memoria` não se perdem |
 
 ## Rodar na VPS (opcional)

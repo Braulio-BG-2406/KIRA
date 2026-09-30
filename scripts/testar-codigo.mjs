@@ -1633,6 +1633,8 @@ teste('power bi: lista os modelos de todas as áreas de trabalho, com os relató
   assert.equal(r.resposta.total, 2);
   assert.deepEqual(r.resposta.modelos[0], { modelo: 'Pedidos', area: 'Comercial', relatorios: ['Painel de Pedidos', 'Controle de Entregas'] });
   assert.deepEqual(r.resposta.areas_sem_acesso, ['Logística']);
+  // ver na lista não é poder consultar: a Kira só confirma depois de ler a estrutura
+  assert.match(r.resposta.orientacao, /não o que ela consegue consultar/);
 });
 teste('power bi: acha o modelo pelo nome do relatório e só aceita consulta DAX (até 200 linhas)', () => {
   let r = escolherModelo({ tipo: 'tabelas', modelo: 'controle de entregas' });
@@ -1721,6 +1723,20 @@ teste('power bi: só leitura, só no ambiente de trabalho, e o acesso fica na cr
     assert.ok(!n.parameters.headerParameters, `${n.name}: nada de token no cabeçalho`);
   }
   assert.match(ler('n8n/sdk/kira-powerbi.workflow.ts'), /newCredential\('Power BI'\)/);
+});
+teste('power bi: a Kira tem a ferramenta, com o ambiente vindo do workflow (não da IA), e as instruções', () => {
+  assert.equal(workflow.connections.consultar_powerbi.ai_tool[0][0].node, 'Kira');
+  const ferramenta = nos.consultar_powerbi.parameters;
+  assert.equal(ferramenta.workflowId.value, '');
+  assert.match(ferramenta.workflowInputs.value.ambiente, /\$\('Ambiente atual'\)/);
+  assert.doesNotMatch(ferramenta.workflowInputs.value.ambiente, /\$fromAI/);
+  assert.deepEqual(Object.keys(ferramenta.workflowInputs.value), ['ambiente', 'tipo', 'modelo', 'dax', 'limite']);
+  const instrucoes = nos.Kira.parameters.options.systemMessage;
+  assert.match(instrucoes, /# Power BI da empresa \(só no modo Trabalho\)/);
+  assert.match(instrucoes, /chame estrutura primeiro/);
+  assert.match(instrucoes, /só diga que consegue ler os dados de um modelo depois de chamar estrutura nele com sucesso/);
+  assert.match(instrucoes, /peça para ele dizer "modo trabalho"/);
+  assert.match(comando('/status').texto_resposta, /Power BI: consulto os modelos e relatórios da empresa/);
 });
 
 teste('nós Code "uma vez por item" não devolvem lista (o n8n recusa e a execução cai)', () => {

@@ -18,7 +18,7 @@ Prefere rodar na VPS? Veja [Rodar na VPS](#rodar-na-vps-opcional) no fim.
 4. [Publicar o workflow](#4-publicar)
 5. [Liberar o seu ID do Telegram](#5-liberar-o-seu-id)
 6. [Fazer o primeiro teste](#6-primeiro-teste-)
-7. Opcionais: [Outlook](#7-outlook-e-mails-agenda-e-rascunhos-de-resposta), [Resumo da manhã às 7h](#8-resumo-da-manhã-às-7h), [Google Drive](#9-google-drive-só-leitura), [LinkedIn](#10-linkedin-rascunhos-e-publicar), [Imagens](#11-imagens-com-ia), [Teams](#12-microsoft-teams), [Pedidos](#13-pedidos-base-oficial-do-erp), [Ambientes](#14-ambientes-kira-20), [Rascunhos automáticos](#15-rascunhos-automáticos-de-e-mails-sobre-pedidos), [Internet](#16-internet-pesquisa-no-google), [Assinatura nos rascunhos](#17-assinatura-nos-rascunhos-de-resposta) e [Planilha do negócio](#18-planilha-do-negócio-modo-negócios)
+7. Opcionais: [Outlook](#7-outlook-e-mails-agenda-e-rascunhos-de-resposta), [Resumo da manhã às 7h](#8-resumo-da-manhã-às-7h), [Google Drive](#9-google-drive-só-leitura), [LinkedIn](#10-linkedin-rascunhos-e-publicar), [Imagens](#11-imagens-com-ia), [Teams](#12-microsoft-teams), [Pedidos](#13-pedidos-base-oficial-do-erp), [Ambientes](#14-ambientes-kira-20), [Rascunhos automáticos](#15-rascunhos-automáticos-de-e-mails-sobre-pedidos), [Internet](#16-internet-pesquisa-no-google), [Assinatura nos rascunhos](#17-assinatura-nos-rascunhos-de-resposta), [Planilha do negócio](#18-planilha-do-negócio-modo-negócios) e [Power BI](#19-power-bi-modo-trabalho)
 
 ---
 
@@ -285,6 +285,38 @@ Para a Kira ver dados novos: na planilha, **Dados → Atualizar Tudo**, salve e 
 
 > As vendas são o total do período do relatório (não dá para separar por mês) e os "dias sem comprar" dos clientes contam até a data de referência da planilha. Como a planilha tem dados de clientes e vendedoras, o sub-workflow não guarda no histórico as execuções que dão certo. Esses dados passam pelo Gemini; no plano gratuito, o Google pode usar o conteúdo para melhorar os produtos dele.
 
+## 19. Power BI (modo Trabalho)
+
+No modo **Trabalho**, a ferramenta **consultar_powerbi** consulta o Power BI da empresa pela API oficial, só leitura: lista os modelos semânticos e os relatórios que a conta conectada vê, mostra as tabelas, colunas e medidas de um modelo e roda consultas **DAX** nele. A resposta vem com o nome do modelo e a hora da última atualização dos dados. O sub-workflow é o **Kira — Power BI (ferramenta)** ([`kira-powerbi.json`](../n8n/workflows/kira-powerbi.json)).
+
+- **Só no modo Trabalho.** O ambiente vai para o sub-workflow pelo workflow da Kira (não pela IA). Em outro ambiente, ele recusa sem chamar a API.
+- **Como a Kira pergunta:** primeiro pede a estrutura do modelo (`COLUMNSTATISTICS()` e `INFO.VIEW.MEASURES()`); depois escreve a consulta DAX com os nomes certos, de preferência com as medidas prontas do relatório. Cada consulta devolve no máximo 200 linhas.
+- **Permissão:** a Kira vê o que a conta conectada vê. Para ler os dados de um modelo pela API, essa conta precisa da permissão de **criar conteúdo (Build)** nele: ser membro ou colaborador da área de trabalho, ou receber essa permissão do dono do modelo (**Gerenciar permissões → Adicionar usuário →** marcar "Permitir que os destinatários criem conteúdo com os dados associados a este modelo semântico"). Relatórios só compartilhados para visualização aparecem na lista, mas a consulta volta "sem permissão" e a Kira explica isso sem inventar números. A opção *Semantic Model Execute Queries REST API* do portal de administração do Power BI precisa estar ligada (vem ligada por padrão).
+
+1. **App no Microsoft Entra ID** (portal.azure.com → **Microsoft Entra ID → Registros de aplicativo → Novo registro**): nome `Kira Power BI`, **Contas somente neste diretório organizacional** e URI de redirecionamento do tipo **Web** com o endereço que o n8n mostra na credencial (**OAuth Redirect URL**; no n8n Cloud, `https://oauth.n8n.cloud/oauth2/callback`). Anote o **ID do aplicativo (cliente)** e o **ID do diretório (locatário)**.
+2. Em **Permissões de API → Adicionar uma permissão → Power BI Service → Permissões delegadas**, marque `Dataset.Read.All`, `Report.Read.All` e `Workspace.Read.All`.
+3. Em **Certificados e segredos → Novo segredo do cliente**, copie o **Valor** (não o "ID do segredo"). Ele só aparece uma vez: cole direto no n8n, nunca em chats.
+4. No n8n, **Credentials → Create credential → OAuth2 API**, com o nome `Power BI`:
+
+   | Campo | Valor |
+   | --- | --- |
+   | Grant Type | Authorization Code |
+   | Authorization URL | `https://login.microsoftonline.com/<ID do diretório>/oauth2/v2.0/authorize` |
+   | Access Token URL | `https://login.microsoftonline.com/<ID do diretório>/oauth2/v2.0/token` |
+   | Client ID | o ID do aplicativo |
+   | Client Secret | o Valor do segredo |
+   | Scope | `https://analysis.windows.net/powerbi/api/Dataset.Read.All https://analysis.windows.net/powerbi/api/Report.Read.All https://analysis.windows.net/powerbi/api/Workspace.Read.All offline_access` |
+   | Auth URI Query Parameters | `prompt=select_account` |
+   | Authentication | Body |
+
+   Clique em **Connect my account**, entre com a conta que vê os modelos e aceite as permissões. Para trocar a conta depois, clique em **Reconnect** e escolha **Usar outra conta**.
+5. Importe o sub-workflow, selecione a credencial nos 6 nós HTTP, publique e, em **Settings → This workflow can be called by**, escolha só a Kira.
+6. Na Kira, selecione o sub-workflow na ferramenta **consultar_powerbi** e publique.
+
+Teste no modo Trabalho: "Kira, quais relatórios do Power BI você vê?" e depois "quanto foi faturado este mês, pelo BI?".
+
+> Os números consultados passam pelo Gemini, como os pedidos e os e-mails; no plano gratuito, o Google pode usar o conteúdo para melhorar os produtos dele. O segredo do app vence no prazo que você escolheu: antes disso, crie um novo e troque na credencial.
+
 ## Personalizar
 
 Tudo fica no nó **Configuração da Kira**:
@@ -332,6 +364,8 @@ Durante os testes ficou uma linha de teste em `kira_logs` (usuário "Teste @test
 | Não apareceu rascunho para um e-mail sobre pedido | Fora do horário, e-mail sem palavras de pedido, já respondido, ou a Kira decidiu que não precisava de resposta | Veja as execuções de **Kira — rascunhos automáticos** e a tabela `kira_emails_auto` (coluna `motivo`) |
 | A Kira diz que não conseguiu pesquisar na internet | Limite diário de pesquisas do plano gratuito ou instabilidade | Tente mais tarde; detalhes nas execuções de **Kira — pesquisar na internet** |
 | A Kira diz que não conseguiu gerar a imagem | Limite diário de imagens do plano gratuito ou pedido recusado pelo filtro do Google | Tente amanhã ou mude a descrição; detalhes nas execuções do sub-workflow **Kira — gerar imagem** |
+| A Kira diz que não tem permissão para consultar um modelo do Power BI | A conta conectada só pode ver o relatório, sem a permissão de criar conteúdo (Build) no modelo | Peça ao dono do modelo essa permissão (ou para entrar na área de trabalho como colaborador), ou reconecte a credencial com a conta dona dos modelos (passo 19) |
+| Erro ao conectar a credencial do Power BI (`AADSTS…`) | `AADSTS900144`: Scope vazio. "Falha na autenticação do cliente" (`AADSTS7000215`): o ID do segredo no lugar do Valor. `AADSTS50011`: endereço de retorno diferente do cadastrado no app | Confira a tabela do passo 19 e o URI de redirecionamento do app |
 | "Não consegui processar o seu áudio" | Transcrição sem credencial do Gemini ou modelo indisponível | Selecione a credencial no nó *Transcrever áudio (Gemini)* e confira o modelo |
 | "Atingi o limite de uso do Gemini" | Limite por minuto ou por dia do plano gratuito | Espere alguns minutos ou ative o faturamento |
 | "Tive um problema técnico" | Credencial ou modelo do Gemini com problema | Abra a execução com erro em **Executions** |

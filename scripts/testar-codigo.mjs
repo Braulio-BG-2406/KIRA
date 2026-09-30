@@ -1593,8 +1593,138 @@ teste('planilha do negócio: precificação e simulação de preço com as regra
   assert.match(r.erro, /peso \(g\)/);
 });
 
+// ---------- Power BI (consulta só leitura, no ambiente de trabalho) ----------
+const powerbi = JSON.parse(ler('n8n/workflows/kira-powerbi.json'));
+const noPowerBi = (nome) => {
+  const n = powerbi.nodes.find((x) => x.name === nome);
+  assert.ok(n, `nó não encontrado no Power BI: ${nome}`);
+  return n;
+};
+// Simula $input e $('Nó') (com isExecuted) para os nós Code do Power BI.
+const rodarPowerBi = (nome, { entrada = [], nosAnteriores = {}, executados = null } = {}) =>
+  new Function('$input', '$', noPowerBi(nome).parameters.jsCode)(
+    { first: () => ({ json: entrada[0] }), all: () => entrada.map((json) => ({ json })) },
+    (no) => ({
+      first: () => ({ json: [].concat(nosAnteriores[no])[0] }),
+      all: () => [].concat(nosAnteriores[no] ?? []).map((json) => ({ json })),
+      isExecuted: executados ? executados.includes(no) : no in nosAnteriores,
+    }),
+  ).map((i) => i.json);
+const areasPowerBi = rodarPowerBi('Áreas de trabalho', { entrada: [{ value: [{ id: 'g1', name: 'Comercial' }, { id: 'g2', name: 'Logística' }] }] });
+const escolherModelo = (pedido) =>
+  rodarPowerBi('Escolher modelo', {
+    nosAnteriores: {
+      'Quando a Kira consultar o Power BI': pedido,
+      'Áreas de trabalho': areasPowerBi,
+      'Listar modelos': [{ value: [] }, { value: [{ id: 'd1', name: 'Pedidos' }, { id: 'd2', name: 'Faturamento' }] }, { error: { message: '403' } }],
+      'Listar relatórios': [
+        { value: [] },
+        { value: [{ name: 'Painel de Pedidos', datasetId: 'd1' }, { name: 'Controle de Entregas', datasetId: 'd1' }, { name: 'Faturamento Mensal', datasetId: 'd2' }] },
+        { error: { message: '403' } },
+      ],
+    },
+  })[0];
+
+teste('power bi: lista os modelos de todas as áreas de trabalho, com os relatórios de cada um', () => {
+  assert.deepEqual(areasPowerBi.map((a) => a.area), ['Meu workspace', 'Comercial', 'Logística']);
+  assert.equal(areasPowerBi[0].grupo_id, '');
+  const r = escolherModelo({ tipo: 'listar' });
+  assert.equal(r.consultar, false);
+  assert.equal(r.resposta.total, 2);
+  assert.deepEqual(r.resposta.modelos[0], { modelo: 'Pedidos', area: 'Comercial', relatorios: ['Painel de Pedidos', 'Controle de Entregas'] });
+  assert.deepEqual(r.resposta.areas_sem_acesso, ['Logística']);
+});
+teste('power bi: acha o modelo pelo nome do relatório e só aceita consulta DAX (até 200 linhas)', () => {
+  let r = escolherModelo({ tipo: 'tabelas', modelo: 'controle de entregas' });
+  assert.deepEqual([r.consultar, r.tipo, r.modelo.nome], [true, 'estrutura', 'Pedidos']);
+  assert.equal(r.base, 'https://api.powerbi.com/v1.0/myorg/groups/g1/datasets/d1');
+  assert.equal(r.dax, 'EVALUATE COLUMNSTATISTICS()');
+  r = escolherModelo({ tipo: 'consulta', modelo: 'Faturamento', dax: "  EVALUATE TOPN(5, 'Notas')", limite: 999 });
+  assert.deepEqual([r.consultar, r.modelo.nome, r.limite, r.dax], [true, 'Faturamento', 200, "EVALUATE TOPN(5, 'Notas')"]);
+  r = escolherModelo({ tipo: 'consulta', modelo: 'Faturamento', dax: 'SELECT * FROM notas' });
+  assert.equal(r.consultar, false);
+  assert.match(r.resposta.erro, /começar com EVALUATE/);
+  r = escolherModelo({ tipo: 'consulta', modelo: 'Estoque' });
+  assert.match(r.resposta.erro, /Não achei no Power BI um modelo ou relatório com "Estoque"/);
+  r = escolherModelo({ tipo: 'estrutura', modelo: '' });
+  assert.match(r.resposta.erro, /Faltou dizer qual modelo/);
+});
+teste('power bi: relatório compartilhado de outra área entra na lista e é consultado pelo endereço geral', () => {
+  const nosAnteriores = {
+    'Quando a Kira consultar o Power BI': { tipo: 'listar' },
+    'Áreas de trabalho': [{ grupo_id: '', area: 'Meu workspace' }],
+    'Listar modelos': [{ value: [{ id: 'd9', name: 'Relat%C3%B3rio%20Usu%C3%A1rios' }] }],
+    'Listar relatórios': [{ value: [{ name: 'Painel Comercial', datasetId: 'x1', datasetWorkspaceId: 'w9' }, { name: 'Metas', datasetId: 'x1' }] }],
+  };
+  assert.deepEqual(rodarPowerBi('Escolher modelo', { nosAnteriores })[0].resposta.modelos, [
+    { modelo: 'Relatório Usuários', area: 'Meu workspace', relatorios: [] },
+    { modelo: 'Painel Comercial', area: 'compartilhado com você', relatorios: ['Painel Comercial', 'Metas'] },
+  ]);
+  nosAnteriores['Quando a Kira consultar o Power BI'] = { tipo: 'estrutura', modelo: 'metas' };
+  assert.equal(rodarPowerBi('Escolher modelo', { nosAnteriores })[0].base, 'https://api.powerbi.com/v1.0/myorg/datasets/x1');
+});
+teste('power bi: estrutura sem as tabelas internas, com as medidas e a hora da última atualização', () => {
+  const r = rodarPowerBi('Montar resultado', {
+    nosAnteriores: {
+      'Escolher modelo': escolherModelo({ tipo: 'estrutura', modelo: 'Pedidos' }),
+      'Executar DAX': {
+        statusCode: 200,
+        body: { results: [{ tables: [{ rows: [
+          { '[Table Name]': 'Pedidos', '[Column Name]': 'Cliente', '[Cardinality]': 10 },
+          { '[Table Name]': 'Pedidos', '[Column Name]': 'Valor', '[Cardinality]': 90 },
+          { '[Table Name]': 'Pedidos', '[Column Name]': 'RowNumber-2662979B', '[Cardinality]': 100 },
+          { '[Table Name]': 'LocalDateTable_123', '[Column Name]': 'Date', '[Cardinality]': 365 },
+        ] }] }] },
+      },
+      'Última atualização': { value: [{ endTime: '2026-09-30T11:15:00Z', status: 'Completed' }] },
+      'Listar medidas': { statusCode: 200, body: { results: [{ tables: [{ rows: [{ '[Tabela]': 'Pedidos', '[Medida]': 'Total Pedidos' }] }] }] } },
+    },
+  })[0];
+  assert.deepEqual(r.tabelas, { Pedidos: ['Cliente', 'Valor'] });
+  assert.deepEqual(r.medidas, { Pedidos: ['Total Pedidos'] });
+  assert.equal(r.atualizado_em, '30/09/2026 às 08:15');
+});
+teste('power bi: consulta corta no limite; erro de DAX e falta de permissão viram orientação', () => {
+  const escolha = escolherModelo({ tipo: 'consulta', modelo: 'Pedidos', dax: 'EVALUATE Pedidos', limite: 2 });
+  const montar = (resposta) => rodarPowerBi('Montar resultado', { nosAnteriores: { 'Escolher modelo': escolha, 'Executar DAX': resposta }, executados: [] })[0];
+  let r = montar({ statusCode: 200, body: { results: [{ tables: [{ rows: [
+    { 'Pedidos[Cliente]': 'A', '[Total]': 10 }, { 'Pedidos[Cliente]': 'B', '[Total]': 20 }, { 'Pedidos[Cliente]': 'C', '[Total]': 30 },
+  ] }] }] } });
+  assert.deepEqual(r.dados, [{ Cliente: 'A', Total: 10 }, { Cliente: 'B', Total: 20 }]);
+  assert.equal(r.cortado, 'mostrando 2 de 3 linhas');
+  r = montar({ statusCode: 400, body: { error: { code: 'DatasetExecuteQueriesError', 'pbi.error': { details: [{ code: 'DetailsMessage', detail: { value: "Query (1, 10) Cannot find table 'Notas'." } }] } } } });
+  assert.match(r.erro, /Cannot find table 'Notas'/);
+  r = montar({ statusCode: 401, body: { error: { code: 'PowerBINotAuthorizedException' } } });
+  assert.match(r.orientacao, /Build/);
+  // modelo de outra área sem permissão de consulta: o Power BI responde 404
+  r = montar({ statusCode: 404, body: { error: { code: 'PowerBIEntityNotFound', 'pbi.error': { details: [{ code: 'DetailsMessage', detail: { value: 'You cannot query the dataset because the dataset was not found or you do not have the required permissions.' } }] } } } });
+  assert.equal(r.ok, false);
+  assert.match(r.erro, /não tem permissão para consultar/);
+  assert.match(r.orientacao, /Build/);
+  assert.match(r.orientacao, /Não invente números/);
+  assert.equal(rodarPowerBi('Montar resultado', { nosAnteriores: { 'Escolher modelo': escolherModelo({ tipo: 'listar' }) } })[0].total, 2);
+});
+teste('power bi: falha de conexão pede para reconectar a credencial', () => {
+  const r = rodarPowerBi('Explicar falha', { entrada: [{ error: { message: '401 - Unauthorized' } }] })[0];
+  assert.equal(r.ok, false);
+  assert.match(r.orientacao, /reconectar/);
+});
+teste('power bi: só leitura, só no ambiente de trabalho, e o acesso fica na credencial do n8n', () => {
+  assert.equal(noPowerBi('Só no ambiente de trabalho').parameters.conditions.conditions[0].rightValue, 'TRABALHO');
+  const http = powerbi.nodes.filter((n) => n.type === 'n8n-nodes-base.httpRequest');
+  assert.equal(http.length, 6);
+  for (const n of http) {
+    assert.equal(n.parameters.genericAuthType, 'oAuth2Api', `${n.name}: use a credencial OAuth2 do Power BI`);
+    // endereço fixo da API ou o endereço do modelo montado em "Escolher modelo" (que também é da API)
+    assert.match(String(n.parameters.url), /https:\/\/api\.powerbi\.com\/v1\.0\/myorg|json\.base \+ '\//, `${n.name}: só a API do Power BI`);
+    assert.ok(n.parameters.method === 'GET' || String(n.parameters.url).endsWith("/executeQueries' }}"), `${n.name}: só leitura`);
+    assert.ok(!n.parameters.headerParameters, `${n.name}: nada de token no cabeçalho`);
+  }
+  assert.match(ler('n8n/sdk/kira-powerbi.workflow.ts'), /newCredential\('Power BI'\)/);
+});
+
 teste('nós Code "uma vez por item" não devolvem lista (o n8n recusa e a execução cai)', () => {
-  const arquivos = ['kira-1.0', 'kira-resumo-da-manha', 'kira-gerar-imagem', 'kira-anexar-imagem', 'kira-teams', 'kira-pedidos', 'kira-base-de-pedidos', 'kira-rascunho-resposta', 'kira-rascunhos-automaticos', 'kira-pesquisar-internet', 'kira-planilha-negocio'];
+  const arquivos = ['kira-1.0', 'kira-resumo-da-manha', 'kira-gerar-imagem', 'kira-anexar-imagem', 'kira-teams', 'kira-pedidos', 'kira-base-de-pedidos', 'kira-rascunho-resposta', 'kira-rascunhos-automaticos', 'kira-pesquisar-internet', 'kira-planilha-negocio', 'kira-powerbi'];
   for (const arquivo of arquivos) {
     const w = JSON.parse(ler(`n8n/workflows/${arquivo}.json`));
     for (const n of w.nodes.filter((x) => x.type === 'n8n-nodes-base.code' && x.parameters.mode === 'runOnceForEachItem')) {
@@ -1627,6 +1757,8 @@ teste('segurança: nenhum token do Telegram, chave do Google ou caminho de webho
     'n8n/sdk/kira-rascunho-resposta.workflow.ts',
     'n8n/workflows/kira-planilha-negocio.json',
     'n8n/sdk/kira-planilha-negocio.workflow.ts',
+    'n8n/workflows/kira-powerbi.json',
+    'n8n/sdk/kira-powerbi.workflow.ts',
   ];
   for (const arquivo of arquivos) {
     const conteudo = ler(arquivo);

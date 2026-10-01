@@ -72,6 +72,7 @@ Meu bot particular: a **Kira** é uma assistente pessoal de IA que roda no **n8n
 | [`n8n/workflows/kira-planilha-negocio.json`](n8n/workflows/kira-planilha-negocio.json) | Sub-workflow da ferramenta `consultar_negocio`, que lê a planilha do negócio no Google Drive (e o SDK em [`n8n/sdk/kira-planilha-negocio.workflow.ts`](n8n/sdk/kira-planilha-negocio.workflow.ts)) |
 | [`n8n/workflows/kira-powerbi.json`](n8n/workflows/kira-powerbi.json) | Sub-workflow da ferramenta `consultar_powerbi`, que consulta o Power BI pela API oficial (e o SDK em [`n8n/sdk/kira-powerbi.workflow.ts`](n8n/sdk/kira-powerbi.workflow.ts)) |
 | [`n8n/workflows/kira-rascunhos-automaticos.json`](n8n/workflows/kira-rascunhos-automaticos.json) | Workflow dos rascunhos automáticos de e-mails sobre pedidos (e o SDK em [`n8n/sdk/kira-rascunhos-automaticos.workflow.ts`](n8n/sdk/kira-rascunhos-automaticos.workflow.ts)) |
+| [`vps/instalar.sh`](vps/instalar.sh) | Instala o n8n numa VPS (Rocky Linux ou RHEL) com Docker e HTTPS automático (Caddy) |
 | [`docs/configuracao.md`](docs/configuracao.md) | Passo a passo para ativar, primeiro teste e solução de problemas |
 | [`docs/arquitetura.md`](docs/arquitetura.md) | Como tudo se encaixa, decisões técnicas e próximos passos |
 | [`docs/persona-kira.md`](docs/persona-kira.md) | Personalidade e instruções da Kira |

@@ -1707,9 +1707,16 @@ teste('power bi: consulta corta no limite; erro de DAX e falta de permissão vir
   assert.equal(rodarPowerBi('Montar resultado', { nosAnteriores: { 'Escolher modelo': escolherModelo({ tipo: 'listar' }) } })[0].total, 2);
 });
 teste('power bi: falha de conexão pede para reconectar a credencial', () => {
-  const r = rodarPowerBi('Explicar falha', { entrada: [{ error: { message: '401 - Unauthorized' } }] })[0];
+  let r = rodarPowerBi('Explicar falha', { entrada: [{ error: { message: '401 - Unauthorized' } }] })[0];
   assert.equal(r.ok, false);
-  assert.match(r.orientacao, /reconectar/);
+  assert.match(r.orientacao, /Reconnect/);
+  // credencial sem login (um "Reconnect" que não terminou): o n8n devolve o erro vazio, sem chamar a API
+  r = rodarPowerBi('Explicar falha', { entrada: [{ tipo: 'listar', error: {} }] })[0];
+  assert.doesNotMatch(r.erro, /object Object/);
+  assert.match(r.erro, /sem login/);
+  assert.match(r.orientacao, /Reconnect/);
+  r = rodarPowerBi('Explicar falha', { entrada: [{ error: { message: 'getaddrinfo ENOTFOUND api.powerbi.com' } }] })[0];
+  assert.match(r.orientacao, /tentar de novo/);
 });
 teste('power bi: só leitura, só no ambiente de trabalho, e o acesso fica na credencial do n8n', () => {
   assert.equal(noPowerBi('Só no ambiente de trabalho').parameters.conditions.conditions[0].rightValue, 'TRABALHO');

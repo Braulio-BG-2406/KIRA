@@ -48,21 +48,29 @@ da credencial).
 | --- | --- |
 | Gemini (`googlePalmApi`) | A mesma chave gratuita do AI Studio |
 | Telegram (`telegramApi`) | O mesmo token do bot |
-| Microsoft Outlook e Microsoft Teams (OAuth2) | Fora do n8n Cloud, o n8n não tem app próprio da Microsoft: use um app do Entra ID (pode ser o mesmo do Power BI), com o endereço de retorno da VPS, o ID do aplicativo e o **Valor** de um segredo. Ao conectar, aceite as permissões. A sincronização da base de pedidos usa a credencial do Teams para ler o SharePoint e o OneDrive |
+| Microsoft: Outlook, Teams, OneDrive e SharePoint (OAuth2 API) | Fora do n8n Cloud, o n8n não tem app próprio da Microsoft, e as credenciais prontas do Teams pedem permissões que só o administrador aprova (`User.ReadWrite.All`, `Group.ReadWrite.All`). Use **uma** credencial genérica **OAuth2 API** (`Microsoft (Kira)`) com o app do Entra ID do Power BI: as URLs `authorize` e `token` do locatário, o **ID do aplicativo**, o **Valor** de um segredo, Scope `offline_access openid User.Read Mail.ReadWrite Calendars.Read Chat.ReadWrite ChatMessage.Send Files.ReadWrite Sites.Read.All` (o próprio usuário aprova), `prompt=select_account` e Authentication **Body**. Nos nós HTTP do Graph, troque a autenticação para **Generic Credential Type → OAuth2 API** e escolha essa credencial |
 | Google Drive (OAuth2) | Projeto no Google Cloud com a API do Google Drive ativada, tela de consentimento **publicada** (em teste, o login vence em 7 dias) e um cliente OAuth do tipo "Aplicativo da Web" com o endereço de retorno |
 | LinkedIn (OAuth2) | App no LinkedIn Developers com "Share on LinkedIn" e "Sign In with LinkedIn using OpenID Connect" e o endereço de retorno |
-| Power BI (OAuth2 API) | A mesma configuração do passo 19 do guia; acrescente o endereço de retorno da VPS no app |
+| Power BI (OAuth2 API) | A mesma configuração do passo 19 do guia, com o mesmo app; conecte com a conta que vê os modelos |
 
 Depois, ligue cada credencial aos nós que a usam e confira, nos sub-workflows, quem pode chamá-los (a Kira; o
 rascunho com assinatura e os pedidos também pelos rascunhos automáticos).
 
-## 5. Testar na VPS, com tudo despublicado
+Erros comuns ao conectar a Microsoft:
+- `AADSTS700016 … application … was not found`: o **Client ID** está errado (costuma ser o "ID do segredo" no lugar
+  do ID do aplicativo).
+- `invalid_client` na volta para o n8n: o **Client Secret** não é o **Valor** do segredo, ou Authentication está em
+  Header.
+
+## 5. Testar na VPS, com a Kira e os agendados despublicados
+- Publique os sub-workflows: eles só rodam quando chamados, e a Kira não consegue usar ferramenta despublicada
+  ("Workflow is not active and cannot be executed").
 - Sub-workflows: `test_workflow` com dados reais (pedidos, internet, Power BI, planilha, Teams, rascunho).
 - Kira: `test_workflow` com o "Telegram Trigger" fixado (chat de teste fictício), lendo a resposta em `kira_logs`.
 - Resumo da manhã e rascunhos automáticos: uma execução manual de cada.
 
 ## 6. Virada
-1. Na VPS, publique os sub-workflows.
+1. Na VPS, confira que os sub-workflows estão publicados.
 2. No n8n Cloud, despublique a Kira, o resumo da manhã, os rascunhos automáticos e a sincronização da base.
 3. Na VPS, publique a Kira (o Telegram passa a entregar as mensagens para a VPS) e os três agendados.
 4. Mande uma mensagem real para a Kira e confira `/status`.

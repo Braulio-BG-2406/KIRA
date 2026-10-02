@@ -14,14 +14,18 @@ Depois: conta de dono, verificação em duas etapas (2FA) e **MCP em nível de i
 Os IDs iguais mantêm as ligações entre a Kira e os sub-workflows (ferramentas `workflowId`) e a lista de quem pode
 chamar cada sub-workflow.
 
-1. No n8n Cloud, abra cada workflow da Kira e use **⋯ → Download**. São 12: a Kira, os oito sub-workflows
-   (imagens, anexar imagem, Teams, pedidos, internet, planilha do negócio, rascunho com assinatura, Power BI) e os
-   agendados (resumo da manhã, rascunhos automáticos, sincronização da base de pedidos).
+1. No n8n Cloud, abra cada workflow da Kira e use **⋯ → Download** (os três pontinhos no canto superior direito).
+   São 12: a Kira, os oito sub-workflows (imagens, anexar imagem, Teams, pedidos, internet, planilha do negócio,
+   rascunho com assinatura, Power BI) e os agendados (resumo da manhã, rascunhos automáticos, sincronização da base
+   de pedidos). Os arquivos vão para a pasta Downloads com `_` no lugar de espaços e acentos (por exemplo
+   `Kira___Teams__ferramenta_.json`); `Ctrl + J` no navegador mostra a lista do que foi baixado.
 2. No PowerShell do computador (não dentro da VPS), copie os arquivos para a VPS:
-   `ssh root@<endereço> "mkdir -p /opt/kira/importar"` e depois
-   `scp (Get-ChildItem $HOME\Downloads\Kira*.json).FullName root@<endereço>:/opt/kira/importar/`.
-3. Na VPS: `bash /opt/kira/importar-workflows.sh` (baixe de `vps/importar-workflows.sh`). Tudo entra
-   **despublicado** e a lista final mostra ID e nome de cada workflow.
+   `scp (Get-ChildItem $HOME\Downloads\Kira_*.json).FullName root@<endereço>:/tmp/`.
+   O `Kira_` deixa de fora os `.json` deste repositório (`kira-…`), que não têm o ID do workflow.
+3. Entre na VPS (`ssh root@<endereço>`) e rode:
+   `mkdir -p /opt/kira/importar && mv /tmp/Kira_*.json /opt/kira/importar/` e depois
+   `bash /opt/kira/importar-workflows.sh` (baixe de `vps/importar-workflows.sh`). Tudo entra **despublicado**; o
+   script pula cópias repetidas e arquivos sem ID, e a lista final mostra ID e nome de cada workflow.
 
 ## 3. Tabelas
 Crie na VPS as tabelas com os mesmos nomes e colunas da nuvem (os workflows procuram as tabelas pelo nome) e copie

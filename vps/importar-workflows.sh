@@ -15,18 +15,33 @@ if [ "${#ARQUIVOS[@]}" -eq 0 ]; then
 fi
 echo "==> ${#ARQUIVOS[@]} arquivo(s) para importar"
 
-# Copia para dentro do container e marca cada workflow como despublicado.
+# Copia para dentro do container e marca cada workflow como despublicado. Pula o que não veio do Download do
+# n8n (sem ID, como os .json deste repositório) e as cópias repetidas ("(1)" no nome).
 docker compose exec -T -u root n8n rm -rf /tmp/importar
 docker compose cp "$PASTA" n8n:/tmp/importar
 docker compose exec -T -u root n8n node -e '
 const fs = require("fs");
 const dir = "/tmp/importar";
-for (const arquivo of fs.readdirSync(dir).filter((f) => f.endsWith(".json"))) {
-  const w = JSON.parse(fs.readFileSync(`${dir}/${arquivo}`, "utf8"));
+const vistos = new Set();
+for (const arquivo of fs.readdirSync(dir).filter((f) => f.endsWith(".json")).sort()) {
+  const caminho = `${dir}/${arquivo}`;
+  let w = null;
+  try { w = JSON.parse(fs.readFileSync(caminho, "utf8")); } catch {}
+  if (!w || !w.id || vistos.has(w.id)) {
+    fs.unlinkSync(caminho);
+    console.log(`pulado: ${arquivo} (${!w ? "não é um workflow" : !w.id ? "sem ID: não veio do Download do n8n" : "repetido"})`);
+    continue;
+  }
+  vistos.add(w.id);
   w.active = false;
-  fs.writeFileSync(`${dir}/${arquivo}`, JSON.stringify(w));
-  console.log(`${w.id || "(sem id: o n8n vai criar um novo)"}  ${w.name}`);
+  fs.writeFileSync(caminho, JSON.stringify(w));
+  console.log(`${w.id}  ${w.name}`);
 }
+if (!vistos.size) {
+  console.log("Nenhum workflow para importar.");
+  process.exit(1);
+}
+console.log(`${vistos.size} workflow(s) para importar`);
 '
 docker compose exec -T -u root n8n chmod -R a+r /tmp/importar
 

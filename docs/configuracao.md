@@ -291,6 +291,7 @@ No modo **Trabalho**, a ferramenta **consultar_powerbi** consulta o Power BI da 
 
 - **Só no modo Trabalho.** O ambiente vai para o sub-workflow pelo workflow da Kira (não pela IA). Em outro ambiente, ele recusa sem chamar a API.
 - **Como a Kira pergunta:** primeiro pede a estrutura do modelo (`COLUMNSTATISTICS()` e `INFO.VIEW.MEASURES()`); depois escreve a consulta DAX com os nomes certos, de preferência com as medidas prontas do relatório. Cada consulta devolve no máximo 200 linhas.
+- **Conexão renovada sozinha:** a conexão com o Power BI vence a cada hora, e o Power BI avisa isso com um código que o n8n não reconhece para renovar. Por isso, antes de cada consulta, o nó **Renovar conexão (Fabric)** faz uma chamada leve à API do Fabric, que usa a mesma conexão e avisa do jeito padrão: o n8n renova sozinho, sem **Reconnect**.
 - **Permissão:** a Kira vê o que a conta conectada vê. Para ler os dados de um modelo pela API, essa conta precisa da permissão de **criar conteúdo (Build)** nele: ser administrador, membro ou colaborador da área de trabalho (**Visualizador não basta**), ou receber essa permissão do dono do modelo (**Gerenciar permissões → Adicionar usuário →** marcar "Permitir que os destinatários criem conteúdo com os dados associados a este modelo semântico"). Relatórios só compartilhados para visualização aparecem na lista, mas a consulta volta "sem permissão" e a Kira explica isso sem inventar números. A opção *Semantic Model Execute Queries REST API* do portal de administração do Power BI precisa estar ligada (vem ligada por padrão).
 
 1. **App no Microsoft Entra ID** (portal.azure.com → **Microsoft Entra ID → Registros de aplicativo → Novo registro**): nome `Kira Power BI`, **Contas somente neste diretório organizacional** e URI de redirecionamento do tipo **Web** com o endereço que o n8n mostra na credencial (**OAuth Redirect URL**; no n8n Cloud, `https://oauth.n8n.cloud/oauth2/callback`). Anote o **ID do aplicativo (cliente)** e o **ID do diretório (locatário)**.
@@ -310,7 +311,7 @@ No modo **Trabalho**, a ferramenta **consultar_powerbi** consulta o Power BI da 
    | Authentication | Body |
 
    Clique em **Connect my account**, entre com a conta que vê os modelos e aceite as permissões. Para trocar a conta depois, clique em **Reconnect** e escolha **Usar outra conta**. Se a Microsoft entrar sozinha com a conta que já está aberta no navegador, troque **Auth URI Query Parameters** por `prompt=login&login_hint=<e-mail da conta>`: ela passa a pedir a senha dessa conta.
-5. Importe o sub-workflow, selecione a credencial nos 6 nós HTTP, publique e, em **Settings → This workflow can be called by**, escolha só a Kira.
+5. Importe o sub-workflow, selecione a credencial nos 7 nós HTTP, publique e, em **Settings → This workflow can be called by**, escolha só a Kira.
 6. Na Kira, selecione o sub-workflow na ferramenta **consultar_powerbi** e publique.
 
 Teste no modo Trabalho: "Kira, quais relatórios do Power BI você vê?" e depois "quanto foi faturado este mês, pelo BI?".

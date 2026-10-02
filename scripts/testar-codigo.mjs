@@ -1721,15 +1721,24 @@ teste('power bi: falha de conexão pede para reconectar a credencial', () => {
 teste('power bi: só leitura, só no ambiente de trabalho, e o acesso fica na credencial do n8n', () => {
   assert.equal(noPowerBi('Só no ambiente de trabalho').parameters.conditions.conditions[0].rightValue, 'TRABALHO');
   const http = powerbi.nodes.filter((n) => n.type === 'n8n-nodes-base.httpRequest');
-  assert.equal(http.length, 6);
+  assert.equal(http.length, 7);
   for (const n of http) {
     assert.equal(n.parameters.genericAuthType, 'oAuth2Api', `${n.name}: use a credencial OAuth2 do Power BI`);
-    // endereço fixo da API ou o endereço do modelo montado em "Escolher modelo" (que também é da API)
-    assert.match(String(n.parameters.url), /https:\/\/api\.powerbi\.com\/v1\.0\/myorg|json\.base \+ '\//, `${n.name}: só a API do Power BI`);
+    // endereço fixo da API ou o endereço do modelo montado em "Escolher modelo" (que também é da API); só a
+    // renovação da conexão usa a lista de áreas de trabalho do Fabric
+    const api = n.name === 'Renovar conexão (Fabric)' ? /^https:\/\/api\.fabric\.microsoft\.com\/v1\/workspaces$/ : /https:\/\/api\.powerbi\.com\/v1\.0\/myorg|json\.base \+ '\//;
+    assert.match(String(n.parameters.url), api, `${n.name}: só a API do Power BI`);
     assert.ok(n.parameters.method === 'GET' || String(n.parameters.url).endsWith("/executeQueries' }}"), `${n.name}: só leitura`);
     assert.ok(!n.parameters.headerParameters, `${n.name}: nada de token no cabeçalho`);
   }
   assert.match(ler('n8n/sdk/kira-powerbi.workflow.ts'), /newCredential\('Power BI'\)/);
+});
+teste('power bi: renova a conexão vencida antes das consultas (o Power BI responde 403; o n8n só renova com 401)', () => {
+  const renovar = noPowerBi('Renovar conexão (Fabric)');
+  assert.equal(renovar.parameters.method, 'GET');
+  assert.equal(renovar.onError, 'continueRegularOutput', 'se o Fabric falhar, a consulta segue e o erro real aparece adiante');
+  assert.equal(powerbi.connections['Só no ambiente de trabalho'].main[0][0].node, 'Renovar conexão (Fabric)');
+  assert.equal(powerbi.connections['Renovar conexão (Fabric)'].main[0][0].node, 'Listar áreas de trabalho');
 });
 teste('power bi: a Kira tem a ferramenta, com o ambiente vindo do workflow (não da IA), e as instruções', () => {
   assert.equal(workflow.connections.consultar_powerbi.ai_tool[0][0].node, 'Kira');

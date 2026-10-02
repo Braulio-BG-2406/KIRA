@@ -72,6 +72,27 @@
       }
     },
     {
+      "id": "a950acc8-4292-47be-a30b-a3819eb1d3c3",
+      "name": "Renovar conexão (Fabric)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        330,
+        160
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.fabric.microsoft.com/v1/workspaces",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "credentials": {},
+      "onError": "continueRegularOutput"
+    },
+    {
       "id": "4a5df45b-5559-4972-a5ae-dba7046a01a3",
       "name": "Listar áreas de trabalho",
       "type": "n8n-nodes-base.httpRequest",
@@ -410,7 +431,7 @@
       "main": [
         [
           {
-            "node": "Listar áreas de trabalho",
+            "node": "Renovar conexão (Fabric)",
             "type": "main",
             "index": 0
           }
@@ -418,6 +439,17 @@
         [
           {
             "node": "Fora do ambiente de trabalho",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Renovar conexão (Fabric)": {
+      "main": [
+        [
+          {
+            "node": "Listar áreas de trabalho",
             "type": "main",
             "index": 0
           }

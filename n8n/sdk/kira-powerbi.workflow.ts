@@ -79,6 +79,29 @@ const foraDoAmbiente = node({
   output: [{ ok: false, erro: 'O Power BI da empresa só pode ser consultado no ambiente de trabalho.', orientacao: 'Diga ao dono que troque de ambiente.' }],
 });
 
+// O Power BI responde 403 (TokenExpired) quando a conexão vence (a cada hora), e o n8n só renova o token sozinho
+// quando a resposta é 401. A API do Fabric aceita o mesmo token e responde 401 quando ele vence: esta chamada leve,
+// antes das consultas, faz o n8n renovar a conexão. Se ela falhar por outro motivo, o fluxo segue e o erro real
+// aparece em "Listar áreas de trabalho".
+const renovarConexao = node({
+  type: 'n8n-nodes-base.httpRequest',
+  version: 4.2,
+  config: {
+    name: 'Renovar conexão (Fabric)',
+    parameters: {
+      method: 'GET',
+      url: 'https://api.fabric.microsoft.com/v1/workspaces',
+      authentication: 'genericCredentialType',
+      genericAuthType: 'oAuth2Api',
+      options: { timeout: 30000 },
+    },
+    credentials: { oAuth2Api: credPowerBi },
+    onError: 'continueRegularOutput',
+    position: [330, 160],
+  },
+  output: [{ value: [{ id: 'g1', displayName: 'Comercial', type: 'Workspace' }] }],
+});
+
 const listarAreas = node({
   type: 'n8n-nodes-base.httpRequest',
   version: 4.2,
@@ -305,7 +328,8 @@ export default workflow('kira-powerbi', 'Kira — Power BI (ferramenta)', {
   .to(
     soNoAmbiente
       .onTrue(
-        listarAreas
+        renovarConexao
+          .to(listarAreas)
           .to(areasDeTrabalho)
           .to(listarModelos)
           .to(listarRelatorios)

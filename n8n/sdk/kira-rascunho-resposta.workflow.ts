@@ -24,7 +24,7 @@ const quandoPedir = trigger({
     },
     position: [0, 300],
   },
-  output: [{ id_email: 'AAMkEmail', texto: 'Olá, Ana!\n\nO pedido sai amanhã.\n\nAtenciosamente,\nBráulio', referencia: '' }],
+  output: [{ id_email: 'AAMkEmail', texto: 'Olá, Ana!\n\nO pedido sai amanhã.\n\nAtenciosamente,\nCarlos', referencia: '' }],
 });
 
 // Onde fica a assinatura: o e-mail que aparece embaixo da imagem e um trecho do nome da imagem no

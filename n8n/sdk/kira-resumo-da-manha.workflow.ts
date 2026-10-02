@@ -1,10 +1,10 @@
 // Kira — Resumo da manhã: todo dia às 7h lê notícias de fontes confiáveis (RSS),
 // pega as cotações do dia, pede ao Gemini um resumo curto por seção e manda no Telegram.
 // Mesma definição de n8n/workflows/kira-resumo-da-manha.json (para importar no n8n, use o JSON).
-import { workflow, node, trigger, sticky, expr } from '@n8n/workflow-sdk';
+import { workflow, node, trigger, sticky, expr, newCredential } from '@n8n/workflow-sdk';
 
-const credTelegram = { id: 'ox55jLJMBQJ3Pxnc', name: 'Telegram account' };
-const credGemini = { id: 'AozFk3svOpYjS2K7', name: 'Google Gemini(PaLM) Api account' };
+const credTelegram = newCredential('Telegram');
+const credGemini = newCredential('Gemini (Google AI Studio)');
 
 const todoDia = trigger({
   type: 'n8n-nodes-base.scheduleTrigger',
@@ -27,7 +27,7 @@ const configuracao = node({
       includeOtherFields: false,
       assignments: {
         assignments: [
-          { id: 'r-nome', name: 'nome_dono', value: 'Bráulio', type: 'string' },
+          { id: 'r-nome', name: 'nome_dono', value: 'Seu nome', type: 'string' },
           { id: 'r-chat', name: 'chat_id', value: '', type: 'string' },
           { id: 'r-itens', name: 'itens_por_fonte', value: 6, type: 'number' },
           { id: 'r-horas', name: 'horas', value: 24, type: 'number' },
@@ -37,7 +37,7 @@ const configuracao = node({
     },
     position: [220, 300],
   },
-  output: [{ nome_dono: 'Bráulio', chat_id: '111111111', itens_por_fonte: 6, horas: 24, fuso_horario: 'America/Sao_Paulo' }],
+  output: [{ nome_dono: 'Carlos', chat_id: '111111111', itens_por_fonte: 6, horas: 24, fuso_horario: 'America/Sao_Paulo' }],
 });
 
 const fontes = node({
@@ -144,7 +144,7 @@ const resumir = node({
     waitBetweenTries: 5000,
     position: [1540, 300],
   },
-  output: [{ mergedResponse: '☀️ **Bom dia, Bráulio!** Resumo de domingo.' }],
+  output: [{ mergedResponse: '☀️ **Bom dia, Carlos!** Resumo de domingo.' }],
 });
 
 const reserva = node({
@@ -155,7 +155,7 @@ const reserva = node({
     parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: "// Plano B: se o Gemini falhar (limite do plano gratuito, por exemplo), manda os\n// principais títulos de cada seção, com link, sem o resumo escrito pela IA.\nconst selecao = $('Selecionar notícias').first().json;\nconst config = $('Configuração do resumo').first().json;\nconst SECOES = [\n  ['Brasil', '🇧🇷'],\n  ['Mundo', '🌎'],\n  ['Mercado financeiro', '💰'],\n  ['Mineração, petróleo, siderurgia e florestal', '🏭'],\n  ['Política', '🏛️'],\n  ['Tecnologia e tendências', '💡'],\n];\n\nconst partes = [`☀️ **Bom dia, ${config.nome_dono}!** Hoje não consegui escrever o resumo, então seguem os principais títulos.`];\nfor (const [secao, emoji] of SECOES) {\n  const itens = (selecao.noticias ?? []).filter((n) => n.secao === secao).slice(0, 4);\n  if (!itens.length) continue;\n  partes.push(`${emoji} **${secao}**\\n` + itens.map((n) => `- ${n.titulo} ([${n.fonte}](${n.link}))`).join('\\n'));\n}\nif (partes.length === 1) partes.push('Não consegui ler as fontes de notícias hoje. 😕');\n\nreturn [{ json: { texto: partes.join('\\n\\n') } }];\n" },
     position: [1760, 480],
   },
-  output: [{ texto: '☀️ **Bom dia, Bráulio!**' }],
+  output: [{ texto: '☀️ **Bom dia, Carlos!**' }],
 });
 
 const montarMensagem = node({
@@ -166,7 +166,7 @@ const montarMensagem = node({
     parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: "// Converte o resumo (Markdown simples) para o HTML aceito pelo Telegram e divide\n// em partes (o Telegram aceita até 4096 caracteres por mensagem).\nconst entrada = $input.first().json;\nconst texto = String(\n  entrada.texto ?? entrada.mergedResponse ?? (entrada.content?.parts ?? []).filter((p) => !p.thought).map((p) => p.text ?? '').join(''),\n).trim();\nconst LIMITE = 3500;\n\nconst escapar = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\n\nfunction markdownParaHtml(md) {\n  // Código e links são convertidos antes e guardados, para não serem alterados depois.\n  const guardados = [];\n  const guardar = (html) => `\\u0000${guardados.push(html) - 1}\\u0000`;\n  const t = md\n    .replace(/```[\\w+-]*\\n?([\\s\\S]*?)```/g, (_, codigo) =>\n      guardar(`<pre>${escapar(codigo.replace(/\\n$/, ''))}</pre>`),\n    )\n    .replace(/`([^`\\n]+)`/g, (_, codigo) => guardar(`<code>${escapar(codigo)}</code>`))\n    .replace(/\\[([^\\]\\n]+)\\]\\((https?:\\/\\/[^\\s)]+)\\)/g, (_, rotulo, url) =>\n      guardar(`<a href=\"${escapar(url).replace(/\"/g, '&quot;')}\">${escapar(rotulo)}</a>`),\n    );\n  return escapar(t)\n    .replace(/^[ \\t]*#{1,6}[ \\t]+(.+?)[ \\t#]*$/gm, (_, titulo) => `<b>${titulo.replace(/\\*\\*|__/g, '')}</b>`)\n    .replace(/^([ \\t]*)[*+-][ \\t]+/gm, '$1• ')\n    .replace(/\\*\\*(?=\\S)([^\\n]*?\\S)\\*\\*/g, '<b>$1</b>')\n    .replace(/__(?=\\S)([^\\n]*?\\S)__/g, '<b>$1</b>')\n    .replace(/(^|[^\\w*])\\*(?=\\S)([^*\\n]*?\\S)\\*(?![\\w*])/g, '$1<i>$2</i>')\n    .replace(/(^|[^\\w])_(?=\\S)([^_\\n]*?\\S)_(?!\\w)/g, '$1<i>$2</i>')\n    .replace(/~~(?=\\S)([^~\\n]*?\\S)~~/g, '<s>$1</s>')\n    .replace(/\\u0000(\\d+)\\u0000/g, (_, i) => guardados[Number(i)]);\n}\n\nfunction dividir(t, limite) {\n  const partes = [];\n  let resto = t;\n  while (resto.length > limite) {\n    let corte = resto.lastIndexOf('\\n\\n', limite);\n    if (corte < limite / 2) corte = resto.lastIndexOf('\\n', limite);\n    if (corte < limite / 2) corte = resto.lastIndexOf(' ', limite);\n    if (corte < limite / 2) corte = limite;\n    partes.push(resto.slice(0, corte).trim());\n    resto = resto.slice(corte).trim();\n  }\n  if (resto) partes.push(resto);\n  return partes;\n}\n\nreturn dividir(texto || 'Não consegui montar o resumo de hoje. 😕', LIMITE).map((parte) => ({\n  json: { html: markdownParaHtml(parte), texto_simples: escapar(parte) },\n}));\n" },
     position: [1980, 300],
   },
-  output: [{ html: '☀️ <b>Bom dia, Bráulio!</b>', texto_simples: '☀️ **Bom dia, Bráulio!**' }],
+  output: [{ html: '☀️ <b>Bom dia, Carlos!</b>', texto_simples: '☀️ **Bom dia, Carlos!**' }],
 });
 
 const enviar = node({
@@ -217,7 +217,7 @@ const textoParaVoz = node({
     onError: 'continueErrorOutput',
     position: [2420, 140],
   },
-  output: [{ resumo: '☀️ **Bom dia, Bráulio!** Resumo de domingo.', nome: 'Bráulio' }],
+  output: [{ resumo: '☀️ **Bom dia, Carlos!** Resumo de domingo.', nome: 'Carlos' }],
 });
 
 const instrucoesRoteiro =
@@ -253,7 +253,7 @@ const roteiroVoz = node({
     waitBetweenTries: 5000,
     position: [2640, 140],
   },
-  output: [{ mergedResponse: 'Bom dia, Bráulio! Aqui é a Kira com o seu resumo da manhã.' }],
+  output: [{ mergedResponse: 'Bom dia, Carlos! Aqui é a Kira com o seu resumo da manhã.' }],
 });
 
 const vozResumo = node({

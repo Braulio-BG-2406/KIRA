@@ -38,7 +38,7 @@
             {
               "id": "c-nome",
               "name": "nome_dono",
-              "value": "Bráulio",
+              "value": "Seu nome",
               "type": "string"
             },
             {
@@ -749,7 +749,7 @@
         -60
       ],
       "parameters": {
-        "content": "## Rascunhos automáticos (Outlook)\nA cada 30 min, de segunda a sexta (7h às 19h30), a Kira lê os e-mails novos da Caixa de Entrada, separa os que perguntam de pedidos (pedido, TRF, cotação, compra, solicitação, produção, prazo, NF), consulta a base oficial de pedidos e deixa a resposta como **rascunho** no Outlook, com a sua assinatura (imagem e e-mail). **Nunca envia.** Depois avisa no Telegram.\n\n- Pula e-mails automáticos, os que você mesmo mandou e os que você já respondeu.\n- Cada e-mail é analisado uma vez só (tabela `kira_emails_auto`, guardada por 10 dias).\n- O que a base não tem fica marcado como **[confirmar]**.\n- Configuração: `chat_id` (seu ID do Telegram) e `ativo_desde` (só e-mails depois dessa data).",
+        "content": "## Rascunhos automáticos (Outlook)\nA cada 30 min, de segunda a sexta (7h às 19h30), a Kira lê os e-mails novos da Caixa de Entrada, separa os que perguntam de pedidos (pedido, TRF, cotação, compra, solicitação, produção, prazo, NF), consulta a base oficial de pedidos e deixa a resposta como **rascunho** no Outlook, com a sua assinatura (imagem e e-mail). **Nunca envia.** Depois avisa no Telegram.\n\n- Pula e-mails automáticos, os que você mesmo mandou e os que você já respondeu.\n- Cada e-mail é analisado uma vez só (tabela `kira_emails_auto`, guardada por 10 dias).\n- O que a base não tem fica marcado como **[confirmar]**.\n- Configuração: `nome_dono` (como a Kira chama você), `chat_id` (seu ID do Telegram) e `ativo_desde` (só e-mails depois dessa data).",
         "color": 4,
         "width": 700,
         "height": 300

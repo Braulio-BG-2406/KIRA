@@ -3,14 +3,14 @@
 // workflow via MCP do n8n (create_workflow_from_code). Para importar no n8n, use o JSON.
 import { workflow, node, trigger, sticky, newCredential, ifElse, switchCase, languageModel, memory, tool, fromAi, expr } from '@n8n/workflow-sdk';
 
-const credTelegram = { id: 'ox55jLJMBQJ3Pxnc', name: 'Telegram account' };
+const credTelegram = newCredential('Telegram');
 
 const exemploMensagem = {
   update_id: 100000001,
   message: {
     message_id: 42,
-    from: { id: 111111111, is_bot: false, first_name: 'Bráulio', username: 'braulio', language_code: 'pt-br' },
-    chat: { id: 111111111, first_name: 'Bráulio', username: 'braulio', type: 'private' },
+    from: { id: 111111111, is_bot: false, first_name: 'Carlos', username: 'carlos', language_code: 'pt-br' },
+    chat: { id: 111111111, first_name: 'Carlos', username: 'carlos', type: 'private' },
     date: 1790460000,
     voice: { duration: 3, mime_type: 'audio/ogg', file_id: 'AwACAgEAAxkBAAIB', file_unique_id: 'AgADxyz', file_size: 12345 },
   },
@@ -19,8 +19,8 @@ const exemploMensagem = {
 const exemploNormalizado = {
   chat_id: '111111111',
   user_id: '111111111',
-  nome_usuario: 'Bráulio',
-  username: 'braulio',
+  nome_usuario: 'Carlos',
+  username: 'carlos',
   tipo_chat: 'private',
   texto: '',
   tipo_entrada: 'voz',
@@ -34,7 +34,7 @@ const exemploNormalizado = {
 };
 
 const exemploEnvelope = {
-  texto_resposta: 'Bom dia, Bráulio! Sim, estou online e pronta para ajudar.',
+  texto_resposta: 'Bom dia, Carlos! Sim, estou online e pronta para ajudar.',
   modo_resposta: 'voz',
   status: 'ok',
   erro: '',
@@ -64,7 +64,7 @@ const configuracao = node({
       include: 'all',
       assignments: {
         assignments: [
-          { id: 'cfg-nome-dono', name: 'nome_dono', value: 'Bráulio', type: 'string' },
+          { id: 'cfg-nome-dono', name: 'nome_dono', value: '', type: 'string' },
           { id: 'cfg-ids-autorizados', name: 'ids_autorizados', value: '', type: 'string' },
           { id: 'cfg-modo-voz', name: 'modo_voz', value: 'espelho', type: 'string' },
           { id: 'cfg-voz-tts', name: 'voz_tts', value: 'Kore', type: 'string' },
@@ -82,7 +82,7 @@ const configuracao = node({
     },
     position: [240, 400],
   },
-  output: [{ update_id: 100000001, message: exemploMensagem.message, nome_dono: 'Bráulio', ids_autorizados: '111111111', modo_voz: 'espelho', voz_tts: 'Kore', modelo_voz: 'gemini-3.8-flash-tts', max_caracteres_voz: 1500, fuso_horario: 'America/Sao_Paulo', perfil_dono: '...' }],
+  output: [{ update_id: 100000001, message: exemploMensagem.message, nome_dono: 'Carlos', ids_autorizados: '111111111', modo_voz: 'espelho', voz_tts: 'Kore', modelo_voz: 'gemini-3.8-flash-tts', max_caracteres_voz: 1500, fuso_horario: 'America/Sao_Paulo', perfil_dono: '...' }],
 });
 
 const normalizar = node({
@@ -818,7 +818,7 @@ const contexto = node({
     },
     position: [2660, 300],
   },
-  output: [{ pergunta: 'Kira, bom dia. Você está online?', canal: 'voz', origem: 'voz', nome: 'Bráulio', perfil: '...', agora: 'sábado, 26 de setembro de 2026, 21:00', hoje: '2026-09-26', memorias: '(nenhuma memória guardada neste ambiente ainda)', ambiente: 'PESSOAL', ambiente_nome: 'Pessoal', ambientes: '- PESSOAL (Pessoal): Vida pessoal.' }],
+  output: [{ pergunta: 'Kira, bom dia. Você está online?', canal: 'voz', origem: 'voz', nome: 'Carlos', perfil: '...', agora: 'sábado, 26 de setembro de 2026, 21:00', hoje: '2026-09-26', memorias: '(nenhuma memória guardada neste ambiente ainda)', ambiente: 'PESSOAL', ambiente_nome: 'Pessoal', ambientes: '- PESSOAL (Pessoal): Vida pessoal.' }],
 });
 
 const geminiPrincipal = languageModel({
@@ -1841,7 +1841,7 @@ const kira = node({
     onError: 'continueErrorOutput',
     position: [2940, 300],
   },
-  output: [{ output: 'Bom dia, Bráulio! Sim, estou online e pronta para ajudar.' }],
+  output: [{ output: 'Bom dia, Carlos! Sim, estou online e pronta para ajudar.' }],
 });
 
 const respostaKira = node({
@@ -2064,7 +2064,7 @@ const respostaPronta = node({
     parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: "// Recebe a resposta de qualquer caminho (conversa, comando, erro, acesso negado...)\n// e decide se ela vai por voz ou por texto. Também prepara o texto que será falado\n// e a legenda do áudio.\nconst envelope = $input.first().json;\nconst entrada = $('Normalizar entrada').first().json;\nconst config = $('Configuração da Kira').first().json;\n\nconst texto =\n  String(envelope.texto_resposta ?? '').trim() ||\n  'Desculpe, não consegui formular uma resposta agora. Pode repetir?';\n\n// Tira a marcação Markdown e mantém o conteúdo.\nfunction semMarkdown(s) {\n  return s\n    .replace(/```[\\w+-]*\\n?([\\s\\S]*?)```/g, '$1')\n    .replace(/`([^`\\n]+)`/g, '$1')\n    .replace(/\\[([^\\]\\n]+)\\]\\((https?:\\/\\/[^\\s)]+)\\)/g, '$1 ($2)')\n    .replace(/^[ \\t]*#{1,6}[ \\t]+/gm, '')\n    .replace(/^([ \\t]*)[*+-][ \\t]+/gm, '$1• ')\n    .replace(/\\*\\*|__|~~/g, '')\n    .replace(/(^|[^\\w*])\\*(?=\\S)([^*\\n]*?\\S)\\*(?![\\w*])/g, '$1$2')\n    .replace(/(^|[^\\w])_(?=\\S)([^_\\n]*?\\S)_(?!\\w)/g, '$1$2')\n    .trim();\n}\n\n// Texto que vai virar áudio: sem links, emojis e marcadores de lista.\nfunction paraFala(s) {\n  return semMarkdown(s)\n    .replace(/\\s*\\(?https?:\\/\\/\\S+/g, '')\n    .replace(/[\\p{Extended_Pictographic}\\u{1F1E6}-\\u{1F1FF}\\u{FE0F}\\u{200D}\\u{20E3}]/gu, '')\n    .replace(/^[ \\t]*•[ \\t]*/gm, '')\n    .replace(/[ \\t]+/g, ' ')\n    .replace(/ *\\n+ */g, '\\n')\n    .trim();\n}\n\nconst escapar = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\n\nconst pediuVoz = envelope.modo_resposta === 'voz';\nconst textoFala = paraFala(texto);\nconst limiteVoz = Number(config.max_caracteres_voz) || 1500;\nconst falar = pediuVoz && textoFala.length > 0 && textoFala.length <= limiteVoz;\n\n// Legenda do áudio (o Telegram aceita até 1024 caracteres).\nconst caracteres = Array.from(semMarkdown(texto));\nconst legenda = escapar(\n  caracteres.length > 900 ? caracteres.slice(0, 897).join('').trimEnd() + '…' : caracteres.join(''),\n);\n\nconst avisos = [envelope.erro];\nif (pediuVoz && !falar) avisos.push('resposta longa demais para voz: enviada como texto');\n\nreturn [\n  {\n    json: {\n      chat_id: entrada.chat_id,\n      texto,\n      modo_resposta: falar ? 'voz' : 'texto',\n      texto_fala: textoFala,\n      legenda,\n      voz_tts: config.voz_tts || 'Kore',\n      status: envelope.status || 'ok',\n      erro: avisos.filter(Boolean).join(' | '),\n      entrada: envelope.entrada ?? entrada.texto ?? '',\n    },\n  },\n];\n" },
     position: [3620, 400],
   },
-  output: [{ chat_id: '111111111', texto: 'Bom dia, Bráulio! Sim, estou online e pronta para ajudar.', modo_resposta: 'voz', texto_fala: 'Bom dia, Bráulio! Sim, estou online e pronta para ajudar.', legenda: 'Bom dia, Bráulio! Sim, estou online e pronta para ajudar.', voz_tts: 'Kore', status: 'ok', erro: '', entrada: 'Kira, bom dia. Você está online?' }],
+  output: [{ chat_id: '111111111', texto: 'Bom dia, Carlos! Sim, estou online e pronta para ajudar.', modo_resposta: 'voz', texto_fala: 'Bom dia, Carlos! Sim, estou online e pronta para ajudar.', legenda: 'Bom dia, Carlos! Sim, estou online e pronta para ajudar.', voz_tts: 'Kore', status: 'ok', erro: '', entrada: 'Kira, bom dia. Você está online?' }],
 });
 
 const responderEmVoz = ifElse({
@@ -2170,7 +2170,7 @@ const dividirMensagem = node({
     parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: "// Converte a resposta (Markdown simples) para o HTML aceito pelo Telegram e divide\n// textos longos em partes (o Telegram aceita até 4096 caracteres por mensagem).\nconst resposta = $('Resposta pronta').first().json;\nconst LIMITE = 3500;\n\nconst escapar = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\n\nfunction markdownParaHtml(md) {\n  // Código e links são convertidos antes e guardados, para não serem alterados depois.\n  const guardados = [];\n  const guardar = (html) => `\\u0000${guardados.push(html) - 1}\\u0000`;\n  const t = md\n    .replace(/```[\\w+-]*\\n?([\\s\\S]*?)```/g, (_, codigo) =>\n      guardar(`<pre>${escapar(codigo.replace(/\\n$/, ''))}</pre>`),\n    )\n    .replace(/`([^`\\n]+)`/g, (_, codigo) => guardar(`<code>${escapar(codigo)}</code>`))\n    .replace(/\\[([^\\]\\n]+)\\]\\((https?:\\/\\/[^\\s)]+)\\)/g, (_, rotulo, url) =>\n      guardar(`<a href=\"${escapar(url).replace(/\"/g, '&quot;')}\">${escapar(rotulo)}</a>`),\n    );\n  return escapar(t)\n    .replace(/^[ \\t]*#{1,6}[ \\t]+(.+?)[ \\t#]*$/gm, (_, titulo) => `<b>${titulo.replace(/\\*\\*|__/g, '')}</b>`)\n    .replace(/^([ \\t]*)[*+-][ \\t]+/gm, '$1• ')\n    .replace(/\\*\\*(?=\\S)([^\\n]*?\\S)\\*\\*/g, '<b>$1</b>')\n    .replace(/__(?=\\S)([^\\n]*?\\S)__/g, '<b>$1</b>')\n    .replace(/(^|[^\\w*])\\*(?=\\S)([^*\\n]*?\\S)\\*(?![\\w*])/g, '$1<i>$2</i>')\n    .replace(/(^|[^\\w])_(?=\\S)([^_\\n]*?\\S)_(?!\\w)/g, '$1<i>$2</i>')\n    .replace(/~~(?=\\S)([^~\\n]*?\\S)~~/g, '<s>$1</s>')\n    .replace(/\\u0000(\\d+)\\u0000/g, (_, i) => guardados[Number(i)]);\n}\n\nfunction dividir(texto, limite) {\n  const partes = [];\n  let resto = texto;\n  while (resto.length > limite) {\n    let corte = resto.lastIndexOf('\\n\\n', limite);\n    if (corte < limite / 2) corte = resto.lastIndexOf('\\n', limite);\n    if (corte < limite / 2) corte = resto.lastIndexOf(' ', limite);\n    if (corte < limite / 2) corte = limite;\n    partes.push(resto.slice(0, corte).trim());\n    resto = resto.slice(corte).trim();\n  }\n  if (resto) partes.push(resto);\n  return partes;\n}\n\nreturn dividir(resposta.texto || '…', LIMITE).map((parte) => ({\n  json: {\n    html: markdownParaHtml(parte),\n    texto_simples: escapar(parte),\n  },\n}));\n" },
     position: [4340, 540],
   },
-  output: [{ html: 'Bom dia, <b>Bráulio</b>!', texto_simples: 'Bom dia, **Bráulio**!' }],
+  output: [{ html: 'Bom dia, <b>Carlos</b>!', texto_simples: 'Bom dia, **Carlos**!' }],
 });
 
 const enviarTexto = node({
@@ -2189,7 +2189,7 @@ const enviarTexto = node({
     onError: 'continueErrorOutput',
     position: [4580, 540],
   },
-  output: [{ ok: true, result: { message_id: 44, text: 'Bom dia, Bráulio!', chat: { id: 111111111, type: 'private' }, date: 1790460005 } }],
+  output: [{ ok: true, result: { message_id: 44, text: 'Bom dia, Carlos!', chat: { id: 111111111, type: 'private' }, date: 1790460005 } }],
 });
 
 const enviarTextoSimples = node({
@@ -2208,7 +2208,7 @@ const enviarTextoSimples = node({
     onError: 'continueRegularOutput',
     position: [4820, 700],
   },
-  output: [{ ok: true, result: { message_id: 45, text: 'Bom dia, **Bráulio**!', chat: { id: 111111111, type: 'private' }, date: 1790460006 } }],
+  output: [{ ok: true, result: { message_id: 45, text: 'Bom dia, **Carlos**!', chat: { id: 111111111, type: 'private' }, date: 1790460006 } }],
 });
 
 const registrar = node({
@@ -2266,14 +2266,15 @@ const registrar = node({
 const notaConfiguracao = sticky(
   '## 🤖 Kira 1.0 — assistente pessoal no Telegram\n\n' +
     '**Antes de ativar:**\n' +
-    '1. **Gemini (grátis)** — crie uma chave em aistudio.google.com e selecione essa credencial nos nós *Gemini (principal)*, *Gemini (reserva)*, *Transcrever áudio (Gemini)* e *Gerar voz (Gemini)*.\n' +
-    '2. **Voz** — usa a mesma chave do Gemini (voz *Kore*). Para trocar, edite **voz_tts** e **modelo_voz** no nó *Configuração da Kira*.\n' +
-    '3. **Seu ID** — ative o workflow e mande “oi” para o bot: ele responde com o seu ID. Cole em **ids_autorizados** no nó *Configuração da Kira* e salve.\n' +
-    '4. **Outlook** (opcional) — credencial Microsoft nas ferramentas *emails_recentes*, *buscar_emails*, *ler_email*, *agenda* e *criar_rascunho_resposta*. A Kira lê e cria rascunhos; nunca envia.\n' +
-    '5. **Google Drive e LinkedIn** (opcionais) — credenciais em *buscar_arquivos_drive*, *ler_arquivo_drive* e *Publicar no LinkedIn* (este só roda com o comando /publicar).\n' +
-    '6. **Ambientes** — campos **ambientes** (JSON) e **ambiente_padrao** no nó *Ambientes da Kira*. Troca por mensagem: "modo <nome>".\n\n' +
+    '1. **Telegram** — credencial com o token do bot da Kira (@BotFather), selecionada em todos os nós do Telegram (gatilho, envios e downloads).\n' +
+    '2. **Gemini (grátis)** — crie uma chave em aistudio.google.com e selecione essa credencial nos nós *Gemini (principal)*, *Gemini (reserva)*, *Transcrever áudio (Gemini)* e *Gerar voz (Gemini)*.\n' +
+    '3. **Voz** — usa a mesma chave do Gemini (voz *Kore*). Para trocar, edite **voz_tts** e **modelo_voz** no nó *Configuração da Kira*.\n' +
+    '4. **Seu ID** — ative o workflow e mande “oi” para o bot: ele responde com o seu ID. Cole em **ids_autorizados** no nó *Configuração da Kira* e salve. Em **nome_dono**, escreva como quer ser chamado (vazio = o seu nome no Telegram).\n' +
+    '5. **Outlook** (opcional) — credencial Microsoft nas ferramentas *emails_recentes*, *buscar_emails*, *ler_email*, *agenda* e *criar_rascunho_resposta*. A Kira lê e cria rascunhos; nunca envia.\n' +
+    '6. **Google Drive e LinkedIn** (opcionais) — credenciais em *buscar_arquivos_drive*, *ler_arquivo_drive* e *Publicar no LinkedIn* (este só roda com o comando /publicar).\n' +
+    '7. **Ambientes** — campos **ambientes** (JSON) e **ambiente_padrao** no nó *Ambientes da Kira*. Troca por mensagem: "modo <nome>".\n\n' +
     'Guia completo: `docs/configuracao.md` no repositório KIRA.',
-  { color: 4, position: [-80, -280], width: 600, height: 560, name: 'Leia antes de ativar' },
+  { color: 4, position: [-80, -280], width: 600, height: 640, name: 'Leia antes de ativar' },
 );
 
 export default workflow('kira-1-0', 'Kira 1.0 — Assistente pessoal (Telegram + Gemini)', { executionOrder: 'v1', timezone: 'America/Sao_Paulo' })

@@ -170,7 +170,7 @@ O que você já guardou sobre o {{ $json.nome }} neste ambiente e em geral (form
 
 | Você | Kira |
 | --- | --- |
-| 🎙️ "Kira, bom dia. Você está online?" | 🔊 "Bom dia, Bráulio! Sim, estou online e pronta para ajudar." |
+| 🎙️ "Kira, bom dia. Você está online?" | 🔊 "Bom dia, (seu nome)! Sim, estou online e pronta para ajudar." |
 | "Kira, lembre que eu prefiro respostas curtas." | Guarda a memória e confirma em uma frase. |
 | "Kira, esqueça a memória 3." | Apaga e confirma. |
 | "Como estou na minha meta?" | Explica que ainda não tem acesso aos seus dados financeiros e oferece ajuda com números que você informar. |

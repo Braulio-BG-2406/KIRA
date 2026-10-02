@@ -29,7 +29,7 @@ const configuracao = node({
       includeOtherFields: false,
       assignments: {
         assignments: [
-          { id: 'c-nome', name: 'nome_dono', value: 'Bráulio', type: 'string' },
+          { id: 'c-nome', name: 'nome_dono', value: 'Seu nome', type: 'string' },
           { id: 'c-chat', name: 'chat_id', value: '', type: 'string' },
           { id: 'c-desde', name: 'ativo_desde', value: '', type: 'string' },
           { id: 'c-janela', name: 'horas_janela', value: 72, type: 'number' },
@@ -40,7 +40,7 @@ const configuracao = node({
     },
     position: [220, 300],
   },
-  output: [{ nome_dono: 'Bráulio', chat_id: '111111111', ativo_desde: '2026-09-27T21:00:00-03:00', horas_janela: 72, max_por_execucao: 5, dias_guardar: 10 }],
+  output: [{ nome_dono: 'Carlos', chat_id: '111111111', ativo_desde: '2026-09-27T21:00:00-03:00', horas_janela: 72, max_por_execucao: 5, dias_guardar: 10 }],
 });
 
 const quemSouEu = node({
@@ -255,7 +255,7 @@ const kiraResponde = node({
     onError: 'continueErrorOutput',
     position: [1320, 300],
   },
-  output: [{ output: '{"responder": true, "motivo": "pergunta de prazo", "consultou": true, "resumo": "Pedido 123456 com previsão para 10/10", "resposta": "Olá, Ana!\\n\\nO pedido 123456 está com previsão de entrega para 10/10.\\n\\nAtenciosamente,\\nBráulio"}' }],
+  output: [{ output: '{"responder": true, "motivo": "pergunta de prazo", "consultou": true, "resumo": "Pedido 123456 com previsão para 10/10", "resposta": "Olá, Ana!\\n\\nO pedido 123456 está com previsão de entrega para 10/10.\\n\\nAtenciosamente,\\nCarlos"}' }],
 });
 
 const interpretarResposta = node({
@@ -496,7 +496,7 @@ const nota = sticky(
     '- Pula e-mails automáticos, os que você mesmo mandou e os que você já respondeu.\n' +
     '- Cada e-mail é analisado uma vez só (tabela `kira_emails_auto`, guardada por 10 dias).\n' +
     '- O que a base não tem fica marcado como **[confirmar]**.\n' +
-    '- Configuração: `chat_id` (seu ID do Telegram) e `ativo_desde` (só e-mails depois dessa data).',
+    '- Configuração: `nome_dono` (como a Kira chama você), `chat_id` (seu ID do Telegram) e `ativo_desde` (só e-mails depois dessa data).',
   { color: 4, position: [-40, -60], width: 700, height: 300, name: 'Sobre este workflow' },
 );
 

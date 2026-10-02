@@ -152,7 +152,7 @@ Todas as tabelas também têm `id`, `createdAt` e `updatedAt`, criados pelo n8n.
 - Só IDs listados em `ids_autorizados`, e só no chat privado.
 - Tokens e chaves ficam nas credenciais do n8n; o workflow e este repositório não têm segredos (`npm test` verifica).
 - O workflow versionado não inclui o caminho do webhook.
-- Este repositório é público: o perfil pessoal (`perfil_dono`) fica preenchido só no n8n.
+- Este repositório é público: o nome e o perfil pessoal (`nome_dono`, `perfil_dono`) e as credenciais ficam só no n8n.
 
 ## Limitações conhecidas da 1.0
 

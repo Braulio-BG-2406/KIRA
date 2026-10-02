@@ -16,12 +16,7 @@
         ],
         "additionalFields": {}
       },
-      "credentials": {
-        "telegramApi": {
-          "id": "ox55jLJMBQJ3Pxnc",
-          "name": "Telegram account"
-        }
-      }
+      "credentials": {}
     },
     {
       "id": "63a6e9ab-ca9f-4f2e-a791-713b12f539fa",
@@ -41,7 +36,7 @@
             {
               "id": "cfg-nome-dono",
               "name": "nome_dono",
-              "value": "Bráulio",
+              "value": "",
               "type": "string"
             },
             {
@@ -241,12 +236,7 @@
         "chatId": "={{ $json.chat_id }}",
         "action": "={{ $json.responder_em_voz ? 'record_voice' : 'typing' }}"
       },
-      "credentials": {
-        "telegramApi": {
-          "id": "ox55jLJMBQJ3Pxnc",
-          "name": "Telegram account"
-        }
-      },
+      "credentials": {},
       "onError": "continueRegularOutput"
     },
     {
@@ -609,12 +599,7 @@
         "download": true,
         "additionalFields": {}
       },
-      "credentials": {
-        "telegramApi": {
-          "id": "ox55jLJMBQJ3Pxnc",
-          "name": "Telegram account"
-        }
-      },
+      "credentials": {},
       "onError": "continueErrorOutput"
     },
     {
@@ -844,12 +829,7 @@
           "mimeType": "={{ $('Normalizar entrada').first().json.audio_mime }}"
         }
       },
-      "credentials": {
-        "telegramApi": {
-          "id": "ox55jLJMBQJ3Pxnc",
-          "name": "Telegram account"
-        }
-      },
+      "credentials": {},
       "onError": "continueRegularOutput"
     },
     {
@@ -3258,12 +3238,7 @@
           "duration": "={{ $('Preparar áudio (WAV)').first().json.segundos }}"
         }
       },
-      "credentials": {
-        "telegramApi": {
-          "id": "ox55jLJMBQJ3Pxnc",
-          "name": "Telegram account"
-        }
-      },
+      "credentials": {},
       "onError": "continueErrorOutput"
     },
     {
@@ -3460,12 +3435,7 @@
           "parse_mode": "HTML"
         }
       },
-      "credentials": {
-        "telegramApi": {
-          "id": "ox55jLJMBQJ3Pxnc",
-          "name": "Telegram account"
-        }
-      },
+      "credentials": {},
       "onError": "continueErrorOutput"
     },
     {
@@ -3487,12 +3457,7 @@
           "parse_mode": "HTML"
         }
       },
-      "credentials": {
-        "telegramApi": {
-          "id": "ox55jLJMBQJ3Pxnc",
-          "name": "Telegram account"
-        }
-      },
+      "credentials": {},
       "onError": "continueRegularOutput"
     },
     {
@@ -3505,10 +3470,10 @@
         -280
       ],
       "parameters": {
-        "content": "## 🤖 Kira 1.0 — assistente pessoal no Telegram\n\n**Antes de ativar:**\n1. **Gemini (grátis)** — crie uma chave em aistudio.google.com e selecione essa credencial nos nós *Gemini (principal)*, *Gemini (reserva)*, *Transcrever áudio (Gemini)* e *Gerar voz (Gemini)*.\n2. **Voz** — usa a mesma chave do Gemini (voz *Kore*). Para trocar, edite **voz_tts** e **modelo_voz** no nó *Configuração da Kira*.\n3. **Seu ID** — ative o workflow e mande “oi” para o bot: ele responde com o seu ID. Cole em **ids_autorizados** no nó *Configuração da Kira* e salve.\n4. **Outlook** (opcional) — credencial Microsoft nas ferramentas *emails_recentes*, *buscar_emails*, *ler_email*, *agenda* e *criar_rascunho_resposta*. A Kira lê e cria rascunhos; nunca envia.\n5. **Google Drive e LinkedIn** (opcionais) — credenciais em *buscar_arquivos_drive*, *ler_arquivo_drive* e *Publicar no LinkedIn* (este só roda com o comando /publicar).\n6. **Ambientes** — campos **ambientes** (JSON) e **ambiente_padrao** no nó *Ambientes da Kira*. Troca por mensagem: \"modo <nome>\".\n\nGuia completo: `docs/configuracao.md` no repositório KIRA.",
+        "content": "## 🤖 Kira 1.0 — assistente pessoal no Telegram\n\n**Antes de ativar:**\n1. **Telegram** — credencial com o token do bot da Kira (@BotFather), selecionada em todos os nós do Telegram (gatilho, envios e downloads).\n2. **Gemini (grátis)** — crie uma chave em aistudio.google.com e selecione essa credencial nos nós *Gemini (principal)*, *Gemini (reserva)*, *Transcrever áudio (Gemini)* e *Gerar voz (Gemini)*.\n3. **Voz** — usa a mesma chave do Gemini (voz *Kore*). Para trocar, edite **voz_tts** e **modelo_voz** no nó *Configuração da Kira*.\n4. **Seu ID** — ative o workflow e mande “oi” para o bot: ele responde com o seu ID. Cole em **ids_autorizados** no nó *Configuração da Kira* e salve. Em **nome_dono**, escreva como quer ser chamado (vazio = o seu nome no Telegram).\n5. **Outlook** (opcional) — credencial Microsoft nas ferramentas *emails_recentes*, *buscar_emails*, *ler_email*, *agenda* e *criar_rascunho_resposta*. A Kira lê e cria rascunhos; nunca envia.\n6. **Google Drive e LinkedIn** (opcionais) — credenciais em *buscar_arquivos_drive*, *ler_arquivo_drive* e *Publicar no LinkedIn* (este só roda com o comando /publicar).\n7. **Ambientes** — campos **ambientes** (JSON) e **ambiente_padrao** no nó *Ambientes da Kira*. Troca por mensagem: \"modo <nome>\".\n\nGuia completo: `docs/configuracao.md` no repositório KIRA.",
         "color": 4,
         "width": 600,
-        "height": 560
+        "height": 640
       }
     }
   ],

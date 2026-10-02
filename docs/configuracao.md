@@ -24,7 +24,7 @@ Prefere rodar na VPS? Veja [Rodar na VPS](#rodar-na-vps-opcional) no fim.
 
 ## 1. Bot do Telegram
 
-O workflow usa a credencial **Telegram account**, que já existia no seu n8n. Confirme que ela tem o token do bot da Kira:
+A Kira usa uma credencial do Telegram (**Telegram account**) com o token do bot dela. Depois de importar o workflow, selecione essa credencial em todos os nós do Telegram (o gatilho e os de envio e download). O token vem do **@BotFather**:
 
 - No Telegram, fale com o **@BotFather** → `/mybots` → escolha o bot → **API Token**.
 - Se ainda não existe um bot só para a Kira: **@BotFather** → `/newbot` → nome `Kira` → um username terminado em `bot` → copie o token e coloque na credencial **Telegram account** do n8n (Overview → Credentials).
@@ -94,7 +94,7 @@ A partir daí a Kira só conversa com você, e só no chat privado. Qualquer out
 ## 6. Primeiro teste 🎙️
 
 1. Grave um áudio no chat da Kira: **"Kira, bom dia. Você está online?"**
-2. No topo do chat aparece que ela está gravando; em seguida chega um áudio **Kira** com algo como *"Bom dia, Bráulio! Sim, estou online e pronta para ajudar."* e o texto na legenda.
+2. No topo do chat aparece que ela está gravando; em seguida chega um áudio **Kira** com algo como *"Bom dia, (seu nome)! Sim, estou online e pronta para ajudar."* e o texto na legenda.
 
 Depois, teste também:
 
@@ -130,7 +130,7 @@ Workflow separado: **Kira — Resumo da manhã (7h)** ([`n8n/workflows/kira-resu
 3. pede ao Gemini um resumo curto em seis seções: Brasil, Mundo, Mercado financeiro, Mineração/petróleo/siderurgia/florestal, Política e Tecnologia e tendências, cada item com o link da fonte;
 4. manda no Telegram e, logo depois, um **áudio na voz da Kira** (cerca de um minuto e meio, com os destaques). Se o Gemini falhar, manda só os títulos com link.
 
-Para configurar: no nó **Configuração do resumo**, preencha `chat_id` (o seu ID do Telegram, o mesmo de `ids_autorizados`) e publique. As fontes ficam no nó **Fontes** (seção, nome, endereço do RSS e limite) e a lista de veículos aceitos, no nó **Selecionar notícias**. O áudio usa a voz `Kore` e o modelo `gemini-3.8-flash-tts`; para trocar, crie os campos `voz_tts` e `modelo_voz` na **Configuração do resumo**. Tudo usa serviços gratuitos.
+Para configurar: selecione as credenciais do Telegram (nos três nós de envio) e do Gemini (nos três nós do Gemini); no nó **Configuração do resumo**, preencha `chat_id` (o seu ID do Telegram, o mesmo de `ids_autorizados`) e `nome_dono` (como a Kira chama você); depois publique. As fontes ficam no nó **Fontes** (seção, nome, endereço do RSS e limite) e a lista de veículos aceitos, no nó **Selecionar notícias**. O áudio usa a voz `Kore` e o modelo `gemini-3.8-flash-tts`; para trocar, crie os campos `voz_tts` e `modelo_voz` na **Configuração do resumo**. Tudo usa serviços gratuitos.
 
 ## 9. Google Drive (só leitura)
 
@@ -232,7 +232,7 @@ Para remetentes de fora da empresa, ela fala só dos pedidos que a pessoa citou,
 
 1. Crie a tabela `kira_emails_auto` com as colunas `message_id`, `status` e `motivo` (texto). Cada e-mail é analisado uma vez só; os registros são apagados depois de 10 dias.
 2. Importe o workflow e selecione as credenciais: *Microsoft Outlook* (nos dois nós HTTP), *Gemini* (nos dois modelos) e *Telegram* (nos dois avisos).
-3. No nó **Configuração**, preencha `chat_id` (o seu ID do Telegram) e `ativo_desde` (data e hora a partir da qual os e-mails contam, por exemplo `2026-09-28T07:00:00-03:00`; vazio = últimas 72 horas).
+3. No nó **Configuração**, preencha `nome_dono` (como a Kira chama você), `chat_id` (o seu ID do Telegram) e `ativo_desde` (data e hora a partir da qual os e-mails contam, por exemplo `2026-09-28T07:00:00-03:00`; vazio = últimas 72 horas).
 4. Na ferramenta **consultar_pedidos**, selecione o sub-workflow de pedidos e, no nó **Criar rascunho**, o sub-workflow do rascunho com assinatura (passo 17). Nos dois, em **Settings → This workflow can be called by**, libere também este workflow. Publique.
 
 Se o Outlook parar de responder (por exemplo, credencial expirada), a Kira avisa no Telegram no máximo uma vez por dia.
@@ -323,7 +323,7 @@ Tudo fica no nó **Configuração da Kira**:
 
 | Campo | Padrão | Para que serve |
 | --- | --- | --- |
-| `nome_dono` | Bráulio | Como a Kira chama você |
+| `nome_dono` | vazio | Como a Kira chama você. Vazio = o seu primeiro nome no Telegram |
 | `ids_autorizados` | vazio | IDs do Telegram liberados, separados por vírgula. Vazio = modo de configuração |
 | `modo_voz` | `espelho` | `espelho`: áudio quando você manda áudio, texto quando você escreve. `sempre`: sempre áudio. `nunca`: sempre texto |
 | `voz_tts` | `Kore` | Voz do Gemini usada nas respostas faladas |

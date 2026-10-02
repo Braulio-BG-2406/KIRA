@@ -40,7 +40,7 @@
             {
               "id": "r-nome",
               "name": "nome_dono",
-              "value": "Bráulio",
+              "value": "Seu nome",
               "type": "string"
             },
             {
@@ -183,12 +183,7 @@
           "includeMergedResponse": true
         }
       },
-      "credentials": {
-        "googlePalmApi": {
-          "id": "AozFk3svOpYjS2K7",
-          "name": "Google Gemini(PaLM) Api account"
-        }
-      },
+      "credentials": {},
       "retryOnFail": true,
       "maxTries": 2,
       "waitBetweenTries": 5000,
@@ -229,12 +224,7 @@
           "disable_web_page_preview": true
         }
       },
-      "credentials": {
-        "telegramApi": {
-          "id": "ox55jLJMBQJ3Pxnc",
-          "name": "Telegram account"
-        }
-      },
+      "credentials": {},
       "onError": "continueErrorOutput"
     },
     {
@@ -287,12 +277,7 @@
           "includeMergedResponse": true
         }
       },
-      "credentials": {
-        "googlePalmApi": {
-          "id": "AozFk3svOpYjS2K7",
-          "name": "Google Gemini(PaLM) Api account"
-        }
-      },
+      "credentials": {},
       "retryOnFail": true,
       "maxTries": 2,
       "waitBetweenTries": 5000,
@@ -319,12 +304,7 @@
           "timeout": 120000
         }
       },
-      "credentials": {
-        "googlePalmApi": {
-          "id": "AozFk3svOpYjS2K7",
-          "name": "Google Gemini(PaLM) Api account"
-        }
-      },
+      "credentials": {},
       "retryOnFail": true,
       "maxTries": 2,
       "waitBetweenTries": 5000,
@@ -387,12 +367,7 @@
           "duration": "={{ $('Preparar áudio (WAV)').first().json.segundos }}"
         }
       },
-      "credentials": {
-        "telegramApi": {
-          "id": "ox55jLJMBQJ3Pxnc",
-          "name": "Telegram account"
-        }
-      },
+      "credentials": {},
       "onError": "continueRegularOutput"
     },
     {
@@ -430,12 +405,7 @@
           "disable_web_page_preview": true
         }
       },
-      "credentials": {
-        "telegramApi": {
-          "id": "ox55jLJMBQJ3Pxnc",
-          "name": "Telegram account"
-        }
-      },
+      "credentials": {},
       "onError": "continueRegularOutput"
     },
     {

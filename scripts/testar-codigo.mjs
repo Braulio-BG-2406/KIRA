@@ -56,7 +56,7 @@ function htmlValidoParaTelegram(html) {
 }
 
 const config = {
-  nome_dono: 'Bráulio',
+  nome_dono: 'Carlos',
   modo_voz: 'espelho',
   voz_tts: 'pt-BR-Chirp3-HD-Kore',
   max_caracteres_voz: 1500,
@@ -69,7 +69,7 @@ const ambienteAtivo = { ambiente: 'TRABALHO', ambiente_nome: 'Trabalho', ambient
 const entradaNormalizada = {
   chat_id: '111',
   user_id: '111',
-  nome_usuario: 'Bráulio',
+  nome_usuario: 'Carlos',
   texto: 'Kira, bom dia. Você está online?',
   comando: '',
   tipo_entrada: 'voz',
@@ -99,7 +99,7 @@ function teste(nome, fn) {
 const partes = (texto) => executar(codigoDo('Dividir mensagem'), { nosAnteriores: { 'Resposta pronta': { texto } } });
 
 for (const [nome, markdown, esperado] of [
-  ['texto simples', 'Bom dia, Bráulio! Sim, estou online.', 'Bom dia, Bráulio! Sim, estou online.'],
+  ['texto simples', 'Bom dia, Carlos! Sim, estou online.', 'Bom dia, Carlos! Sim, estou online.'],
   ['escapa HTML', '2 < 3 & 5 > 4', '2 &lt; 3 &amp; 5 &gt; 4'],
   ['negrito e itálico', '**Meta** e *foco* e __ok__ e _sim_', '<b>Meta</b> e <i>foco</i> e <b>ok</b> e <i>sim</i>'],
   ['código', 'Use `a < b` aqui', 'Use <code>a &lt; b</code> aqui'],
@@ -142,10 +142,10 @@ const preparar = (envelope) =>
   })[0];
 
 teste('resposta: responde por voz quando pedido e o texto é curto', () => {
-  const r = preparar({ texto_resposta: 'Bom dia, Bráulio! ☀️ Sim, estou **online**.', modo_resposta: 'voz', status: 'ok' });
+  const r = preparar({ texto_resposta: 'Bom dia, Carlos! ☀️ Sim, estou **online**.', modo_resposta: 'voz', status: 'ok' });
   assert.equal(r.modo_resposta, 'voz');
-  assert.equal(r.texto_fala, 'Bom dia, Bráulio! Sim, estou online.');
-  assert.equal(r.legenda, 'Bom dia, Bráulio! ☀️ Sim, estou online.');
+  assert.equal(r.texto_fala, 'Bom dia, Carlos! Sim, estou online.');
+  assert.equal(r.legenda, 'Bom dia, Carlos! ☀️ Sim, estou online.');
   assert.equal(r.chat_id, '111');
   assert.equal(r.erro, '');
 });
@@ -468,7 +468,7 @@ teste('resumo: todas as seções têm fontes e o Gemini não inventa (só usa a 
 teste('resumo: reserva sem IA monta títulos com link', () => {
   const selecao = { noticias: [{ secao: 'Mundo', fonte: 'BBC', titulo: 'Fato', link: 'https://x/1' }] };
   const [r] = executar(nosResumo['Resumo reserva (só títulos)'].parameters.jsCode, {
-    nosAnteriores: { 'Selecionar notícias': selecao, 'Configuração do resumo': { nome_dono: 'Bráulio' } },
+    nosAnteriores: { 'Selecionar notícias': selecao, 'Configuração do resumo': { nome_dono: 'Carlos' } },
   });
   const [m] = executar(nosResumo['Montar mensagem'].parameters.jsCode, { entrada: [r] });
   assert.match(m.html, /• Fato \(<a href="https:\/\/x\/1">BBC<\/a>\)/);
@@ -524,12 +524,12 @@ teste('resumo: depois do texto vem o áudio da Kira (roteiro + voz do Gemini)', 
   assert.equal(nosResumo['Enviar áudio do resumo'].parameters.operation, 'sendAudio');
   const anteriores = {
     'Resumir (Gemini)': { mergedResponse: '- Fato ([g1](https://g1.globo.com/a)) e https://x.com/b' },
-    'Configuração do resumo': { nome_dono: 'Bráulio' },
+    'Configuração do resumo': { nome_dono: 'Carlos' },
   };
   const $ = (nome) => ({ isExecuted: nome in anteriores, first: () => ({ json: anteriores[nome] }) });
   const [voz] = new Function('$', nosResumo['Texto para a voz'].parameters.jsCode)($).map((i) => i.json);
   assert.equal(voz.resumo, '- Fato (g1) e');
-  assert.equal(voz.nome, 'Bráulio');
+  assert.equal(voz.nome, 'Carlos');
 });
 
 teste('resumo: repositório sem chat_id preenchido', () => {
@@ -920,7 +920,7 @@ function rodarRascunho(nome, { entrada = {}, nosAnteriores = {} } = {}) {
     $,
   );
 }
-const pedidoDeRascunho = { 'Quando pedirem um rascunho de resposta': { id_email: ' AAMk= ', texto: 'Olá, Ana!\nO pedido <1> sai & chega "sexta".\n\nAtenciosamente,\nBráulio', referencia: '<a@t>' } };
+const pedidoDeRascunho = { 'Quando pedirem um rascunho de resposta': { id_email: ' AAMk= ', texto: 'Olá, Ana!\nO pedido <1> sai & chega "sexta".\n\nAtenciosamente,\nCarlos', referencia: '<a@t>' } };
 const assinaturaDeTeste = { email: 'dono@empresa.com.br', imagem_drive: 'assinatura', largura_maxima: 600 };
 const imagemAchada = (mimeType, size) => ({ files: [{ id: 'img1', name: 'assinatura.png', mimeType, size: String(size) }] });
 // procura = saída de "Procurar imagem da assinatura"; "Montar resposta" recebe a imagem em base64
@@ -936,7 +936,7 @@ teste('assinatura: texto em HTML seguro, imagem reduzida para 600 px e e-mail em
   assert.equal(r.json.referencia, '<a@t>');
   assert.equal(
     r.json.comentario,
-    'Olá, Ana!<br>O pedido &lt;1&gt; sai &amp; chega &quot;sexta&quot;.<br><br>Atenciosamente,<br>Bráulio<br><br>' +
+    'Olá, Ana!<br>O pedido &lt;1&gt; sai &amp; chega &quot;sexta&quot;.<br><br>Atenciosamente,<br>Carlos<br><br>' +
       '<img src="cid:assinatura-kira" alt="Assinatura" width="600" height="150" style="border:0"><br>' +
       '<a href="mailto:dono@empresa.com.br">dono@empresa.com.br</a>',
   );
@@ -945,7 +945,7 @@ teste('assinatura: texto em HTML seguro, imagem reduzida para 600 px e e-mail em
 teste('assinatura: sem a imagem no Google Drive (ou imagem inválida), sai só o e-mail, com aviso', async () => {
   let [r] = await montarRascunho({ files: [] });
   assert.equal(r.json.imagem, null);
-  assert.ok(r.json.comentario.endsWith('Bráulio<br><br><a href="mailto:dono@empresa.com.br">dono@empresa.com.br</a>'));
+  assert.ok(r.json.comentario.endsWith('Carlos<br><br><a href="mailto:dono@empresa.com.br">dono@empresa.com.br</a>'));
   assert.match(r.json.aviso, /não achei no Google Drive a imagem da assinatura \(PNG, JPG ou GIF com "assinatura" no nome\)/);
   [r] = await montarRascunho({ error: { message: '401 Unauthorized' } });
   assert.match(r.json.aviso, /não consegui procurar a imagem da assinatura no Google Drive \(401 Unauthorized\)/);
@@ -1180,7 +1180,7 @@ teste('rascunhos: corta o histórico citado, marca "só em cópia" e sem saber o
 teste('rascunhos: a resposta da Kira vira rascunho só quando vem no formato combinado', () => {
   const email = { chave: '<a1@teste>', id: 'a1', assunto: 'Pedido 1' };
   const interpretar = (output) => executarRA('Interpretar resposta', { nosAnteriores: { 'Separar e-mails': email }, json: { output } }).json;
-  let r = interpretar('```json\n{"responder": true, "resumo": "Previsão [confirmar]", "resposta": "Olá!\\nVerificando [confirmar].\\nBráulio", "consultou": true}\n```');
+  let r = interpretar('```json\n{"responder": true, "resumo": "Previsão [confirmar]", "resposta": "Olá!\\nVerificando [confirmar].\\nCarlos", "consultou": true}\n```');
   assert.equal(r.responder, true);
   assert.equal(r.confirmar, 1);
   assert.equal(r.chave, '<a1@teste>');

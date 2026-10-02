@@ -92,7 +92,7 @@ Os testes executam o código dos nós dos workflows (formatação para o Telegra
 ## Segurança
 
 - Tokens e chaves de API ficam **só nas credenciais do n8n**. Nunca no chat, no código ou neste repositório.
-- Este repositório é **público**: o perfil pessoal da Kira, os IDs do Telegram e do LinkedIn e os IDs dos sub-workflows ficam preenchidos apenas no n8n.
+- Este repositório é **público**: o seu nome, o perfil pessoal da Kira, as credenciais, os IDs do Telegram e do LinkedIn e os IDs dos sub-workflows ficam preenchidos apenas no n8n.
 - Nada sai em seu nome sem você: e-mails ficam como rascunho (inclusive os automáticos), posts só vão para o LinkedIn com `/publicar N` e mensagens no Teams só saem quando você pede.
 - Os ambientes não se misturam: memórias, histórico, tarefas e contatos de um ambiente não aparecem em outro sem você autorizar. A planilha do negócio só é lida no modo Negócios e o Power BI só no modo Trabalho (a trava fica no sub-workflow, com o ambiente vindo do workflow, não da IA).
 

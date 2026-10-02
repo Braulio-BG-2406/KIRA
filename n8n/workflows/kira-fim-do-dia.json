@@ -1,0 +1,617 @@
+{
+  "name": "Kira — Fim do Dia (18h)",
+  "nodes": [
+    {
+      "id": "78d5a669-4f9b-4869-af5d-6876a14dac2d",
+      "name": "Seg a sex às 18h",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 18 * * 1-5"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "20509957-f3d3-473a-a73f-87b00de1f53d",
+      "name": "Configuração do fim do dia",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        300
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f-nome",
+              "name": "nome_dono",
+              "value": "Seu nome",
+              "type": "string"
+            },
+            {
+              "id": "f-chat",
+              "name": "chat_id",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "f-user",
+              "name": "user_id",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "f-amb",
+              "name": "ambiente",
+              "value": "TRABALHO",
+              "type": "string"
+            },
+            {
+              "id": "f-amb-nome",
+              "name": "ambiente_nome",
+              "value": "Trabalho",
+              "type": "string"
+            },
+            {
+              "id": "f-fuso",
+              "name": "fuso_horario",
+              "value": "America/Sao_Paulo",
+              "type": "string"
+            },
+            {
+              "id": "f-max",
+              "name": "max_itens",
+              "value": 8,
+              "type": "number"
+            },
+            {
+              "id": "f-hoje",
+              "name": "hoje",
+              "value": "={{ $now.setZone('America/Sao_Paulo').toFormat('yyyy-MM-dd') }}",
+              "type": "string"
+            },
+            {
+              "id": "f-hoje-ext",
+              "name": "hoje_extenso",
+              "value": "={{ $now.setZone('America/Sao_Paulo').setLocale('pt-BR').toFormat('cccc, dd/MM') }}",
+              "type": "string"
+            },
+            {
+              "id": "f-inicio",
+              "name": "inicio_hoje_utc",
+              "value": "={{ $now.setZone('America/Sao_Paulo').startOf('day').toUTC().toISO({ suppressMilliseconds: true }) }}",
+              "type": "string"
+            },
+            {
+              "id": "f-prox",
+              "name": "proximo_dia",
+              "value": "={{ (() => { const d = $now.setZone('America/Sao_Paulo').startOf('day'); return d.plus({ days: d.weekday === 5 ? 3 : d.weekday === 6 ? 2 : 1 }).toISO({ suppressMilliseconds: true }); })() }}",
+              "type": "string"
+            },
+            {
+              "id": "f-prox-rotulo",
+              "name": "proximo_dia_rotulo",
+              "value": "={{ (() => { const d = $now.setZone('America/Sao_Paulo').startOf('day'); const mais = d.weekday === 5 ? 3 : d.weekday === 6 ? 2 : 1; const t = d.plus({ days: mais }).setLocale('pt-BR').toFormat('cccc, dd/MM'); return mais === 1 ? 'Amanhã, ' + t : t.charAt(0).toUpperCase() + t.slice(1); })() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "223ba5f0-917a-4834-aa86-a04cfb9a78b1",
+      "name": "Quem sou eu",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        300
+      ],
+      "parameters": {
+        "url": "https://graph.microsoft.com/v1.0/me",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "microsoftOutlookOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "$select",
+              "value": "mail,userPrincipalName"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "credentials": {},
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "0a3a1fe5-6af5-449f-a441-1d4170652d55",
+      "name": "E-mails de hoje",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        300
+      ],
+      "parameters": {
+        "url": "https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "microsoftOutlookOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "$filter",
+              "value": "={{ 'receivedDateTime ge ' + $('Configuração do fim do dia').first().json.inicio_hoje_utc }}"
+            },
+            {
+              "name": "$orderby",
+              "value": "receivedDateTime desc"
+            },
+            {
+              "name": "$top",
+              "value": "50"
+            },
+            {
+              "name": "$select",
+              "value": "id,subject,from,sender,toRecipients,receivedDateTime,importance,isRead,inferenceClassification"
+            },
+            {
+              "name": "$expand",
+              "value": "singleValueExtendedProperties($filter=id eq 'Integer 0x1081')"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "credentials": {},
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "9dae3044-413e-440b-aeed-c9a380727004",
+      "name": "Rascunhos",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        300
+      ],
+      "parameters": {
+        "url": "https://graph.microsoft.com/v1.0/me/mailFolders/drafts/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "microsoftOutlookOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "$orderby",
+              "value": "lastModifiedDateTime desc"
+            },
+            {
+              "name": "$top",
+              "value": "50"
+            },
+            {
+              "name": "$select",
+              "value": "lastModifiedDateTime"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "credentials": {},
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "bed3fc51-0780-4932-a971-079edeb91d94",
+      "name": "Agenda do próximo dia útil",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        300
+      ],
+      "parameters": {
+        "url": "https://graph.microsoft.com/v1.0/me/calendarView",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "microsoftOutlookOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "startDateTime",
+              "value": "={{ $('Configuração do fim do dia').first().json.proximo_dia }}"
+            },
+            {
+              "name": "endDateTime",
+              "value": "={{ DateTime.fromISO($('Configuração do fim do dia').first().json.proximo_dia).plus({ days: 1 }).toISO() }}"
+            },
+            {
+              "name": "$orderby",
+              "value": "start/dateTime"
+            },
+            {
+              "name": "$top",
+              "value": "30"
+            },
+            {
+              "name": "$select",
+              "value": "subject,start,end,location,isAllDay,isCancelled"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "outlook.timezone=\"E. South America Standard Time\""
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "credentials": {},
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "f29e3ec6-e4b0-4e8e-a1e7-f858e9a1c893",
+      "name": "Tarefas abertas",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1320,
+        300
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "kira_tarefas"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "user_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Configuração do fim do dia').first().json.user_id }}"
+            },
+            {
+              "keyName": "contexto",
+              "condition": "eq",
+              "keyValue": "={{ $('Configuração do fim do dia').first().json.ambiente }}"
+            },
+            {
+              "keyName": "status",
+              "condition": "eq",
+              "keyValue": "aberta"
+            }
+          ]
+        },
+        "returnAll": true
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "ed96c4ed-7a4e-4fa0-ae77-fb8735875e7d",
+      "name": "Pedidos atrasados",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1540,
+        300
+      ],
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": ""
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "busca": "",
+            "tipo": "atrasados",
+            "limite": 1
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "busca",
+              "displayName": "busca",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "tipo",
+              "displayName": "tipo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "limite",
+              "displayName": "limite",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "54fdd211-abe3-438e-a3cd-76d75639a4e8",
+      "name": "Montar mensagem",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Monta a mensagem do fim do dia (HTML do Telegram): agenda do próximo dia útil, e-mails de hoje sem resposta,\n// rascunhos, tarefas abertas do ambiente de trabalho e pedidos atrasados. Uma parte que falhar vira um aviso curto,\n// sem derrubar o resto.\nconst cfg = $('Configuração do fim do dia').first().json;\nconst esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nconst corta = (s, n) => {\n  const t = String(s ?? '').replace(/\\s+/g, ' ').trim();\n  return t.length > n ? t.slice(0, n - 1) + '…' : t;\n};\nconst resposta = (no) => {\n  try {\n    return $(no).first()?.json ?? {};\n  } catch (e) {\n    return { error: { message: 'não rodou' } };\n  }\n};\nconst falhou = (r) => Boolean(r.error);\nconst motivo = (r) => corta(r.error?.message ?? r.error?.description ?? (typeof r.error === 'string' ? r.error : ''), 120);\nconst avisos = [];\nconst MAX = Math.min(Math.max(Number(cfg.max_itens) || 8, 1), 15);\nconst lista = (itens, linha) => itens.slice(0, MAX).map(linha).join('\\n') + (itens.length > MAX ? `\\n…e mais ${itens.length - MAX}` : '');\n\n// Agenda do próximo dia útil (o Outlook devolve o horário já no fuso do Brasil).\nconst agenda = resposta('Agenda do próximo dia útil');\nconst eventos = falhou(agenda) ? [] : (agenda.value ?? []).filter((e) => e && !e.isCancelled);\nif (falhou(agenda)) avisos.push(`agenda (${motivo(agenda)})`);\nconst hora = (dt) => String(dt ?? '').slice(11, 16);\nconst dataCurta = (iso) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;\nconst alvo = String(cfg.proximo_dia ?? '').slice(0, 10);\n// Compromisso de vários dias (férias, viagem...) aparece como \"dia todo (até dd/mm)\", sem um horário que confunda.\nconst ultimoDia = (e) => {\n  const fim = String(e.end?.dateTime ?? '');\n  if (!e.isAllDay && fim.slice(11, 16) !== '00:00') return fim.slice(0, 10);\n  const d = new Date(fim.slice(0, 10) + 'T12:00:00Z');\n  if (isNaN(d)) return fim.slice(0, 10);\n  d.setUTCDate(d.getUTCDate() - 1);\n  return d.toISOString().slice(0, 10);\n};\nconst linhaEvento = (e) => {\n  const ultimo = ultimoDia(e);\n  const variosDias = Boolean(alvo) && (String(e.start?.dateTime ?? '').slice(0, 10) < alvo || ultimo > alvo);\n  const quando =\n    e.isAllDay || variosDias ? (alvo && ultimo > alvo ? `dia todo (até ${dataCurta(ultimo)})` : 'dia todo') : `${hora(e.start?.dateTime)}–${hora(e.end?.dateTime)}`;\n  const local = e.location?.displayName ? ` (${esc(corta(e.location.displayName, 40))})` : '';\n  return `• ${quando} ${esc(corta(e.subject || '(sem assunto)', 70))}${local}`;\n};\n\n// E-mails de hoje que ainda não foram respondidos nem encaminhados (sem os automáticos e os em que ele está só em cópia).\nconst eu = resposta('Quem sou eu');\nconst meuEmail = String(eu.mail || eu.userPrincipalName || '').trim().toLowerCase();\nconst emails = resposta('E-mails de hoje');\nconst semResposta = [];\nif (falhou(emails)) avisos.push(`e-mails (${motivo(emails)})`);\nelse {\n  // Remetentes automáticos: pelo começo do endereço ou por uma parte do domínio (ex.: avisos@notificacoes.loja.com).\n  const AUTOMATICO = /^(no-?reply|nao-?responda|naoresponda|do-?not-?reply|mailer-daemon|postmaster|bounce|notifica|notification|alerta?s?|newsletter|news|marketing|info@|mkt|xml@|nfe@)/;\n  const DOMINIO_AUTOMATICO = /@(.+[.-])?(notifica[a-z]*|notifications?|newsletters?|news|mailer|marketing|mkt|bounces?)[.-]/;\n  const endereco = (r) => String(r?.emailAddress?.address ?? '').trim().toLowerCase();\n  for (const m of emails.value ?? []) {\n    const de = endereco(m.from) || endereco(m.sender);\n    if (!de || (meuEmail && de === meuEmail) || AUTOMATICO.test(de) || DOMINIO_AUTOMATICO.test(de)) continue;\n    // Na Caixa de Entrada Destaques, o que o Outlook separou em \"Outros\" (propaganda, avisos) não conta.\n    if (m.inferenceClassification === 'other') continue;\n    const verbo = (m.singleValueExtendedProperties ?? []).find((p) => /0x1081/i.test(String(p.id)));\n    if (verbo && ['102', '103', '104'].includes(String(verbo.value))) continue;\n    const para = (m.toRecipients ?? []).map(endereco);\n    if (meuEmail && para.length && !para.includes(meuEmail)) continue;\n    semResposta.push(m);\n  }\n  semResposta.sort(\n    (a, b) => (b.importance === 'high') - (a.importance === 'high') || String(b.receivedDateTime).localeCompare(String(a.receivedDateTime)),\n  );\n}\nconst horaLocal = (iso) => {\n  const d = new Date(iso);\n  return isNaN(d) ? '' : d.toLocaleTimeString('pt-BR', { timeZone: cfg.fuso_horario || 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' });\n};\nconst linhaEmail = (m) =>\n  `• ${horaLocal(m.receivedDateTime)} ${esc(corta(m.from?.emailAddress?.name || m.from?.emailAddress?.address || '', 30))}: ` +\n  `${esc(corta(m.subject || '(sem assunto)', 60))}${m.importance === 'high' ? ' ❗' : ''}`;\n\n// Rascunhos na pasta Rascunhos (os mexidos hoje e o total).\nconst rascunhos = resposta('Rascunhos');\nlet rascunhosHoje = 0;\nlet rascunhosTotal = 0;\nif (falhou(rascunhos)) avisos.push(`rascunhos (${motivo(rascunhos)})`);\nelse {\n  const todos = rascunhos.value ?? [];\n  rascunhosTotal = todos.length;\n  rascunhosHoje = todos.filter((r) => String(r.lastModifiedDateTime ?? '') >= String(cfg.inicio_hoje_utc)).length;\n}\n\n// Tarefas abertas, só do ambiente de trabalho (sem misturar ambientes).\nlet tarefas = [];\ntry {\n  tarefas = $('Tarefas abertas')\n    .all()\n    .map((i) => i.json)\n    .filter((t) => t && t.titulo);\n} catch (e) {\n  avisos.push('tarefas');\n}\ntarefas.sort((a, b) => String(a.prazo || '9999').localeCompare(String(b.prazo || '9999')));\nconst linhaTarefa = (t) => {\n  const prazo = /^\\d{4}-\\d{2}-\\d{2}/.test(String(t.prazo || '')) ? String(t.prazo).slice(0, 10) : '';\n  const marca = !prazo ? '' : prazo < cfg.hoje ? ` ⚠️ atrasada (${dataCurta(prazo)})` : prazo === cfg.hoje ? ' (vence hoje)' : ` (até ${dataCurta(prazo)})`;\n  return `• ${esc(corta(t.titulo, 70))}${marca}`;\n};\n\n// Pedidos atrasados (base oficial de pedidos), em números.\nconst pedidos = resposta('Pedidos atrasados');\nlet blocoPedidos = '';\nif (falhou(pedidos) || !pedidos.resumo) avisos.push(`pedidos (${motivo(pedidos) || corta(pedidos.erro, 120) || 'sem resposta da base'})`);\nelse {\n  const r = pedidos.resumo;\n  const unidades = (r.por_unidade ?? [])\n    .slice(0, 4)\n    .map((u) => `${esc(corta(u.valor, 25))}: ${u.itens}`)\n    .join(' · ');\n  blocoPedidos = r.itens\n    ? `📦 <b>Pedidos atrasados: ${r.itens} ${r.itens === 1 ? 'item' : 'itens'}</b> em ${r.pedidos} ${r.pedidos === 1 ? 'pedido' : 'pedidos'}` +\n      (unidades ? `\\n${unidades}` : '')\n    : '📦 <b>Pedidos atrasados:</b> nenhum';\n  const atualizada = /atualizada em (.+)$/.exec(String(pedidos.fonte ?? ''))?.[1];\n  if (atualizada) blocoPedidos += `\\n<i>Base de ${esc(atualizada)}</i>`;\n}\n\nconst partes = [\n  `🌙 <b>Fim do dia, ${esc(cfg.nome_dono)}!</b> ${esc(cfg.hoje_extenso)}`,\n  `📅 <b>${esc(cfg.proximo_dia_rotulo)}</b>\\n` + (falhou(agenda) ? 'Não consegui ler a agenda.' : eventos.length ? lista(eventos, linhaEvento) : 'Nada na agenda.'),\n  `📬 <b>E-mails de hoje sem resposta: ${falhou(emails) ? '?' : semResposta.length}</b>` + (semResposta.length ? `\\n${lista(semResposta, linhaEmail)}` : ''),\n  falhou(rascunhos)\n    ? ''\n    : `📝 <b>Rascunhos para revisar:</b> ${rascunhosHoje} de hoje` +\n      (rascunhosTotal > rascunhosHoje ? `, ${rascunhosTotal >= 50 ? '50 ou mais' : rascunhosTotal} na pasta` : ''),\n  `✅ <b>Tarefas abertas (${esc(cfg.ambiente_nome)}): ${tarefas.length}</b>` + (tarefas.length ? `\\n${lista(tarefas, linhaTarefa)}` : ''),\n  blocoPedidos,\n  avisos.length ? `⚠️ <i>Não consegui ler: ${esc(avisos.join('; '))}.</i>` : '',\n  'Bom descanso! 😊',\n].filter(Boolean);\nconst html = partes.join('\\n\\n');\nreturn [\n  {\n    json: {\n      html,\n      texto_simples: html.replace(/<[^>]+>/g, ''),\n      contagens: {\n        eventos: eventos.length,\n        emails_sem_resposta: falhou(emails) ? null : semResposta.length,\n        rascunhos_hoje: rascunhosHoje,\n        tarefas: tarefas.length,\n        pedidos_atrasados: pedidos?.resumo?.itens ?? null,\n      },\n      avisos,\n    },\n  },\n];\n"
+      }
+    },
+    {
+      "id": "1405fc4d-070a-42e5-a278-acbac8f7177b",
+      "name": "Enviar fim do dia",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1980,
+        300
+      ],
+      "parameters": {
+        "chatId": "={{ $('Configuração do fim do dia').first().json.chat_id }}",
+        "text": "={{ $json.html }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "disable_web_page_preview": true,
+          "parse_mode": "HTML"
+        }
+      },
+      "credentials": {},
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "509e132a-b69e-4ab5-ad44-d5a8e0bb4566",
+      "name": "Conferência (só números)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2200,
+        300
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c-cont",
+              "name": "contagens",
+              "value": "={{ $('Montar mensagem').first().json.contagens }}",
+              "type": "object"
+            },
+            {
+              "id": "c-avisos",
+              "name": "avisos",
+              "value": "={{ $('Montar mensagem').first().json.avisos }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "a811a1af-6018-493f-aa03-7ec6e44120cf",
+      "name": "Enviar sem formatação",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2200,
+        480
+      ],
+      "parameters": {
+        "chatId": "={{ $('Configuração do fim do dia').first().json.chat_id }}",
+        "text": "={{ $('Montar mensagem').first().json.texto_simples }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "disable_web_page_preview": true,
+          "parse_mode": "HTML"
+        }
+      },
+      "credentials": {},
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Seg a sex às 18h": {
+      "main": [
+        [
+          {
+            "node": "Configuração do fim do dia",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configuração do fim do dia": {
+      "main": [
+        [
+          {
+            "node": "Quem sou eu",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Quem sou eu": {
+      "main": [
+        [
+          {
+            "node": "E-mails de hoje",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "E-mails de hoje": {
+      "main": [
+        [
+          {
+            "node": "Rascunhos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rascunhos": {
+      "main": [
+        [
+          {
+            "node": "Agenda do próximo dia útil",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agenda do próximo dia útil": {
+      "main": [
+        [
+          {
+            "node": "Tarefas abertas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tarefas abertas": {
+      "main": [
+        [
+          {
+            "node": "Pedidos atrasados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pedidos atrasados": {
+      "main": [
+        [
+          {
+            "node": "Montar mensagem",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar mensagem": {
+      "main": [
+        [
+          {
+            "node": "Enviar fim do dia",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar fim do dia": {
+      "main": [
+        [
+          {
+            "node": "Conferência (só números)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Enviar sem formatação",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar sem formatação": {
+      "main": [
+        [
+          {
+            "node": "Conferência (só números)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Sao_Paulo"
+  },
+  "tags": []
+}

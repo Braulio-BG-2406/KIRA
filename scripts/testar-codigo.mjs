@@ -1,7 +1,7 @@
 // Testes da Kira: executa o código dos nós "Code" dos workflows exportados
 // (n8n/workflows/*.json) com dados simulados e confere a estrutura dos workflows.
 // Uso: npm test   (ou: node scripts/testar-codigo.mjs)
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { deflateRawSync } from 'node:zlib';
 import assert from 'node:assert/strict';
 
@@ -1755,8 +1755,281 @@ teste('power bi: a Kira tem a ferramenta, com o ambiente vindo do workflow (não
   assert.match(comando('/status').texto_resposta, /Power BI: consulto os modelos e relatórios da empresa/);
 });
 
+// Fim do Dia: resumo do fim do expediente (agenda, e-mails sem resposta, rascunhos, tarefas e pedidos atrasados).
+const fimDoDia = JSON.parse(ler('n8n/workflows/kira-fim-do-dia.json'));
+const noFimDoDia = (nome) => {
+  const n = fimDoDia.nodes.find((x) => x.name === nome);
+  assert.ok(n, `nó não encontrado no fim do dia: ${nome}`);
+  return n;
+};
+const configFimDoDia = {
+  nome_dono: 'Carlos', ambiente: 'TRABALHO', ambiente_nome: 'Trabalho', fuso_horario: 'America/Sao_Paulo', max_itens: 3,
+  hoje: '2026-10-02', hoje_extenso: 'sexta-feira, 02/10', proximo_dia: '2026-10-05T00:00:00-03:00', proximo_dia_rotulo: 'Segunda-feira, 05/10',
+  inicio_hoje_utc: '2026-10-02T03:00:00Z',
+};
+const paraMim = [{ emailAddress: { address: 'eu@empresa.com.br' } }];
+const fimDoDiaCompleto = {
+  'Configuração do fim do dia': configFimDoDia,
+  'Quem sou eu': { mail: 'eu@empresa.com.br' },
+  'Agenda do próximo dia útil': {
+    value: [
+      { subject: 'Reunião <comercial> & metas', start: { dateTime: '2026-10-05T09:00:00.0000000' }, end: { dateTime: '2026-10-05T10:00:00.0000000' }, location: { displayName: 'Sala 2' } },
+      { subject: 'Cancelada', isCancelled: true, start: { dateTime: '2026-10-05T11:00:00' }, end: { dateTime: '2026-10-05T12:00:00' } },
+      { subject: 'Feriado', isAllDay: true, start: { dateTime: '2026-10-05T00:00:00' }, end: { dateTime: '2026-10-06T00:00:00' } },
+      // começou antes e vai até a outra semana: sem horário
+      { subject: 'Viagem', start: { dateTime: '2026-10-01T06:00:00' }, end: { dateTime: '2026-10-09T23:30:00' } },
+    ],
+  },
+  'E-mails de hoje': {
+    value: [
+      { subject: 'Prazo do pedido 123', from: { emailAddress: { name: 'Ana', address: 'ana@cliente.com' } }, toRecipients: paraMim, receivedDateTime: '2026-10-02T13:05:00Z', importance: 'normal' },
+      { subject: 'Urgente', from: { emailAddress: { name: 'Bia', address: 'bia@cliente.com' } }, toRecipients: paraMim, receivedDateTime: '2026-10-02T12:00:00Z', importance: 'high' },
+      { subject: 'Respondido', from: { emailAddress: { address: 'c@x.com' } }, toRecipients: paraMim, receivedDateTime: '2026-10-02T11:00:00Z', singleValueExtendedProperties: [{ id: 'Integer 0x1081', value: '102' }] },
+      { subject: 'Promoção', from: { emailAddress: { address: 'noreply@loja.com' } }, toRecipients: paraMim, receivedDateTime: '2026-10-02T10:00:00Z' },
+      { subject: 'Só em cópia', from: { emailAddress: { address: 'd@x.com' } }, toRecipients: [{ emailAddress: { address: 'outro@x.com' } }], receivedDateTime: '2026-10-02T09:00:00Z' },
+      { subject: 'Meu', from: { emailAddress: { address: 'eu@empresa.com.br' } }, toRecipients: paraMim, receivedDateTime: '2026-10-02T08:00:00Z' },
+      { subject: 'Aprovação pendente', from: { emailAddress: { address: 'sender@notificacoes.sistema.com' } }, toRecipients: paraMim, receivedDateTime: '2026-10-02T15:00:00Z' },
+      { subject: 'Oferta', from: { emailAddress: { address: 'contato@loja.com' } }, toRecipients: paraMim, receivedDateTime: '2026-10-02T15:30:00Z', inferenceClassification: 'other' },
+    ],
+  },
+  Rascunhos: { value: [{ lastModifiedDateTime: '2026-10-02T14:00:00Z' }, { lastModifiedDateTime: '2026-10-01T14:00:00Z' }] },
+  'Tarefas abertas': [
+    { titulo: 'Ligar para fornecedor', prazo: '2026-10-01' },
+    { titulo: 'Enviar proposta', prazo: '2026-10-02' },
+    { titulo: 'Revisar contrato', prazo: '' },
+    { titulo: 'Planejar visita', prazo: '2026-10-09' },
+  ],
+  'Pedidos atrasados': {
+    fonte: 'Base oficial de pedidos do ERP (base.xlsx), planilha atualizada em 02/10/2026 às 09:17',
+    resumo: { itens: 12, pedidos: 7, por_unidade: [{ valor: 'Unidade A', itens: 8 }, { valor: 'Unidade B', itens: 4 }] },
+  },
+};
+const rodarFimDoDia = (nos) => executar(noFimDoDia('Montar mensagem').parameters.jsCode, { nosAnteriores: nos })[0];
+teste('fim do dia: agenda do próximo dia útil, e-mails sem resposta, rascunhos, tarefas e pedidos atrasados', () => {
+  const r = rodarFimDoDia(fimDoDiaCompleto);
+  assert.equal(htmlValidoParaTelegram(r.html), true);
+  assert.deepEqual(r.contagens, { eventos: 3, emails_sem_resposta: 2, rascunhos_hoje: 1, tarefas: 4, pedidos_atrasados: 12 });
+  assert.deepEqual(r.avisos, []);
+  assert.match(r.html, /Fim do dia, Carlos!<\/b> sexta-feira, 02\/10/);
+  assert.match(r.html, /Segunda-feira, 05\/10<\/b>\n• 09:00–10:00 Reunião &lt;comercial&gt; &amp; metas \(Sala 2\)\n• dia todo Feriado\n• dia todo \(até 09\/10\) Viagem/);
+  // respondidos, automáticos (pelo endereço ou pelo domínio), os que o Outlook separou em "Outros", os que ele só recebeu
+  // em cópia e os que ele mesmo mandou ficam de fora; os importantes vêm primeiro
+  assert.match(r.html, /sem resposta: 2<\/b>\n• 09:00 Bia: Urgente ❗\n• 10:05 Ana: Prazo do pedido 123/);
+  assert.match(r.html, /Rascunhos para revisar:<\/b> 1 de hoje, 2 na pasta/);
+  assert.match(r.html, /Tarefas abertas \(Trabalho\): 4<\/b>\n• Ligar para fornecedor ⚠️ atrasada \(01\/10\)\n• Enviar proposta \(vence hoje\)\n• Planejar visita \(até 09\/10\)\n…e mais 1/);
+  assert.match(r.html, /Pedidos atrasados: 12 itens<\/b> em 7 pedidos\nUnidade A: 8 · Unidade B: 4\n<i>Base de 02\/10\/2026 às 09:17<\/i>/);
+  assert.doesNotMatch(r.texto_simples, /<\/?b>/);
+});
+teste('fim do dia: uma parte que falha vira aviso e o resto segue', () => {
+  const nos = { ...fimDoDiaCompleto, 'E-mails de hoje': { error: { message: '401 - token expirado' } }, 'Agenda do próximo dia útil': { error: { message: 'timeout' } } };
+  delete nos['Pedidos atrasados'];
+  const r = rodarFimDoDia(nos);
+  assert.equal(htmlValidoParaTelegram(r.html), true);
+  assert.equal(r.contagens.emails_sem_resposta, null);
+  assert.equal(r.contagens.pedidos_atrasados, null);
+  assert.match(r.html, /Não consegui ler a agenda\./);
+  assert.match(r.html, /sem resposta: \?<\/b>/);
+  assert.match(r.html, /Não consegui ler: agenda \(timeout\); e-mails \(401 - token expirado\); pedidos \(não rodou\)\./);
+  assert.match(r.html, /Tarefas abertas \(Trabalho\): 4/);
+  const semPedidos = rodarFimDoDia({ ...fimDoDiaCompleto, 'Pedidos atrasados': { resumo: { itens: 0, pedidos: 0 } } });
+  assert.match(semPedidos.html, /Pedidos atrasados:<\/b> nenhum/);
+});
+teste('fim do dia: só lê, só o ambiente de trabalho, de segunda a sexta às 18h', () => {
+  assert.equal(noFimDoDia('Seg a sex às 18h').parameters.rule.interval[0].expression, '0 18 * * 1-5');
+  const http = fimDoDia.nodes.filter((n) => n.type === 'n8n-nodes-base.httpRequest');
+  assert.equal(http.length, 4);
+  for (const n of http) {
+    assert.ok(!n.parameters.method || n.parameters.method === 'GET', `${n.name}: só leitura`);
+    assert.match(n.parameters.url, /^https:\/\/graph\.microsoft\.com\/v1\.0\/me/, `${n.name}: só o Microsoft Graph`);
+    assert.equal(n.onError, 'continueRegularOutput', `${n.name}: uma falha não derruba o resumo`);
+  }
+  const condicoes = noFimDoDia('Tarefas abertas').parameters.filters.conditions;
+  assert.deepEqual(condicoes.map((c) => c.keyName), ['user_id', 'contexto', 'status']);
+  assert.match(condicoes[1].keyValue, /ambiente/);
+  assert.equal(condicoes[2].keyValue, 'aberta');
+  assert.equal(noFimDoDia('Configuração do fim do dia').parameters.assignments.assignments.find((a) => a.name === 'ambiente').value, 'TRABALHO');
+  assert.equal(noFimDoDia('Pedidos atrasados').parameters.workflowInputs.value.tipo, 'atrasados');
+  assert.equal(noFimDoDia('Enviar fim do dia').parameters.additionalFields.parse_mode, 'HTML');
+  assert.equal(fimDoDia.connections['Enviar fim do dia'].main[1][0].node, 'Enviar sem formatação');
+});
+
+// Saúde da Kira: avisa quando algo falha (um aviso por dia para cada workflow) e manda o resumo da semana na segunda.
+const saude = JSON.parse(ler('n8n/workflows/kira-saude.json'));
+const rodarSaude = (nome, nos) => executar(noDe(saude, nome).parameters.jsCode, { nosAnteriores: nos })[0];
+teste('saúde: aviso de falha em HTML seguro, com o nó, uma dica e o link da execução', () => {
+  const r = rodarSaude('Resumir falha', {
+    'Quando algo falhar': {
+      execution: { id: '231', url: 'https://n8n.exemplo.com/workflow/abc/executions/231', error: { message: 'Erro <404> & token expired' }, lastNodeExecuted: 'Ler e-mails', mode: 'trigger' },
+      workflow: { id: 'abc', name: 'Kira — rascunhos automáticos' },
+    },
+  });
+  assert.equal(htmlValidoParaTelegram(r.html), true);
+  assert.deepEqual([r.workflow_id, r.execucao_id, r.no, r.modo], ['abc', '231', 'Ler e-mails', 'trigger']);
+  assert.match(r.html, /Erro: Erro &lt;404&gt; &amp; token expired/);
+  assert.match(r.html, /Reconnect/);
+  assert.match(r.html, /<a href="https:\/\/n8n\.exemplo\.com\/workflow\/abc\/executions\/231">/);
+  // falha ao ligar um gatilho também vira aviso; endereço que não é https não vira link
+  const gatilho = rodarSaude('Resumir falha', {
+    'Quando algo falhar': { trigger: { error: { message: 'getaddrinfo EAI_AGAIN', node: { name: 'Telegram Trigger' } }, mode: 'trigger' }, workflow: { id: 'k', name: 'Kira' } },
+  });
+  assert.match(gatilho.html, /Onde: <i>Telegram Trigger<\/i>/);
+  assert.match(gatilho.html, /Instabilidade/);
+  const semLink = rodarSaude('Resumir falha', { 'Quando algo falhar': { execution: { url: 'javascript:alert(1)', error: { message: '429 Too Many Requests' } }, workflow: { id: 'x', name: 'A' } } });
+  assert.doesNotMatch(semLink.html, /href/);
+  assert.match(semLink.html, /Limite de uso/);
+  assert.equal(htmlValidoParaTelegram(rodarSaude('Resumir falha', { 'Quando algo falhar': {} }).html), true);
+});
+const configSaude = { fuso_horario: 'America/Sao_Paulo', agora: '2026-10-05T11:00:00Z', base_max_dias: 4, backup_max_dias: 8, linkedin_conectado_em: '2026-10-02', linkedin_validade_dias: 60 };
+const saudeOk = {
+  'Configuração da saúde': configSaude,
+  Outlook: { id: 'x' },
+  'Google Drive e último backup': { files: [{ name: 'kira-backup-2026-10-04.json', createdTime: '2026-10-04T06:00:12Z', size: '123456' }] },
+  Gemini: { models: [{ name: 'models/x' }] },
+  'Power BI': { value: [] },
+  LinkedIn: { sub: 'x' },
+  'Base de pedidos (OneDrive)': { lastModifiedDateTime: '2026-10-03T21:17:00Z' },
+  'Falhas da semana': [
+    { id: 1, workflow: 'Kira — rascunhos automáticos', no: 'Ler e-mails', modo: 'trigger', createdAt: '2026-10-03T17:30:00.000Z' },
+    { id: 2, workflow: 'Kira — rascunhos automáticos', no: 'Ler <caixa>', modo: 'trigger', createdAt: '2026-10-04T17:30:00.000Z' },
+    { id: 3, workflow: 'Kira 1.0', no: '', modo: 'webhook', createdAt: '2026-10-01T13:00:00.000Z' },
+    { id: 4, workflow: 'Teste', no: 'x', modo: 'manual', createdAt: '2026-10-02T13:00:00.000Z' },
+  ],
+};
+teste('saúde: resumo de segunda com conexões, falhas agrupadas, base de pedidos, backup e LinkedIn', () => {
+  const r = rodarSaude('Montar relatório', saudeOk);
+  assert.equal(htmlValidoParaTelegram(r.html), true);
+  // execuções de teste (modo manual) não contam
+  assert.deepEqual(r.contagens, { conexoes_ok: 5, conexoes_com_problema: 0, falhas_7_dias: 3, workflows_com_falha: 2, base_ok: true, backup_ok: true, linkedin_faltam_dias: 57, itens_para_olhar: 0 });
+  assert.match(r.html, /• Kira — rascunhos automáticos: 2 \(última 04\/10 às 14:30, em <i>Ler &lt;caixa&gt;<\/i>\)\n• Kira 1\.0: 1 \(última 01\/10 às 10:00\)/);
+  assert.match(r.html, /Base de pedidos:<\/b> ✅ atualizada em 03\/10 às 18:17/);
+  assert.match(r.html, /Último backup:<\/b> ✅ 04\/10 às 03:00 \(121 KB\)/);
+  assert.match(r.html, /LinkedIn:<\/b> reconectar até 01\/12 \(faltam 57 dias\)/);
+  assert.match(r.html, /Tudo certo por aqui/);
+  assert.doesNotMatch(r.texto_simples, /<\/?b>/);
+});
+teste('saúde: o que não respondeu vira "Para olhar" e o resumo sai mesmo assim', () => {
+  const nos = {
+    ...saudeOk,
+    'Configuração da saúde': { ...configSaude, agora: '2026-11-25T11:00:00Z' },
+    'Power BI': { error: { message: 'Request failed with status code 401' } },
+    'Falhas da semana': [{ error: { message: 'tabela não existe' } }],
+    'Google Drive e último backup': { files: [] },
+  };
+  delete nos.Gemini;
+  const r = rodarSaude('Montar relatório', nos);
+  assert.equal(htmlValidoParaTelegram(r.html), true);
+  assert.equal(r.contagens.conexoes_com_problema, 2);
+  assert.equal(r.contagens.falhas_7_dias, null);
+  assert.match(r.html, /⚠️ Gemini/);
+  assert.match(r.html, /Power BI: Request failed with status code 401 \(reconecte no n8n: Credentials → Reconnect\)/);
+  assert.match(r.html, /Base de pedidos:<\/b> ⚠️ parada desde 03\/10 às 18:17/);
+  assert.match(r.html, /Último backup:<\/b> ⚠️ nenhum backup ainda/);
+  assert.match(r.html, /LinkedIn:<\/b> ⚠️ reconectar até 01\/12 \(faltam 6 dias\)/);
+  assert.match(r.html, /Falhas: não consegui ler a tabela kira_saude/);
+});
+teste('saúde: só entram no resumo os serviços da lista "servicos"', () => {
+  const r = rodarSaude('Montar relatório', { ...saudeOk, 'Configuração da saúde': { ...configSaude, servicos: 'outlook, gemini' }, LinkedIn: { error: { message: 'sem credencial' } } });
+  assert.equal(htmlValidoParaTelegram(r.html), true);
+  assert.equal(r.contagens.conexoes_ok, 2);
+  assert.equal(r.contagens.itens_para_olhar, 0);
+  assert.equal(r.contagens.base_ok, null);
+  assert.doesNotMatch(r.html, /Base de pedidos|Último backup|LinkedIn|Power BI/);
+  assert.match(noDe(saude, 'Configuração da saúde').parameters.assignments.assignments.find((a) => a.name === 'servicos').value, /^outlook, drive, gemini, powerbi, linkedin, pedidos$/);
+});
+teste('saúde: um aviso por dia para cada workflow; segunda às 8h; só lê os serviços e só escreve na kira_saude', () => {
+  assert.equal(noDe(saude, 'Segunda às 8h').parameters.rule.interval[0].expression, '0 8 * * 1');
+  assert.ok(saude.nodes.some((n) => n.type === 'n8n-nodes-base.errorTrigger'));
+  const http = saude.nodes.filter((n) => n.type === 'n8n-nodes-base.httpRequest');
+  assert.equal(http.length, 7);
+  for (const n of http) {
+    assert.ok(!n.parameters.method || n.parameters.method === 'GET', `${n.name}: só leitura`);
+    assert.equal(n.onError, 'continueRegularOutput', `${n.name}: uma conexão com problema não derruba o resumo`);
+  }
+  for (const n of saude.nodes.filter((x) => x.type === 'n8n-nodes-base.dataTable')) assert.equal(n.parameters.dataTableId.value, 'kira_saude');
+  assert.deepEqual(noDe(saude, 'Já avisei hoje?').parameters.filters.conditions.map((c) => c.keyName), ['workflow_id', 'createdAt']);
+  assert.match(noDe(saude, 'Primeiro aviso de hoje?').parameters.conditions.conditions[0].leftValue, /Já avisei hoje\?/);
+  assert.equal(saude.connections['Primeiro aviso de hoje?'].main[0][0].node, 'Avisar no Telegram');
+  assert.ok(!saude.connections['Primeiro aviso de hoje?'].main[1]?.length, 'a segunda falha do dia não avisa de novo');
+  assert.equal(noDe(saude, 'Limpar falhas antigas').parameters.matchType, 'anyCondition');
+  assert.equal(noDe(saude, 'Configuração da saúde').parameters.assignments.assignments.find((a) => a.name === 'chat_id').value, '');
+  assert.equal(noDe(saude, 'Configuração da saúde').parameters.assignments.assignments.find((a) => a.name === 'linkedin_conectado_em').value, '');
+});
+
+// Backup semanal: as tabelas da Kira num arquivo JSON no Google Drive, guardando os 8 mais recentes.
+const backup = JSON.parse(ler('n8n/workflows/kira-backup.json'));
+const rodarBackup = (nome, nos, entrada = []) => executar(noDe(backup, nome).parameters.jsCode, { nosAnteriores: nos, entrada });
+const lerTabelas = {
+  'Configuração do backup': { pasta: 'Kira - backups', manter: 2, prefixo: 'kira-backup-', hoje: '2026-10-04' },
+  'Pasta do backup': { pasta_id: 'pasta1' },
+  'Ler kira_config': [{ id: 1, user_id: '1', contexto: 'TRABALHO' }],
+  'Ler kira_memoria': [{ id: 1, fato: 'a' }, { id: 2, fato: 'b' }],
+  'Ler kira_tarefas': [{}],
+  'Ler kira_contatos': [{}],
+  'Ler kira_logs': [{ id: 7, entrada: 'oi' }],
+  'Ler kira_linkedin': [{}],
+  'Ler kira_imagens': [{}],
+  'Ler kira_emails_auto': [{ id: 3 }],
+  'Ler kira_saude': [{ error: 'Data table not found' }],
+};
+teste('backup: junta as tabelas num JSON, conta as linhas e anota a tabela que não abriu', () => {
+  const [r] = executar(noDe(backup, 'Montar backup').parameters.jsCode, { nosAnteriores: lerTabelas });
+  assert.equal(r.arquivo, 'kira-backup-2026-10-04.json');
+  assert.equal(r.pasta_id, 'pasta1');
+  assert.deepEqual(r.linhas, { kira_config: 1, kira_memoria: 2, kira_tarefas: 0, kira_contatos: 0, kira_logs: 1, kira_linkedin: 0, kira_imagens: 0, kira_emails_auto: 1 });
+  assert.deepEqual(r.falhas, ['kira_saude (Data table not found)']);
+  const vazio = Object.fromEntries(Object.entries(lerTabelas).map(([k, v]) => [k, k.startsWith('Ler ') ? [{ error: { message: 'sem acesso' } }] : v]));
+  assert.throws(() => executar(noDe(backup, 'Montar backup').parameters.jsCode, { nosAnteriores: vazio }), /nenhuma tabela/);
+});
+teste('backup: o arquivo leva os registros; backup parcial para com erro (avisa) e não apaga os antigos', () => {
+  const codigo = noDe(backup, 'Montar backup').parameters.jsCode;
+  const itens = new Function('$', '$input', 'DateTime', codigo)(
+    (nome) => {
+      const lista = [].concat(lerTabelas[nome]).map((json) => ({ json }));
+      return { first: () => lista[0], all: () => lista };
+    },
+    {},
+    DateTime,
+  );
+  const conteudo = JSON.parse(Buffer.from(itens[0].binary.data.data, 'base64').toString('utf8'));
+  assert.equal(conteudo.tabelas.kira_memoria.length, 2);
+  assert.deepEqual(conteudo.tabelas.kira_tarefas, []);
+  assert.equal(itens[0].binary.data.mimeType, 'application/json');
+  const montado = itens[0].json;
+  assert.throws(() => rodarBackup('Conferência (só números)', { 'Montar backup': montado }, [{ id: 'arq1' }]), /sem estas tabelas: kira_saude/);
+  assert.throws(() => rodarBackup('Conferência (só números)', { 'Montar backup': { ...montado, falhas: [] } }, [{}]), /não confirmou/);
+  assert.equal(rodarBackup('Conferência (só números)', { 'Montar backup': { ...montado, falhas: [] } }, [{ id: 'arq1' }])[0].tabelas, 8);
+  const arquivos = [
+    { id: 'a', name: 'kira-backup-2026-09-20.json', createdTime: '2026-09-20T06:00:00Z' },
+    { id: 'b', name: 'kira-backup-2026-10-04.json', createdTime: '2026-10-04T06:00:00Z' },
+    { id: 'c', name: 'kira-backup-2026-09-27.json', createdTime: '2026-09-27T06:00:00Z' },
+    { id: 'd', name: 'outro-arquivo.json', createdTime: '2026-01-01T06:00:00Z' },
+  ];
+  const cfg = { 'Configuração do backup': lerTabelas['Configuração do backup'] };
+  assert.deepEqual(rodarBackup('Escolher os antigos', cfg, [{ files: arquivos }]).map((f) => f.id), ['a']);
+  assert.deepEqual(rodarBackup('Escolher os antigos', cfg, [{ error: { message: 'x' } }]), []);
+});
+teste('backup: domingo às 3h, todas as tabelas usadas pela Kira, pasta própria e lixeira só para os antigos', () => {
+  assert.equal(noDe(backup, 'Domingo às 3h').parameters.rule.interval[0].expression, '0 3 * * 0');
+  const lidas = backup.nodes.filter((n) => n.type === 'n8n-nodes-base.dataTable').map((n) => n.parameters.dataTableId.value);
+  const usadas = new Set();
+  for (const arquivo of readdirSync(new URL('n8n/workflows/', raiz))) {
+    for (const n of JSON.parse(ler(`n8n/workflows/${arquivo}`)).nodes) {
+      if (/dataTable/.test(n.type) && n.parameters.dataTableId?.value) usadas.add(n.parameters.dataTableId.value);
+    }
+  }
+  for (const t of usadas) assert.ok(lidas.includes(t), `o backup não copia a tabela ${t}`);
+  const codigo = noDe(backup, 'Montar backup').parameters.jsCode;
+  for (const t of lidas) assert.match(codigo, new RegExp(`'${t}'`), `Montar backup não junta ${t}`);
+  assert.equal(noDe(backup, 'Guardar no Google Drive').parameters.operation, 'upload');
+  assert.match(noDe(backup, 'Backups da pasta').parameters.queryParameters.parameters[0].value, /in parents/);
+  const lixeira = noDe(backup, 'Mandar para a lixeira').parameters;
+  assert.equal(lixeira.method, 'PATCH');
+  assert.equal(lixeira.jsonBody, '{"trashed": true}');
+  assert.equal(backup.settings.saveDataSuccessExecution, 'none');
+});
+
 teste('nós Code "uma vez por item" não devolvem lista (o n8n recusa e a execução cai)', () => {
-  const arquivos = ['kira-1.0', 'kira-resumo-da-manha', 'kira-gerar-imagem', 'kira-anexar-imagem', 'kira-teams', 'kira-pedidos', 'kira-base-de-pedidos', 'kira-rascunho-resposta', 'kira-rascunhos-automaticos', 'kira-pesquisar-internet', 'kira-planilha-negocio', 'kira-powerbi'];
+  const arquivos = ['kira-1.0', 'kira-resumo-da-manha', 'kira-gerar-imagem', 'kira-anexar-imagem', 'kira-teams', 'kira-pedidos', 'kira-base-de-pedidos', 'kira-rascunho-resposta', 'kira-rascunhos-automaticos', 'kira-pesquisar-internet', 'kira-planilha-negocio', 'kira-powerbi', 'kira-fim-do-dia', 'kira-saude', 'kira-backup'];
   for (const arquivo of arquivos) {
     const w = JSON.parse(ler(`n8n/workflows/${arquivo}.json`));
     for (const n of w.nodes.filter((x) => x.type === 'n8n-nodes-base.code' && x.parameters.mode === 'runOnceForEachItem')) {
@@ -1791,6 +2064,12 @@ teste('segurança: nenhum token do Telegram, chave do Google ou caminho de webho
     'n8n/sdk/kira-planilha-negocio.workflow.ts',
     'n8n/workflows/kira-powerbi.json',
     'n8n/sdk/kira-powerbi.workflow.ts',
+    'n8n/workflows/kira-fim-do-dia.json',
+    'n8n/sdk/kira-fim-do-dia.workflow.ts',
+    'n8n/workflows/kira-saude.json',
+    'n8n/sdk/kira-saude.workflow.ts',
+    'n8n/workflows/kira-backup.json',
+    'n8n/sdk/kira-backup.workflow.ts',
   ];
   for (const arquivo of arquivos) {
     const conteudo = ler(arquivo);

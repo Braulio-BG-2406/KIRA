@@ -25,6 +25,8 @@ A Kira é um **agente central** que roda no n8n e conversa pelo Telegram, por te
 
    Em paralelo: ☀️ resumo das 7h · 📝 rascunhos automáticos de e-mails sobre pedidos
                 · 📦 sincronização da base oficial de pedidos (seg a sáb, 4x ao dia)
+                · 🌙 fim do dia (seg a sex, 18h) · 🩺 saúde (avisos de falha e resumo de segunda)
+                · 💾 backup das tabelas no Google Drive (domingo, 3h)
 ```
 
 ## Caminho de uma mensagem
@@ -88,6 +90,21 @@ Os nomes em **negrito** são os nós do workflow [`n8n/workflows/kira-1.0.json`]
 
 **Kira — rascunhos automáticos (Outlook)**, de segunda a sexta, das 7h às 19h30, a cada 30 minutos: **Configuração** → **Quem sou eu** (seu endereço, para reconhecer e-mails seus e remetentes de fora) → **Buscar e-mails novos** (Caixa de Entrada, só depois de `ativo_desde`, com a marca de "já respondido") → **Já processados** (`kira_emails_auto`) → **Separar e-mails** (pula os já vistos, automáticos, seus, já respondidos e os que não falam de pedidos; até 5 por vez) → **Kira prepara a resposta** (agente com **consultar_pedidos**, devolve JSON) → **Interpretar resposta** → **Tem resposta?** → **Criar rascunho** (sub-workflow do rascunho com assinatura, um e-mail por vez; devolve a chave do e-mail como `referencia`) → **Resultado do rascunho** → **Registrar e-mail** e **Montar aviso** → **Avisar no Telegram**. Falha da IA por limite de uso não é registrada (o e-mail volta na próxima rodada); outras falhas são registradas e avisadas. Se o Outlook falhar, **Falha já avisada hoje?** garante no máximo um aviso por dia.
 
+### Fim do dia (workflow separado)
+
+**Kira — Fim do Dia (18h)**, de segunda a sexta às 18h: **Configuração do fim do dia** (o dono, o ambiente de trabalho, hoje e o próximo dia útil, que na sexta é a segunda) → **Quem sou eu** → **E-mails de hoje** (com a marca de "já respondido" e a classificação Destaques/Outros) → **Rascunhos** → **Agenda do próximo dia útil** (no fuso do Brasil) → **Tarefas abertas** (`kira_tarefas`, só do ambiente de trabalho) → **Pedidos atrasados** (o sub-workflow de pedidos, tipo `atrasados`) → **Montar mensagem** → **Enviar fim do dia** (se o HTML falhar, **Enviar sem formatação**) → **Conferência (só números)**. Cada leitura segue mesmo com erro; o que falhou vira uma linha "Não consegui ler".
+
+### Saúde da Kira (workflow separado)
+
+**Kira — Saúde (avisos e resumo de segunda)** tem dois gatilhos, que passam pela **Configuração da saúde** e se separam em **Veio de uma falha?**:
+
+- **Quando algo falhar** (*Error Trigger*: a Kira, o resumo, os rascunhos, o fim do dia e o backup apontam para este workflow em **Settings → Error workflow**) → **Resumir falha** (automação, passo, erro, dica e link da execução, em HTML seguro) → **Já avisei hoje?** (`kira_saude`, mesmo workflow desde a meia-noite) → **Anotar falha** → **Primeiro aviso de hoje?** → **Avisar no Telegram**.
+- **Segunda às 8h** → uma leitura simples em cada serviço (**Outlook**, **Base de pedidos (OneDrive)**, **Google Drive e último backup**, **Renovar conexão (Power BI)** e **Power BI**, **Gemini**, **LinkedIn**; todas seguem mesmo com erro) → **Falhas da semana** (`kira_saude`) → **Montar relatório** → **Enviar relatório** (ou **Enviar sem formatação**) → **Conferência (só números)** → **Limpar falhas antigas** (mais de 90 dias e as anotações de teste).
+
+### Backup semanal (workflow separado)
+
+**Kira — Backup semanal (domingo 3h)**: **Configuração do backup** → **Ler** cada tabela (`kira_config`, `kira_memoria`, `kira_tarefas`, `kira_contatos`, `kira_logs`, `kira_linkedin`, `kira_imagens`, `kira_emails_auto` e `kira_saude`; uma que falhar não para as outras) → **Achar pasta** → **Pasta já existe?** (se não, **Criar pasta**) → **Pasta do backup** → **Montar backup** (um JSON com as linhas de cada tabela e as contagens) → **Guardar no Google Drive** → **Conferência (só números)** (se faltou alguma tabela, para com erro: a Saúde avisa e os antigos ficam) → **Backups da pasta** → **Escolher os antigos** (além dos 8 mais recentes) → **Mandar para a lixeira**. As execuções que dão certo não ficam guardadas no n8n (o arquivo já está no Drive).
+
 ## Dados
 
 | Tabela | Colunas | Para que serve |
@@ -100,6 +117,7 @@ Os nomes em **negrito** são os nós do workflow [`n8n/workflows/kira-1.0.json`]
 | `kira_emails_auto` | `message_id`, `status` (`rascunho`, `ignorado` ou `erro`), `motivo` | E-mails já analisados pelos rascunhos automáticos (guardados por 10 dias) |
 | `kira_linkedin` | `texto`, `status` (`pendente` ou `publicado`), `post_urn`, `erro`, `imagem_id` | Rascunhos de posts; o `id` é o número usado no `/publicar N` |
 | `kira_imagens` | `user_id`, `chat_id`, `file_id`, `descricao`, `legenda`, `formato`, `modelo` | Imagens geradas; o `id` é o número da imagem (#N) e o arquivo fica no Telegram (`file_id`) |
+| `kira_saude` | `workflow_id`, `workflow`, `no`, `erro`, `execucao_id`, `modo` | Falhas das automações, anotadas pela Saúde da Kira (guardadas por 90 dias); a primeira do dia de cada automação vira aviso |
 
 Todas as tabelas também têm `id`, `createdAt` e `updatedAt`, criados pelo n8n.
 
@@ -173,6 +191,6 @@ Todas as tabelas também têm `id`, `createdAt` e `updatedAt`, criados pelo n8n.
 
 1. **Mais dados de Negócios e Pessoal**: leads e CRM, o segundo negócio e finanças, cada um no seu ambiente e com permissões mínimas.
 2. **Memória persistente da conversa** (por exemplo, *Postgres Chat Memory*), para não perder o contexto em reinícios.
-3. **Kira proativa**: juntar ao resumo das 7h a agenda do dia e as tarefas abertas de cada ambiente.
+3. **Kira proativa**: o fim do dia já traz a agenda do próximo dia útil e as tarefas do trabalho; falta juntar ao resumo das 7h a agenda do dia e as tarefas abertas de cada ambiente.
 4. **Fotos e documentos**, aproveitando que o Gemini é multimodal.
 5. **Privacidade**: e-mails, Teams, pedidos e a planilha do negócio já passam pelo Gemini no plano gratuito, por escolha do dono; o plano pago evita que o Google use esse conteúdo. Este repositório deve ficar privado se passar a guardar qualquer coisa sensível.

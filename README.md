@@ -2,7 +2,7 @@
 
 Meu bot particular: a **Kira** é uma assistente pessoal de IA que roda no **n8n**, pensa com o **Google Gemini** e conversa comigo pelo **Telegram**, por texto ou por voz.
 
-> **Status: no ar, já com os ambientes da Kira 2.0** (Trabalho, Negócios e Pessoal, cada um com memórias, tarefas e contatos separados), grátis (chave gratuita do Gemini): Outlook (leitura e rascunhos de resposta com a sua assinatura), Google Drive (leitura), Microsoft Teams (lê e responde quando você pede), pedidos da empresa (base oficial do ERP, atualizada 4 vezes ao dia), a planilha do negócio no modo Negócios (vendas, vendedoras, clientes, estoque e precificação), pesquisa na internet (Busca Google), rascunhos de posts do LinkedIn, imagens com IA, resumo de notícias às 7h em texto e áudio e rascunhos automáticos para e-mails que perguntam de pedidos. Para montar do zero, siga o [guia de configuração](docs/configuracao.md).
+> **Status: no ar, já com os ambientes da Kira 2.0** (Trabalho, Negócios e Pessoal, cada um com memórias, tarefas e contatos separados), grátis (chave gratuita do Gemini): Outlook (leitura e rascunhos de resposta com a sua assinatura), Google Drive (leitura), Microsoft Teams (lê e responde quando você pede), pedidos da empresa (base oficial do ERP, atualizada 4 vezes ao dia), a planilha do negócio no modo Negócios (vendas, vendedoras, clientes, estoque e precificação), pesquisa na internet (Busca Google), rascunhos de posts do LinkedIn, imagens com IA, resumo de notícias às 7h em texto e áudio, rascunhos automáticos para e-mails que perguntam de pedidos, o fim do dia às 18h, avisos quando algo falha (com um resumo da saúde toda segunda) e backup semanal das tabelas no Google Drive. Para montar do zero, siga o [guia de configuração](docs/configuracao.md).
 
 ## Como funciona
 
@@ -28,6 +28,9 @@ Meu bot particular: a **Kira** é uma assistente pessoal de IA que roda no **n8n
 
    ☀️ 7h: notícias (RSS) + cotações ─► resumo do Gemini ─► Telegram (texto + áudio da Kira)
    📦 seg a sáb, 9h/12h/15h/18h: planilha oficial de pedidos (SharePoint, centenas de MB) ─► lida em etapas ─► base compacta no OneDrive
+   🌙 seg a sex, 18h: agenda do próximo dia útil, e-mails sem resposta, rascunhos, tarefas e pedidos atrasados ─► Telegram
+   🩺 se algo falhar: aviso no Telegram (um por dia por automação) · seg 8h: resumo da saúde da Kira
+   💾 domingo, 3h: tabelas da Kira ─► arquivo JSON na pasta "Kira - backups" do Google Drive (guarda os 8 últimos)
 ```
 
 ## O que a Kira 1.0 faz
@@ -54,6 +57,9 @@ Meu bot particular: a **Kira** é uma assistente pessoal de IA que roda no **n8n
 | 🌐 Internet | Pesquisa no Google quando a resposta depende de informação atualizada (notícias, cotações, preços, clima, leis, empresas) e lê a página quando você manda um link. Responde com a data da informação e as fontes. |
 | 📝 Rascunhos automáticos | De segunda a sexta, a cada 30 minutos, olha os e-mails novos, separa os que perguntam de pedidos, consulta a base de pedidos e deixa a resposta como **rascunho** no Outlook, com a sua assinatura (nunca envia). Depois avisa no Telegram. |
 | ☀️ Resumo da manhã | Todo dia às 7h: Brasil, Mundo, Mercado financeiro, Mineração/petróleo/siderurgia/florestal, Política e Tecnologia, com links das fontes, cotações do dia e **áudio na voz da Kira**. |
+| 🌙 Fim do dia | De segunda a sexta, às 18h: a agenda do próximo dia útil, os e-mails de hoje ainda sem resposta, os rascunhos para revisar, as tarefas abertas do trabalho e os pedidos atrasados. Só lê. |
+| 🩺 Saúde da Kira | Avisa no Telegram quando a Kira ou uma automação dela falha (no máximo uma vez por dia cada uma, com uma dica do que fazer) e, toda segunda às 8h, manda o resumo: conexões, falhas da semana, base de pedidos, último backup e quando reconectar o LinkedIn. |
+| 💾 Backup | Todo domingo às 3h, copia as tabelas da Kira (memórias, tarefas, contatos, histórico…) para um arquivo no seu Google Drive e guarda os 8 mais recentes. |
 
 ## Estrutura do repositório
 
@@ -72,6 +78,9 @@ Meu bot particular: a **Kira** é uma assistente pessoal de IA que roda no **n8n
 | [`n8n/workflows/kira-planilha-negocio.json`](n8n/workflows/kira-planilha-negocio.json) | Sub-workflow da ferramenta `consultar_negocio`, que lê a planilha do negócio no Google Drive (e o SDK em [`n8n/sdk/kira-planilha-negocio.workflow.ts`](n8n/sdk/kira-planilha-negocio.workflow.ts)) |
 | [`n8n/workflows/kira-powerbi.json`](n8n/workflows/kira-powerbi.json) | Sub-workflow da ferramenta `consultar_powerbi`, que consulta o Power BI pela API oficial (e o SDK em [`n8n/sdk/kira-powerbi.workflow.ts`](n8n/sdk/kira-powerbi.workflow.ts)) |
 | [`n8n/workflows/kira-rascunhos-automaticos.json`](n8n/workflows/kira-rascunhos-automaticos.json) | Workflow dos rascunhos automáticos de e-mails sobre pedidos (e o SDK em [`n8n/sdk/kira-rascunhos-automaticos.workflow.ts`](n8n/sdk/kira-rascunhos-automaticos.workflow.ts)) |
+| [`n8n/workflows/kira-fim-do-dia.json`](n8n/workflows/kira-fim-do-dia.json) | Workflow do fim do dia às 18h (e o SDK em [`n8n/sdk/kira-fim-do-dia.workflow.ts`](n8n/sdk/kira-fim-do-dia.workflow.ts)) |
+| [`n8n/workflows/kira-saude.json`](n8n/workflows/kira-saude.json) | Workflow da Saúde da Kira: avisos de falha e resumo de segunda (e o SDK em [`n8n/sdk/kira-saude.workflow.ts`](n8n/sdk/kira-saude.workflow.ts)) |
+| [`n8n/workflows/kira-backup.json`](n8n/workflows/kira-backup.json) | Workflow do backup semanal das tabelas no Google Drive (e o SDK em [`n8n/sdk/kira-backup.workflow.ts`](n8n/sdk/kira-backup.workflow.ts)) |
 | [`vps/instalar.sh`](vps/instalar.sh) | Instala o n8n numa VPS (Rocky Linux ou RHEL) com Docker e HTTPS automático (Caddy) |
 | [`vps/importar-workflows.sh`](vps/importar-workflows.sh) e [`docs/migracao-vps.md`](docs/migracao-vps.md) | Importa na VPS os workflows baixados do n8n Cloud (mantendo os IDs) e o roteiro da migração |
 | [`docs/configuracao.md`](docs/configuracao.md) | Passo a passo para ativar, primeiro teste e solução de problemas |
@@ -87,7 +96,7 @@ Com Node.js 18 ou mais recente:
 npm test
 ```
 
-Os testes executam o código dos nós dos workflows (formatação para o Telegram, voz e texto, áudio WAV, comandos, ambientes e troca de ambiente, memórias por ambiente, `/publicar` com e sem imagem, geração e anexo de imagens, Teams, leitura da planilha de pedidos em etapas (um .xlsx gerado no próprio teste), base compacta e consulta de pedidos, planilha do negócio (outro .xlsx gerado no teste, com painéis, bases e precificação), rascunho com assinatura, pesquisa na internet, rascunhos automáticos, resumo da manhã com cotações, fontes confiáveis e áudio), conferem que Outlook e Drive só leem (o Outlook só cria rascunhos) e verificam que nenhum token, chave de API ou caminho de webhook foi parar nos arquivos.
+Os testes executam o código dos nós dos workflows (formatação para o Telegram, voz e texto, áudio WAV, comandos, ambientes e troca de ambiente, memórias por ambiente, `/publicar` com e sem imagem, geração e anexo de imagens, Teams, leitura da planilha de pedidos em etapas (um .xlsx gerado no próprio teste), base compacta e consulta de pedidos, planilha do negócio (outro .xlsx gerado no teste, com painéis, bases e precificação), rascunho com assinatura, pesquisa na internet, rascunhos automáticos, resumo da manhã com cotações, fontes confiáveis e áudio, fim do dia, avisos e resumo da Saúde da Kira e o backup semanal), conferem que Outlook e Drive só leem (o Outlook só cria rascunhos) e verificam que nenhum token, chave de API ou caminho de webhook foi parar nos arquivos.
 
 ## Segurança
 
@@ -99,5 +108,5 @@ Os testes executam o código dos nós dos workflows (formatação para o Telegra
 ## Roadmap
 
 - **Kira 1.0**: Telegram + Gemini, texto e voz, memória, comandos e logs; Outlook (leitura e rascunhos), Google Drive (leitura), Teams (lê e responde quando você pede), pedidos da empresa, LinkedIn (rascunhos e `/publicar`), imagens com IA e resumo das 7h em texto e áudio.
-- **Kira 2.0** (agora): ambientes **Trabalho**, **Negócios** e **Pessoal**, com memórias, histórico, tarefas e contatos separados, rascunhos automáticos para e-mails sobre pedidos, pesquisa na internet, a base oficial de pedidos (todas as unidades), a assinatura nos rascunhos, a planilha do negócio no modo Negócios e o Power BI da empresa no modo Trabalho.
-- **Próximos**: mais fontes de Negócios (leads e CRM) e de finanças, memória da conversa que sobrevive a reinícios e um resumo do dia com agenda e tarefas. Detalhes em [arquitetura.md](docs/arquitetura.md#próximos-passos).
+- **Kira 2.0** (agora): ambientes **Trabalho**, **Negócios** e **Pessoal**, com memórias, histórico, tarefas e contatos separados, rascunhos automáticos para e-mails sobre pedidos, pesquisa na internet, a base oficial de pedidos (todas as unidades), a assinatura nos rascunhos, a planilha do negócio no modo Negócios, o Power BI da empresa no modo Trabalho, o fim do dia às 18h, a Saúde da Kira (avisos de falha e resumo de segunda) e o backup semanal.
+- **Próximos**: mais fontes de Negócios (leads e CRM) e de finanças, memória da conversa que sobrevive a reinícios e a agenda e as tarefas do dia também no resumo das 7h. Detalhes em [arquitetura.md](docs/arquitetura.md#próximos-passos).

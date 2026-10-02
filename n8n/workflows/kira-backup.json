@@ -1,0 +1,778 @@
+{
+  "name": "Kira — Backup semanal (domingo 3h)",
+  "nodes": [
+    {
+      "id": "e4c40b72-bb99-4936-a2ff-179dc3c32cc3",
+      "name": "Domingo às 3h",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 3 * * 0"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "aac314da-6ae9-4e66-ae2e-f89b172d9e90",
+      "name": "Configuração do backup",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        300
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b-pasta",
+              "name": "pasta",
+              "value": "Kira - backups",
+              "type": "string"
+            },
+            {
+              "id": "b-manter",
+              "name": "manter",
+              "value": 8,
+              "type": "number"
+            },
+            {
+              "id": "b-prefixo",
+              "name": "prefixo",
+              "value": "kira-backup-",
+              "type": "string"
+            },
+            {
+              "id": "b-hoje",
+              "name": "hoje",
+              "value": "={{ $now.setZone('America/Sao_Paulo').toFormat('yyyy-MM-dd') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "c82faf6b-22de-41d2-a548-767366960efc",
+      "name": "Ler kira_config",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        440,
+        300
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "kira_config"
+        },
+        "returnAll": true
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "60241d23-7bca-4413-a8f5-631c84ebe200",
+      "name": "Ler kira_memoria",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        640,
+        300
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "kira_memoria"
+        },
+        "returnAll": true
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "4f21322e-8da9-47fc-ae53-121f40dc7e2d",
+      "name": "Ler kira_tarefas",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        840,
+        300
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "kira_tarefas"
+        },
+        "returnAll": true
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "bdc14984-290c-4222-a519-33abfc25a8f7",
+      "name": "Ler kira_contatos",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1040,
+        300
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "kira_contatos"
+        },
+        "returnAll": true
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "85e0249a-e2c5-4e3d-a491-43dbd8e5a42e",
+      "name": "Ler kira_logs",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1240,
+        300
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "kira_logs"
+        },
+        "returnAll": true
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "acb3ee7a-9009-467a-a3e9-e9abaa7f3be3",
+      "name": "Ler kira_linkedin",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1440,
+        300
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "kira_linkedin"
+        },
+        "returnAll": true
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "a52dd411-1e31-42bc-a97b-26864ab72250",
+      "name": "Ler kira_imagens",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1640,
+        300
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "kira_imagens"
+        },
+        "returnAll": true
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "292b9f5a-f750-48fb-a639-672a91058bd8",
+      "name": "Ler kira_emails_auto",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1840,
+        300
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "kira_emails_auto"
+        },
+        "returnAll": true
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "cd98cc54-fa88-4bd6-a40d-cda3f0b9475e",
+      "name": "Ler kira_saude",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2040,
+        300
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "kira_saude"
+        },
+        "returnAll": true
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "e28b2f11-1946-4118-a135-631d80f8a070",
+      "name": "Achar pasta",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2240,
+        300
+      ],
+      "parameters": {
+        "url": "https://www.googleapis.com/drive/v3/files",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "={{ \"mimeType = 'application/vnd.google-apps.folder' and name = '\" + $('Configuração do backup').first().json.pasta + \"' and trashed = false\" }}"
+            },
+            {
+              "name": "pageSize",
+              "value": "1"
+            },
+            {
+              "name": "fields",
+              "value": "files(id,name)"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "credentials": {},
+      "executeOnce": true
+    },
+    {
+      "id": "6ed1a22c-6ac4-4ab4-a80b-2631fabe0d91",
+      "name": "Pasta já existe?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2460,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c-pasta",
+              "leftValue": "={{ ($json.files || []).length > 0 }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "f9663ffa-e001-41bb-a66f-a4e0457bbe34",
+      "name": "Pasta do backup",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2900,
+        300
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "p-id",
+              "name": "pasta_id",
+              "value": "={{ $json.files ? $json.files[0].id : $json.id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "b7aac43f-736a-4a48-a84b-db1aff92b9dc",
+      "name": "Criar pasta",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2680,
+        460
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.googleapis.com/drive/v3/files",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "fields",
+              "value": "id,name"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ name: $('Configuração do backup').first().json.pasta, mimeType: 'application/vnd.google-apps.folder' }) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "credentials": {},
+      "executeOnce": true
+    },
+    {
+      "id": "eda618ce-4d1d-4954-ad62-c210a02318c3",
+      "name": "Montar backup",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3120,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Junta as tabelas da Kira num arquivo JSON (a cópia de segurança da semana) e conta as linhas de cada uma.\n// Uma tabela que não abriu fica de fora e entra na lista de falhas; se nenhuma abrir, o backup para com erro.\nconst cfg = $('Configuração do backup').first().json;\nconst TABELAS = ['kira_config', 'kira_memoria', 'kira_tarefas', 'kira_contatos', 'kira_logs', 'kira_linkedin', 'kira_imagens', 'kira_emails_auto', 'kira_saude'];\nconst backup = { kira_backup: 1, gerado_em: new Date().toISOString(), tabelas: {} };\nconst linhas = {};\nconst falhas = [];\nfor (const nome of TABELAS) {\n  let itens;\n  try {\n    itens = $('Ler ' + nome).all().map((i) => i.json);\n  } catch (e) {\n    falhas.push(`${nome} (não rodou)`);\n    continue;\n  }\n  const comErro = itens.find((r) => r && r.error);\n  if (comErro) {\n    const e = comErro.error;\n    falhas.push(`${nome} (${String((e && e.message) || e).replace(/\\s+/g, ' ').slice(0, 80)})`);\n    continue;\n  }\n  // Tabela vazia: o n8n entrega um item vazio, que não entra no backup.\n  const registros = itens.filter((r) => r && r.id !== undefined);\n  backup.tabelas[nome] = registros;\n  linhas[nome] = registros.length;\n}\nif (!Object.keys(backup.tabelas).length) throw new Error('Não consegui ler nenhuma tabela da Kira: ' + falhas.join('; '));\nbackup.linhas = linhas;\nbackup.falhas = falhas;\nconst texto = JSON.stringify(backup);\nconst arquivo = `${cfg.prefixo || 'kira-backup-'}${cfg.hoje}.json`;\nreturn [\n  {\n    json: { arquivo, pasta_id: $('Pasta do backup').first().json.pasta_id, tamanho_kb: Math.round(Buffer.byteLength(texto) / 1024), linhas, falhas },\n    binary: { data: { data: Buffer.from(texto, 'utf8').toString('base64'), mimeType: 'application/json', fileName: arquivo } },\n  },\n];\n"
+      }
+    },
+    {
+      "id": "7e5df097-32a8-4ce0-a849-0519d8ef5abc",
+      "name": "Guardar no Google Drive",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        3340,
+        300
+      ],
+      "parameters": {
+        "resource": "file",
+        "operation": "upload",
+        "inputDataFieldName": "data",
+        "name": "={{ $json.arquivo }}",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.pasta_id }}"
+        },
+        "options": {}
+      },
+      "credentials": {}
+    },
+    {
+      "id": "3ff3586f-f69d-4513-a71a-ba8f82ea05b4",
+      "name": "Conferência (só números)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3560,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Confere o backup salvo. Se alguma tabela ficou de fora, o arquivo parcial fica no Google Drive, mas a execução\n// para com erro: a Saúde da Kira avisa no Telegram e os backups antigos não são apagados.\nconst b = $('Montar backup').first().json;\nconst salvo = $input.first().json;\nif (!salvo.id) throw new Error('O Google Drive não confirmou o arquivo do backup.');\nif (b.falhas.length) throw new Error(`Backup salvo sem estas tabelas: ${b.falhas.join('; ')}`);\nreturn [{ json: { arquivo: b.arquivo, tamanho_kb: b.tamanho_kb, linhas: b.linhas, tabelas: Object.keys(b.linhas).length } }];\n"
+      }
+    },
+    {
+      "id": "3a9a3a50-2133-48f8-a6b1-0427f9be085f",
+      "name": "Backups da pasta",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3780,
+        300
+      ],
+      "parameters": {
+        "url": "https://www.googleapis.com/drive/v3/files",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "={{ \"'\" + $('Pasta do backup').first().json.pasta_id + \"' in parents and name contains '\" + $('Configuração do backup').first().json.prefixo + \"' and trashed = false\" }}"
+            },
+            {
+              "name": "orderBy",
+              "value": "createdTime desc"
+            },
+            {
+              "name": "pageSize",
+              "value": "100"
+            },
+            {
+              "name": "fields",
+              "value": "files(id,name,createdTime)"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "credentials": {},
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "c03fe258-5c28-4242-a097-18167b89c410",
+      "name": "Escolher os antigos",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4000,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Guarda os backups mais recentes (8 por padrão); os mais antigos vão para a lixeira do Google Drive, que os apaga\n// de vez depois de 30 dias. Só mexe em arquivos \"kira-backup-...\" da pasta de backups.\nconst manter = Math.max(Number($('Configuração do backup').first().json.manter) || 8, 1);\nconst arquivos = ($input.first().json.files ?? []).filter((f) => f && f.id && /^kira-backup-.*\\.json$/.test(String(f.name ?? '')));\narquivos.sort((a, b) => String(b.createdTime ?? '').localeCompare(String(a.createdTime ?? '')));\nreturn arquivos.slice(manter).map((f) => ({ json: { id: f.id, name: f.name } }));\n"
+      }
+    },
+    {
+      "id": "265d41d8-2650-434e-a924-2d3fc594cc52",
+      "name": "Mandar para a lixeira",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4220,
+        300
+      ],
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ 'https://www.googleapis.com/drive/v3/files/' + $json.id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"trashed\": true}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "credentials": {},
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Domingo às 3h": {
+      "main": [
+        [
+          {
+            "node": "Configuração do backup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configuração do backup": {
+      "main": [
+        [
+          {
+            "node": "Ler kira_config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ler kira_config": {
+      "main": [
+        [
+          {
+            "node": "Ler kira_memoria",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ler kira_memoria": {
+      "main": [
+        [
+          {
+            "node": "Ler kira_tarefas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ler kira_tarefas": {
+      "main": [
+        [
+          {
+            "node": "Ler kira_contatos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ler kira_contatos": {
+      "main": [
+        [
+          {
+            "node": "Ler kira_logs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ler kira_logs": {
+      "main": [
+        [
+          {
+            "node": "Ler kira_linkedin",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ler kira_linkedin": {
+      "main": [
+        [
+          {
+            "node": "Ler kira_imagens",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ler kira_imagens": {
+      "main": [
+        [
+          {
+            "node": "Ler kira_emails_auto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ler kira_emails_auto": {
+      "main": [
+        [
+          {
+            "node": "Ler kira_saude",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ler kira_saude": {
+      "main": [
+        [
+          {
+            "node": "Achar pasta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Achar pasta": {
+      "main": [
+        [
+          {
+            "node": "Pasta já existe?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pasta já existe?": {
+      "main": [
+        [
+          {
+            "node": "Pasta do backup",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Criar pasta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pasta do backup": {
+      "main": [
+        [
+          {
+            "node": "Montar backup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Criar pasta": {
+      "main": [
+        [
+          {
+            "node": "Pasta do backup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar backup": {
+      "main": [
+        [
+          {
+            "node": "Guardar no Google Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar no Google Drive": {
+      "main": [
+        [
+          {
+            "node": "Conferência (só números)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Conferência (só números)": {
+      "main": [
+        [
+          {
+            "node": "Backups da pasta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Backups da pasta": {
+      "main": [
+        [
+          {
+            "node": "Escolher os antigos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Escolher os antigos": {
+      "main": [
+        [
+          {
+            "node": "Mandar para a lixeira",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Sao_Paulo",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "all"
+  },
+  "tags": []
+}

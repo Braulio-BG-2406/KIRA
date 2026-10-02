@@ -18,7 +18,7 @@ Prefere rodar na VPS? Veja [Rodar na VPS](#rodar-na-vps-opcional) no fim.
 4. [Publicar o workflow](#4-publicar)
 5. [Liberar o seu ID do Telegram](#5-liberar-o-seu-id)
 6. [Fazer o primeiro teste](#6-primeiro-teste-)
-7. Opcionais: [Outlook](#7-outlook-e-mails-agenda-e-rascunhos-de-resposta), [Resumo da manhã às 7h](#8-resumo-da-manhã-às-7h), [Google Drive](#9-google-drive-só-leitura), [LinkedIn](#10-linkedin-rascunhos-e-publicar), [Imagens](#11-imagens-com-ia), [Teams](#12-microsoft-teams), [Pedidos](#13-pedidos-base-oficial-do-erp), [Ambientes](#14-ambientes-kira-20), [Rascunhos automáticos](#15-rascunhos-automáticos-de-e-mails-sobre-pedidos), [Internet](#16-internet-pesquisa-no-google), [Assinatura nos rascunhos](#17-assinatura-nos-rascunhos-de-resposta), [Planilha do negócio](#18-planilha-do-negócio-modo-negócios) e [Power BI](#19-power-bi-modo-trabalho)
+7. Opcionais: [Outlook](#7-outlook-e-mails-agenda-e-rascunhos-de-resposta), [Resumo da manhã às 7h](#8-resumo-da-manhã-às-7h), [Google Drive](#9-google-drive-só-leitura), [LinkedIn](#10-linkedin-rascunhos-e-publicar), [Imagens](#11-imagens-com-ia), [Teams](#12-microsoft-teams), [Pedidos](#13-pedidos-base-oficial-do-erp), [Ambientes](#14-ambientes-kira-20), [Rascunhos automáticos](#15-rascunhos-automáticos-de-e-mails-sobre-pedidos), [Internet](#16-internet-pesquisa-no-google), [Assinatura nos rascunhos](#17-assinatura-nos-rascunhos-de-resposta), [Planilha do negócio](#18-planilha-do-negócio-modo-negócios), [Power BI](#19-power-bi-modo-trabalho), [Fim do dia às 18h](#20-fim-do-dia-às-18h), [Saúde da Kira](#21-saúde-da-kira-avisos-de-falha-e-resumo-de-segunda) e [Backup semanal](#22-backup-semanal-google-drive)
 
 ---
 
@@ -318,6 +318,53 @@ Teste no modo Trabalho: "Kira, quais relatórios do Power BI você vê?" e depoi
 
 > Os números consultados passam pelo Gemini, como os pedidos e os e-mails; no plano gratuito, o Google pode usar o conteúdo para melhorar os produtos dele. O segredo do app vence no prazo que você escolheu: antes disso, crie um novo e troque na credencial.
 
+## 20. Fim do dia às 18h
+
+Workflow separado: **Kira — Fim do Dia (18h)** ([`kira-fim-do-dia.json`](../n8n/workflows/kira-fim-do-dia.json)). De segunda a sexta, às 18h, a Kira manda no Telegram o resumo do expediente. Só lê: não envia e-mail nem muda nada.
+
+- 📅 **Agenda do próximo dia útil** (na sexta, a de segunda). Compromissos de vários dias, como férias e viagens, aparecem como "dia todo (até dd/mm)".
+- 📬 **E-mails de hoje ainda sem resposta**, os importantes primeiro. Ficam de fora os que você já respondeu ou encaminhou, os automáticos (como "não responda" e avisos de sistemas), os que o Outlook separou em **Outros** e os em que você está só em cópia.
+- 📝 **Rascunhos para revisar**: os de hoje e o total da pasta.
+- ✅ **Tarefas abertas do ambiente de trabalho** (`kira_tarefas`), com as atrasadas marcadas. Só desse ambiente: nada dos outros aparece.
+- 📦 **Pedidos atrasados** da base oficial (passo 13), em números e por unidade.
+
+Se uma parte não responder, a mensagem sai mesmo assim, com uma linha dizendo o que faltou.
+
+1. Importe o workflow e selecione as credenciais: *Microsoft Outlook* (nos 4 nós HTTP) e *Telegram* (nos 2 envios).
+2. No nó **Configuração do fim do dia**, preencha `nome_dono`, `chat_id` e `user_id` (o seu ID do Telegram, o mesmo da Kira). Se quiser, troque o ambiente (`ambiente` e `ambiente_nome`; padrão Trabalho) e `max_itens` (quantos itens por lista; padrão 8).
+3. No nó **Pedidos atrasados**, selecione o sub-workflow de pedidos e, nele, em **Settings → This workflow can be called by**, libere também este workflow. Publique.
+
+## 21. Saúde da Kira (avisos de falha e resumo de segunda)
+
+Workflow separado: **Kira — Saúde (avisos e resumo de segunda)** ([`kira-saude.json`](../n8n/workflows/kira-saude.json)). Ele faz duas coisas:
+
+- **Avisa quando algo falha.** Se a Kira ou uma automação dela parar com erro, chega no Telegram: qual automação, em que passo, o erro, uma dica (por exemplo, "parece que uma conexão venceu: clique em Reconnect") e o link da execução no n8n. É no máximo **um aviso por dia** para cada automação; as outras falhas do mesmo dia só ficam anotadas na tabela `kira_saude` (guardada por 90 dias).
+- **Toda segunda às 8h**, manda o resumo da semana: as conexões (Outlook, Google Drive, Gemini, Power BI e LinkedIn), as falhas dos últimos 7 dias por automação, quando a base de pedidos foi atualizada, o último backup (passo 22) e quantos dias faltam para reconectar o LinkedIn. O que precisar de atenção aparece em **Para olhar**.
+
+Ele só lê os serviços e só escreve na tabela `kira_saude`.
+
+1. Crie a tabela `kira_saude` com as colunas `workflow_id`, `workflow`, `no`, `erro`, `execucao_id` e `modo` (texto).
+2. Importe o workflow e selecione as credenciais: *Microsoft Outlook* (nó **Outlook**), a mesma da base de pedidos no nó **Base de pedidos (OneDrive)**, *Google Drive*, *Power BI* (nos 2 nós do Power BI), *Gemini*, *LinkedIn* e *Telegram* (nos 3 envios).
+3. No nó **Configuração da saúde**, preencha `chat_id` (o seu ID do Telegram) e `linkedin_conectado_em` (o dia em que você conectou o LinkedIn, como `2026-10-02`: a Kira avisa quando faltarem 10 dias para os 60 dias). Em `servicos` ficam os serviços que você usa (`outlook, drive, gemini, powerbi, linkedin, pedidos`): se não usa algum, tire o nome da lista e apague o nó dele. Publique.
+4. Em cada automação da Kira (a Kira, o resumo da manhã, os rascunhos automáticos, o fim do dia e o backup), abra **Settings → Error workflow**, escolha **Kira — Saúde (avisos e resumo de segunda)** e salve. Não precisa publicar de novo. A base de pedidos já tem o aviso dela (passo 13).
+
+> Os avisos só valem para as execuções de verdade (as agendadas e as mensagens do Telegram). Testes feitos no editor do n8n não avisam.
+
+## 22. Backup semanal (Google Drive)
+
+Workflow separado: **Kira — Backup semanal (domingo 3h)** ([`kira-backup.json`](../n8n/workflows/kira-backup.json)). Todo domingo às 3h, ele copia as tabelas da Kira (configuração, memórias, tarefas, contatos, histórico das conversas, rascunhos do LinkedIn, imagens, e-mails automáticos e falhas) para um arquivo `kira-backup-AAAA-MM-DD.json` na pasta **Kira - backups** do seu Google Drive. A pasta é criada na primeira vez.
+
+- Ficam os **8 backups mais recentes**; os mais antigos vão para a lixeira do Drive, que os apaga de vez em 30 dias. Ele só mexe nos arquivos `kira-backup-…` dessa pasta.
+- Se alguma tabela não abrir, o arquivo é salvo sem ela, a Saúde da Kira avisa no Telegram e os backups antigos não são apagados.
+- O arquivo tem os dados dos três ambientes e o histórico das conversas, por isso fica só no seu Google Drive, numa pasta que só você vê. A Kira não lê esse arquivo.
+- Os workflows e as credenciais não entram nele: eles ficam no banco do n8n. Na VPS, a cópia deles é a da pasta do n8n (veja [migracao-vps.md](migracao-vps.md)).
+
+1. Importe o workflow e selecione a credencial *Google Drive* nos 5 nós do Drive (**Achar pasta**, **Criar pasta**, **Guardar no Google Drive**, **Backups da pasta** e **Mandar para a lixeira**).
+2. Se quiser, troque na **Configuração do backup** o nome da pasta (`pasta`) e quantos backups guardar (`manter`). Publique.
+3. Para fazer o primeiro na hora, abra o workflow e clique em **Execute workflow**: a pasta e o arquivo aparecem no Drive.
+
+**Para recuperar uma tabela:** o arquivo traz, em `tabelas`, as linhas de cada tabela com todas as colunas. Dá para recolocar as linhas pelo n8n (com um workflow que lê o arquivo e grava na tabela); peça ajuda se precisar.
+
 ## Personalizar
 
 Tudo fica no nó **Configuração da Kira**:
@@ -342,6 +389,8 @@ A personalidade e as regras de comportamento estão em [persona-kira.md](persona
 - **Data tables → `kira_logs`**: uma linha por mensagem, com entrada, resposta, modo (voz ou texto), erros, tempo de resposta e o número da execução.
 - **Executions** (no workflow): o passo a passo de cada execução. Use o `execucao_id` do log para achar a execução certa.
 - **Data tables → `kira_memoria`**: as memórias guardadas. Você pode editar ou apagar linhas à mão.
+- **Data tables → `kira_saude`**: as falhas anotadas pela Saúde da Kira (passo 21), com o passo e o número da execução.
+- **Google Drive → Kira - backups**: os backups semanais das tabelas (passo 22).
 
 Durante os testes ficou uma linha de teste em `kira_logs` (usuário "Teste @teste_kira"); pode apagar.
 

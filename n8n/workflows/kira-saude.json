@@ -1,0 +1,938 @@
+{
+  "name": "Kira — Saúde (avisos e resumo de segunda)",
+  "nodes": [
+    {
+      "id": "6121e2f0-8a66-48cf-ab3e-c8d1a213860f",
+      "name": "Quando algo falhar",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        100
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "87313687-47fe-4f84-a922-c9f5bfcb922a",
+      "name": "Configuração da saúde",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        250
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "s-chat",
+              "name": "chat_id",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "s-fuso",
+              "name": "fuso_horario",
+              "value": "America/Sao_Paulo",
+              "type": "string"
+            },
+            {
+              "id": "s-agora",
+              "name": "agora",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            },
+            {
+              "id": "s-base",
+              "name": "base_max_dias",
+              "value": 4,
+              "type": "number"
+            },
+            {
+              "id": "s-backup",
+              "name": "backup_max_dias",
+              "value": 8,
+              "type": "number"
+            },
+            {
+              "id": "s-linkedin",
+              "name": "linkedin_conectado_em",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "s-linkedin-dias",
+              "name": "linkedin_validade_dias",
+              "value": 60,
+              "type": "number"
+            },
+            {
+              "id": "s-servicos",
+              "name": "servicos",
+              "value": "outlook, drive, gemini, powerbi, linkedin, pedidos",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "51c2ba06-b452-4b17-af9b-fbda54ebedaf",
+      "name": "Segunda às 8h",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        400
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * 1"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "c8fc3e08-dc07-4bcd-a607-fbcbe16012a9",
+      "name": "Veio de uma falha?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        480,
+        250
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c-falha",
+              "leftValue": "={{ $('Quando algo falhar').isExecuted }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "24862190-fb61-4360-af04-163971b485b6",
+      "name": "Resumir falha",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        100
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Resume a falha que o n8n avisou (Error Trigger) em poucos campos e monta o aviso do Telegram.\n// Vale para falha no meio de um workflow (execution) e para falha ao ligar um gatilho (trigger).\nconst dados = $('Quando algo falhar').first().json || {};\nconst execucao = dados.execution || {};\nconst gatilho = dados.trigger || {};\nconst wf = dados.workflow || {};\nconst erro = execucao.error || gatilho.error || {};\nconst esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nconst corta = (s, n) => {\n  const t = String(s ?? '').replace(/\\s+/g, ' ').trim();\n  return t.length > n ? t.slice(0, n - 1) + '…' : t;\n};\nconst nome = corta(wf.name || 'Workflow sem nome', 120);\nconst no = corta(execucao.lastNodeExecuted || erro.node?.name || '', 120);\nconst mensagem = corta(erro.message || erro.description || 'erro sem mensagem', 300);\nconst link = /^https:\\/\\/[^\\s\"<>]+$/.test(String(execucao.url || '')) ? execucao.url : '';\n\n// Uma dica curta para os erros mais comuns (o dono não é técnico).\nlet dica = '';\nif (/\\b401\\b|unauthori[sz]ed|invalid_grant|expired|expirad|reconnect|reconect/i.test(mensagem)) {\n  dica = 'Parece que uma conexão venceu: no n8n, abra Credentials, escolha a conexão desse serviço e clique em Reconnect.';\n} else if (/\\b429\\b|quota|rate.?limit|resource.?exhausted|too many requests/i.test(mensagem)) {\n  dica = 'Limite de uso do serviço gratuito: costuma voltar sozinho em algumas horas.';\n} else if (/timeout|timed out|ETIMEDOUT|ECONNRESET|ECONNREFUSED|ENOTFOUND|EAI_AGAIN|socket hang up|\\b50[234]\\b/i.test(mensagem)) {\n  dica = 'Instabilidade na internet ou no serviço: costuma passar sozinha na próxima rodada.';\n}\n\nconst linhas = ['⚠️ <b>Kira: uma automação falhou</b>', `<b>${esc(nome)}</b>`];\nif (no) linhas.push(`Onde: <i>${esc(no)}</i>`);\nlinhas.push(`Erro: ${esc(mensagem)}`);\nif (dica) linhas.push(`💡 ${esc(dica)}`);\nif (link) linhas.push(`<a href=\"${esc(link)}\">Abrir a execução no n8n</a>`);\nlinhas.push('<i>Se ela falhar de novo hoje, eu só anoto, sem novo aviso. O resumo da semana chega na segunda.</i>');\n\nreturn [\n  {\n    json: {\n      workflow_id: String(wf.id ?? ''),\n      workflow: nome,\n      no,\n      erro: mensagem,\n      execucao_id: String(execucao.id ?? ''),\n      modo: String(execucao.mode || gatilho.mode || ''),\n      html: linhas.join('\\n'),\n    },\n  },\n];\n"
+      }
+    },
+    {
+      "id": "d5127a46-17db-427a-a776-7d84e9b06f9a",
+      "name": "Já avisei hoje?",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        960,
+        100
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "kira_saude"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "workflow_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Resumir falha').first().json.workflow_id }}"
+            },
+            {
+              "keyName": "createdAt",
+              "condition": "gte",
+              "keyValue": "={{ $now.setZone('America/Sao_Paulo').startOf('day').toISO() }}"
+            }
+          ]
+        },
+        "returnAll": false,
+        "limit": 1
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "0b2d6fd2-c5ba-4828-a7de-69a8a97f3b38",
+      "name": "Anotar falha",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1200,
+        100
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "kira_saude"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "workflow_id": "={{ $('Resumir falha').first().json.workflow_id }}",
+            "workflow": "={{ $('Resumir falha').first().json.workflow }}",
+            "no": "={{ $('Resumir falha').first().json.no }}",
+            "erro": "={{ $('Resumir falha').first().json.erro }}",
+            "execucao_id": "={{ $('Resumir falha').first().json.execucao_id }}",
+            "modo": "={{ $('Resumir falha').first().json.modo }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "workflow_id",
+              "displayName": "workflow_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "workflow",
+              "displayName": "workflow",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "no",
+              "displayName": "no",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "erro",
+              "displayName": "erro",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "execucao_id",
+              "displayName": "execucao_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "modo",
+              "displayName": "modo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "executeOnce": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "a95c213c-a171-4a7f-a04e-43383b15d929",
+      "name": "Primeiro aviso de hoje?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1440,
+        100
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c-primeiro",
+              "leftValue": "={{ !$('Já avisei hoje?').first().json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "0ec3aca6-d631-444a-ad48-00aa7e6840fb",
+      "name": "Avisar no Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1680,
+        0
+      ],
+      "parameters": {
+        "chatId": "={{ $('Configuração da saúde').first().json.chat_id }}",
+        "text": "={{ $('Resumir falha').first().json.html }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "disable_web_page_preview": true,
+          "parse_mode": "HTML"
+        }
+      },
+      "credentials": {},
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "d22b591d-f496-4911-a592-3f8be3f63c04",
+      "name": "Outlook",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        400
+      ],
+      "parameters": {
+        "url": "https://graph.microsoft.com/v1.0/me",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "microsoftOutlookOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "$select",
+              "value": "id"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "credentials": {},
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "b1601112-a760-4675-af06-c4ee5da06343",
+      "name": "Base de pedidos (OneDrive)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        400
+      ],
+      "parameters": {
+        "url": "https://graph.microsoft.com/v1.0/me/drive/root:/Kira/base-pedidos.json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "microsoftTeamsOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "$select",
+              "value": "lastModifiedDateTime,size"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "credentials": {},
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "98a3a22f-78d3-4968-af8a-153f8d717f4b",
+      "name": "Google Drive e último backup",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1200,
+        400
+      ],
+      "parameters": {
+        "url": "https://www.googleapis.com/drive/v3/files",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "name contains 'kira-backup-' and mimeType = 'application/json' and trashed = false"
+            },
+            {
+              "name": "orderBy",
+              "value": "createdTime desc"
+            },
+            {
+              "name": "pageSize",
+              "value": "1"
+            },
+            {
+              "name": "fields",
+              "value": "files(name,createdTime,size)"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "credentials": {},
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "e40c91e8-cdca-4151-a066-b815afcaf454",
+      "name": "Renovar conexão (Power BI)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1440,
+        400
+      ],
+      "parameters": {
+        "url": "https://api.fabric.microsoft.com/v1/workspaces",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "credentials": {},
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "3ad0d7f2-537e-41f8-aa14-8a73b3ed75d1",
+      "name": "Power BI",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1680,
+        400
+      ],
+      "parameters": {
+        "url": "https://api.powerbi.com/v1.0/myorg/groups",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "$top",
+              "value": "1"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "credentials": {},
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "2b260e2c-2629-422c-ad4e-b1e7d83606ca",
+      "name": "Gemini",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1920,
+        400
+      ],
+      "parameters": {
+        "url": "https://generativelanguage.googleapis.com/v1beta/models",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googlePalmApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "pageSize",
+              "value": "1"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "credentials": {},
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "f1e56c7f-a921-4969-a72c-1570bb67f66e",
+      "name": "LinkedIn",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2160,
+        400
+      ],
+      "parameters": {
+        "url": "https://api.linkedin.com/v2/userinfo",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "linkedInOAuth2Api",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "credentials": {},
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "79b73882-6d34-4393-a372-60d5ac455972",
+      "name": "Falhas da semana",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2400,
+        400
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "kira_saude"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "createdAt",
+              "condition": "gte",
+              "keyValue": "={{ $now.minus({ days: 7 }).toISO() }}"
+            }
+          ]
+        },
+        "returnAll": true
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "b8202081-0c98-4535-acc9-59a7a497cd83",
+      "name": "Montar relatório",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2640,
+        400
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Monta o resumo semanal da saúde da Kira (HTML do Telegram): conexões, falhas dos últimos 7 dias, base de pedidos,\n// último backup e quando reconectar o LinkedIn. Cada verificação que falhar vira um item de \"Para olhar\",\n// sem derrubar o resto.\nconst cfg = $('Configuração da saúde').first().json;\nconst fuso = cfg.fuso_horario || 'America/Sao_Paulo';\nconst agora = new Date(cfg.agora || Date.now());\nconst esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nconst corta = (s, n) => {\n  const t = String(s ?? '').replace(/\\s+/g, ' ').trim();\n  return t.length > n ? t.slice(0, n - 1) + '…' : t;\n};\nconst resposta = (no) => {\n  try {\n    return $(no).first()?.json ?? {};\n  } catch (e) {\n    return { error: { message: 'não rodou' } };\n  }\n};\nconst falhou = (r) => Boolean(r.error);\nconst motivo = (r) => {\n  const m = corta(r.error?.message ?? r.error?.description ?? (typeof r.error === 'string' ? r.error : ''), 100) || 'sem resposta';\n  return /\\b401\\b|unauthori[sz]ed|invalid_grant|expired/i.test(m) ? `${m} (reconecte no n8n: Credentials → Reconnect)` : m;\n};\nconst valida = (iso) => {\n  const d = new Date(iso);\n  return isNaN(d) ? null : d;\n};\nconst diaMes = (d) => d.toLocaleDateString('pt-BR', { timeZone: fuso, day: '2-digit', month: '2-digit' });\nconst diaHora = (d) =>\n  d.toLocaleString('pt-BR', { timeZone: fuso, day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(', ', ' às ');\nconst diasDesde = (d) => (agora - d) / 86400000;\nconst paraOlhar = [];\n// Só entram no resumo os serviços da lista \"servicos\" da configuração.\nconst usados = String(cfg.servicos ?? 'outlook, drive, gemini, powerbi, linkedin, pedidos').toLowerCase().split(/[\\s,;]+/).filter(Boolean);\nconst usa = (servico) => usados.includes(servico);\n\n// Conexões: uma leitura simples em cada serviço.\nconst conexoes = [\n  ['Outlook', 'Outlook', 'outlook'],\n  ['Google Drive', 'Google Drive e último backup', 'drive'],\n  ['Gemini', 'Gemini', 'gemini'],\n  ['Power BI', 'Power BI', 'powerbi'],\n  ['LinkedIn', 'LinkedIn', 'linkedin'],\n].filter((c) => usa(c[2]));\nlet conexoesOk = 0;\nconst marcas = conexoes.map(([rotulo, no]) => {\n  const r = resposta(no);\n  if (falhou(r)) {\n    paraOlhar.push(`${rotulo}: ${motivo(r)}`);\n    return `⚠️ ${rotulo}`;\n  }\n  conexoesOk += 1;\n  return `✅ ${rotulo}`;\n});\n\n// Falhas anotadas pelo aviso de falhas (execuções de teste não contam).\nlet falhas = null;\ntry {\n  const linhas = $('Falhas da semana').all().map((i) => i.json);\n  if (!linhas.some((r) => r && r.error)) falhas = linhas.filter((r) => r && r.id !== undefined && r.modo !== 'manual');\n} catch (e) {}\nconst grupos = new Map();\nfor (const f of falhas ?? []) {\n  const chave = f.workflow || f.workflow_id || 'Workflow sem nome';\n  const g = grupos.get(chave) ?? { nome: chave, total: 0, ultima: '', no: '' };\n  g.total += 1;\n  if (String(f.createdAt ?? '') >= g.ultima) {\n    g.ultima = String(f.createdAt ?? '');\n    g.no = f.no || '';\n  }\n  grupos.set(chave, g);\n}\nconst listaGrupos = [...grupos.values()].sort((a, b) => b.total - a.total || b.ultima.localeCompare(a.ultima));\nconst MAX = 6;\nconst linhaGrupo = (g) => {\n  const quando = valida(g.ultima);\n  const detalhes = [quando ? `última ${diaHora(quando)}` : '', g.no ? `em <i>${esc(corta(g.no, 50))}</i>` : ''].filter(Boolean).join(', ');\n  return `• ${esc(corta(g.nome, 60))}: ${g.total}${detalhes ? ` (${detalhes})` : ''}`;\n};\n\n// Base de pedidos: o arquivo que a sincronização grava no OneDrive.\nconst base = usa('pedidos') ? resposta('Base de pedidos (OneDrive)') : {};\nconst MAX_BASE = Number(cfg.base_max_dias) || 4;\nlet linhaBase = '';\nlet baseOk = usa('pedidos') ? false : null;\nconst dataBase = valida(base.lastModifiedDateTime);\nif (!usa('pedidos')) {\n  // sem a base de pedidos, a linha não aparece\n} else if (falhou(base)) {\n  linhaBase = '⚠️ não consegui conferir';\n  paraOlhar.push(`Base de pedidos: ${motivo(base)}`);\n} else if (!dataBase) {\n  linhaBase = '⚠️ arquivo não encontrado';\n  paraOlhar.push('Base de pedidos: o arquivo da base não apareceu no OneDrive');\n} else if (diasDesde(dataBase) > MAX_BASE) {\n  linhaBase = `⚠️ parada desde ${diaHora(dataBase)}`;\n  paraOlhar.push(`Base de pedidos: sem atualização há ${Math.floor(diasDesde(dataBase))} dias`);\n} else {\n  baseOk = true;\n  linhaBase = `✅ atualizada em ${diaHora(dataBase)}`;\n}\n\n// Último backup (a pasta do Google Drive).\nconst drive = usa('drive') ? resposta('Google Drive e último backup') : {};\nconst MAX_BACKUP = Number(cfg.backup_max_dias) || 8;\nconst ultimo = (drive.files ?? [])[0];\nconst dataBackup = valida(ultimo?.createdTime);\nlet linhaBackup = '';\nlet backupOk = usa('drive') ? false : null;\nif (!usa('drive')) {\n  // o backup fica no Google Drive: sem ele, a linha não aparece\n} else if (falhou(drive)) linhaBackup = '⚠️ não consegui conferir';\nelse if (!dataBackup) {\n  linhaBackup = '⚠️ nenhum backup ainda';\n  paraOlhar.push('Backup: nenhum arquivo na pasta de backups');\n} else {\n  const kb = Math.round((Number(ultimo.size) || 0) / 1024);\n  const tamanho = kb >= 1024 ? `${(kb / 1024).toFixed(1).replace('.', ',')} MB` : `${kb} KB`;\n  backupOk = diasDesde(dataBackup) <= MAX_BACKUP;\n  linhaBackup = `${backupOk ? '✅' : '⚠️'} ${diaHora(dataBackup)} (${tamanho})`;\n  if (!backupOk) paraOlhar.push(`Backup: o último tem ${Math.floor(diasDesde(dataBackup))} dias`);\n}\n\n// LinkedIn: o acesso dura 60 dias e não renova sozinho.\nlet linhaLinkedin = '';\nlet faltamLinkedin = null;\n// Conta em dias de calendário (data de hoje no fuso do dono contra a data do vencimento).\nconst conectado = valida(String(cfg.linkedin_conectado_em || '').slice(0, 10) + 'T12:00:00Z');\nif (usa('linkedin') && cfg.linkedin_conectado_em && conectado) {\n  const vence = new Date(conectado.getTime() + (Number(cfg.linkedin_validade_dias) || 60) * 86400000);\n  const hoje = new Date(agora.toLocaleDateString('en-CA', { timeZone: fuso }) + 'T12:00:00Z');\n  faltamLinkedin = Math.round((vence - hoje) / 86400000);\n  if (faltamLinkedin < 0) {\n    linhaLinkedin = `⚠️ a conexão venceu em ${diaMes(vence)}`;\n    paraOlhar.push('LinkedIn: reconecte no n8n (Credentials → LinkedIn → Reconnect) e anote a nova data na Configuração da saúde');\n  } else if (faltamLinkedin <= 10) {\n    linhaLinkedin = `⚠️ reconectar até ${diaMes(vence)} (faltam ${faltamLinkedin} dias)`;\n    paraOlhar.push('LinkedIn: reconecte no n8n (Credentials → LinkedIn → Reconnect) e anote a nova data na Configuração da saúde');\n  } else linhaLinkedin = `reconectar até ${diaMes(vence)} (faltam ${faltamLinkedin} dias)`;\n}\n\nconst partes = [`🩺 <b>Saúde da Kira</b> — semana até ${diaMes(agora)}`, '', `<b>Conexões:</b> ${marcas.join(' · ')}`, ''];\nif (falhas === null) {\n  partes.push('<b>Falhas nos últimos 7 dias:</b> ?');\n  paraOlhar.push('Falhas: não consegui ler a tabela kira_saude');\n} else if (!falhas.length) partes.push('<b>Falhas nos últimos 7 dias:</b> nenhuma 🎉');\nelse {\n  partes.push(`<b>Falhas nos últimos 7 dias:</b> ${falhas.length}`);\n  partes.push(listaGrupos.slice(0, MAX).map(linhaGrupo).join('\\n') + (listaGrupos.length > MAX ? `\\n…e mais ${listaGrupos.length - MAX}` : ''));\n}\npartes.push('');\nif (linhaBase) partes.push(`<b>Base de pedidos:</b> ${linhaBase}`);\nif (linhaBackup) partes.push(`<b>Último backup:</b> ${linhaBackup}`);\nif (linhaLinkedin) partes.push(`<b>LinkedIn:</b> ${linhaLinkedin}`);\npartes.push('');\nif (paraOlhar.length) partes.push('👀 <b>Para olhar:</b>\\n' + paraOlhar.map((p) => `• ${esc(p)}`).join('\\n'));\nelse partes.push('Tudo certo por aqui. 💪');\n\nconst html = partes.join('\\n').replace(/\\n{3,}/g, '\\n\\n').trim();\nconst texto_simples = esc(html.replace(/<[^>]+>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&'));\nreturn [\n  {\n    json: {\n      html,\n      texto_simples,\n      contagens: {\n        conexoes_ok: conexoesOk,\n        conexoes_com_problema: conexoes.length - conexoesOk,\n        falhas_7_dias: falhas === null ? null : falhas.length,\n        workflows_com_falha: falhas === null ? null : listaGrupos.length,\n        base_ok: baseOk,\n        backup_ok: backupOk,\n        linkedin_faltam_dias: faltamLinkedin,\n        itens_para_olhar: paraOlhar.length,\n      },\n    },\n  },\n];\n"
+      }
+    },
+    {
+      "id": "20b89dab-7e13-4e60-aab8-66bcbfe95f33",
+      "name": "Enviar relatório",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2880,
+        400
+      ],
+      "parameters": {
+        "chatId": "={{ $('Configuração da saúde').first().json.chat_id }}",
+        "text": "={{ $json.html }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "disable_web_page_preview": true,
+          "parse_mode": "HTML"
+        }
+      },
+      "credentials": {},
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "4c03102a-5db5-461b-aa11-ad02b5d50c34",
+      "name": "Conferência (só números)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3120,
+        400
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c-cont",
+              "name": "contagens",
+              "value": "={{ $('Montar relatório').first().json.contagens }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "fcbc77ff-8e3d-464e-a931-c901c7658abd",
+      "name": "Limpar falhas antigas",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        3360,
+        400
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "deleteRows",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "kira_saude"
+        },
+        "matchType": "anyCondition",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "createdAt",
+              "condition": "lt",
+              "keyValue": "={{ $now.minus({ days: 90 }).toISO() }}"
+            },
+            {
+              "keyName": "modo",
+              "condition": "eq",
+              "keyValue": "manual"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "executeOnce": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "e8df522c-348f-4bba-a5d0-d28bee2092c9",
+      "name": "Enviar sem formatação",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        3120,
+        580
+      ],
+      "parameters": {
+        "chatId": "={{ $('Configuração da saúde').first().json.chat_id }}",
+        "text": "={{ $('Montar relatório').first().json.texto_simples }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "disable_web_page_preview": true,
+          "parse_mode": "HTML"
+        }
+      },
+      "credentials": {},
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Quando algo falhar": {
+      "main": [
+        [
+          {
+            "node": "Configuração da saúde",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configuração da saúde": {
+      "main": [
+        [
+          {
+            "node": "Veio de uma falha?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Segunda às 8h": {
+      "main": [
+        [
+          {
+            "node": "Configuração da saúde",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Veio de uma falha?": {
+      "main": [
+        [
+          {
+            "node": "Resumir falha",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Outlook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resumir falha": {
+      "main": [
+        [
+          {
+            "node": "Já avisei hoje?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Já avisei hoje?": {
+      "main": [
+        [
+          {
+            "node": "Anotar falha",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anotar falha": {
+      "main": [
+        [
+          {
+            "node": "Primeiro aviso de hoje?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Primeiro aviso de hoje?": {
+      "main": [
+        [
+          {
+            "node": "Avisar no Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Outlook": {
+      "main": [
+        [
+          {
+            "node": "Base de pedidos (OneDrive)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Base de pedidos (OneDrive)": {
+      "main": [
+        [
+          {
+            "node": "Google Drive e último backup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive e último backup": {
+      "main": [
+        [
+          {
+            "node": "Renovar conexão (Power BI)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Renovar conexão (Power BI)": {
+      "main": [
+        [
+          {
+            "node": "Power BI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Power BI": {
+      "main": [
+        [
+          {
+            "node": "Gemini",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini": {
+      "main": [
+        [
+          {
+            "node": "LinkedIn",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LinkedIn": {
+      "main": [
+        [
+          {
+            "node": "Falhas da semana",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Falhas da semana": {
+      "main": [
+        [
+          {
+            "node": "Montar relatório",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar relatório": {
+      "main": [
+        [
+          {
+            "node": "Enviar relatório",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar relatório": {
+      "main": [
+        [
+          {
+            "node": "Conferência (só números)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Enviar sem formatação",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Conferência (só números)": {
+      "main": [
+        [
+          {
+            "node": "Limpar falhas antigas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar sem formatação": {
+      "main": [
+        [
+          {
+            "node": "Conferência (só números)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Sao_Paulo"
+  },
+  "tags": []
+}

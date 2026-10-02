@@ -50,11 +50,15 @@ da credencial).
 | Telegram (`telegramApi`) | O mesmo token do bot |
 | Microsoft: Outlook, Teams, OneDrive e SharePoint (OAuth2 API) | Fora do n8n Cloud, o n8n não tem app próprio da Microsoft, e as credenciais prontas do Teams pedem permissões que só o administrador aprova (`User.ReadWrite.All`, `Group.ReadWrite.All`). Use **uma** credencial genérica **OAuth2 API** (`Microsoft (Kira)`) com o app do Entra ID do Power BI: as URLs `authorize` e `token` do locatário, o **ID do aplicativo**, o **Valor** de um segredo, Scope `offline_access openid User.Read Mail.ReadWrite Calendars.Read Chat.ReadWrite ChatMessage.Send Files.ReadWrite Sites.Read.All` (o próprio usuário aprova), `prompt=select_account` e Authentication **Body**. Nos nós HTTP do Graph, troque a autenticação para **Generic Credential Type → OAuth2 API** e escolha essa credencial |
 | Google Drive (OAuth2) | Projeto no Google Cloud com a API do Google Drive ativada, tela de consentimento **publicada** (em teste, o login vence em 7 dias) e um cliente OAuth do tipo "Aplicativo da Web" com o endereço de retorno |
-| LinkedIn (OAuth2) | App no LinkedIn Developers com "Share on LinkedIn" e "Sign In with LinkedIn using OpenID Connect" e o endereço de retorno |
+| LinkedIn (OAuth2) | App próprio no LinkedIn Developers (ligado a uma página de empresa) com os produtos "Share on LinkedIn" e "Sign In with LinkedIn using OpenID Connect" e o endereço de retorno na aba **Auth**. Na credencial, desligue **Organization Support** e **Legacy** (vêm ligados e fazem o LinkedIn recusar a conexão). O identificador da pessoa muda com o app: nos nós *Publicar no LinkedIn*, escolha a pessoa de novo no campo **Person**. A conexão vale 60 dias; depois, é só clicar em **Conectar** de novo |
 | Power BI (OAuth2 API) | A mesma configuração do passo 19 do guia, com o mesmo app; conecte com a conta que vê os modelos |
 
 Depois, ligue cada credencial aos nós que a usam e confira, nos sub-workflows, quem pode chamá-los (a Kira; o
 rascunho com assinatura e os pedidos também pelos rascunhos automáticos).
+
+Erro comum ao conectar o LinkedIn: `The redirect_uri does not match the registered value` quer dizer que o endereço de
+retorno não foi salvo no app (aba **Auth** → **Authorized redirect URLs** → **Update**). Se o LinkedIn mostrar
+"Bummer, something went wrong" e voltar para a VPS, as opções **Organization Support** e **Legacy** estão ligadas.
 
 Erros comuns ao conectar a Microsoft:
 - `AADSTS700016 … application … was not found`: o **Client ID** está errado (costuma ser o "ID do segredo" no lugar
@@ -79,6 +83,16 @@ Erros comuns ao conectar a Microsoft:
 2. No n8n Cloud, despublique a Kira, o resumo da manhã, os rascunhos automáticos e a sincronização da base.
 3. Na VPS, publique a Kira (o Telegram passa a entregar as mensagens para a VPS) e os três agendados.
 4. Mande uma mensagem real para a Kira e confira `/status`.
+
+Despublicar a Kira apaga o endereço de entrega (webhook) do bot no Telegram, mesmo que ele já aponte para o outro
+n8n. Por isso a ordem importa: primeiro despublique na nuvem, depois publique na VPS. Se a Kira da VPS não responder e
+o log mostrar `Workflow partially published; some triggers failed to activate` (`docker compose logs n8n | grep
+"partially"`, dentro de `/opt/kira`), a entrada do Telegram não ligou: despublique e publique a Kira de novo na VPS.
+Mensagens mandadas enquanto nenhuma Kira recebe não se perdem: o Telegram guarda e entrega quando o endereço volta (às
+vezes alguns minutos depois).
+
+Depois da virada, copie da nuvem o que mudou desde a cópia das tabelas: as conversas novas de `kira_logs` (pelo mesmo
+caminho direto de um n8n para o outro) e as linhas novas das outras tabelas (compare o `updatedAt` de cada tabela).
 
 ## 7. Depois
 - Backup: a pasta `/opt/kira` (tem a chave das credenciais) e o volume `kira_n8n_data`.

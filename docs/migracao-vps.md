@@ -14,16 +14,17 @@ Depois: conta de dono, verificação em duas etapas (2FA) e **MCP em nível de i
 Os IDs iguais mantêm as ligações entre a Kira e os sub-workflows (ferramentas `workflowId`) e a lista de quem pode
 chamar cada sub-workflow.
 
-1. No n8n Cloud, abra cada workflow da Kira e use **⋯ → Download** (os três pontinhos no canto superior direito).
-   São 12: a Kira, os oito sub-workflows (imagens, anexar imagem, Teams, pedidos, internet, planilha do negócio,
-   rascunho com assinatura, Power BI) e os agendados (resumo da manhã, rascunhos automáticos, sincronização da base
-   de pedidos). Os arquivos vão para a pasta Downloads com `_` no lugar de espaços e acentos (por exemplo
-   `Kira___Teams__ferramenta_.json`); `Ctrl + J` no navegador mostra a lista do que foi baixado.
-2. No PowerShell do computador (não dentro da VPS), copie os arquivos para a VPS:
-   `scp (Get-ChildItem $HOME\Downloads\Kira_*.json).FullName root@<endereço>:/tmp/`.
-   O `Kira_` deixa de fora os `.json` deste repositório (`kira-…`), que não têm o ID do workflow.
+1. No n8n Cloud, abra cada workflow da Kira, clique nos **três pontinhos (⋯) ao lado do nome** e em **Download**
+   (em português, "JSON de exportação"; não confunda com "Arquivo", que arquiva o workflow). São 12: a Kira, os
+   oito sub-workflows (imagens, anexar imagem, Teams, pedidos, internet, planilha do negócio, rascunho com
+   assinatura, Power BI) e os agendados (resumo da manhã, rascunhos automáticos, sincronização da base de pedidos).
+   Os arquivos vão para a pasta Downloads com o nome começando por "Kira"; `Ctrl + J` no navegador mostra a lista.
+2. No PowerShell do computador (não dentro da VPS), separe os arquivos baixados nas últimas 3 horas (deixa de fora
+   os `.json` deste repositório, que não têm o ID do workflow), confira que são 12 e copie para a VPS:
+   `$arquivos = Get-ChildItem $HOME\Downloads\Kira*.json | Where-Object LastWriteTime -gt (Get-Date).AddHours(-3); $arquivos.Count`
+   e depois `scp $arquivos.FullName root@<endereço>:/tmp/`.
 3. Entre na VPS (`ssh root@<endereço>`) e rode:
-   `mkdir -p /opt/kira/importar && mv /tmp/Kira_*.json /opt/kira/importar/` e depois
+   `mkdir -p /opt/kira/importar && mv /tmp/Kira*.json /opt/kira/importar/` e depois
    `bash /opt/kira/importar-workflows.sh` (baixe de `vps/importar-workflows.sh`). Tudo entra **despublicado**; o
    script pula cópias repetidas e arquivos sem ID, e a lista final mostra ID e nome de cada workflow.
 
@@ -32,6 +33,12 @@ Crie na VPS as tabelas com os mesmos nomes e colunas da nuvem (os workflows proc
 as linhas: `kira_config`, `kira_memoria`, `kira_contatos`, `kira_tarefas`, `kira_imagens`, `kira_linkedin`,
 `kira_emails_auto` e o histórico recente de `kira_logs` (a recuperação de histórico quebrado e `buscar_conversas`
 usam as últimas conversas).
+
+As linhas copiadas ganham a data da cópia (`createdAt` não pode ser gravado) e a Kira ordena as conversas por essa
+data: grave as conversas da mais antiga para a mais nova, uma por vez (como faz o nó Data table ao inserir item a
+item; numa inserção em lote todas ficam com o mesmo horário). Para as conversas não passarem por mais ninguém,
+copie `kira_logs` direto de um n8n para o outro: um workflow temporário na nuvem lê a tabela e envia por HTTP para
+um webhook temporário na VPS (caminho aleatório, despublicado logo depois), que grava e responde só contagens.
 
 ## 4. Credenciais (o dono cria na VPS; nunca pelo chat)
 O endereço de retorno OAuth da VPS é `https://<endereço>/rest/oauth2-credential/callback` (o n8n mostra na tela

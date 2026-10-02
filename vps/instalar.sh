@@ -74,6 +74,7 @@ services:
       - EXECUTIONS_DATA_PRUNE=true
       - EXECUTIONS_DATA_MAX_AGE=336
       - N8N_DIAGNOSTICS_ENABLED=false
+      - N8N_RUNNERS_HEARTBEAT_INTERVAL=300
     volumes:
       - n8n_data:/home/node/.n8n
 

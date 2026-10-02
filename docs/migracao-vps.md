@@ -68,6 +68,11 @@ Erros comuns ao conectar a Microsoft:
 - Sub-workflows: `test_workflow` com dados reais (pedidos, internet, Power BI, planilha, Teams, rascunho).
 - Kira: `test_workflow` com o "Telegram Trigger" fixado (chat de teste fictício), lendo a resposta em `kira_logs`.
 - Resumo da manhã e rascunhos automáticos: uma execução manual de cada.
+- Sincronização da base de pedidos: "Atualizar agora". Numa VPS pequena, cada etapa da leitura da planilha prende
+  o executor de código por mais tempo que na nuvem; sem folga, a etapa é cancelada com "Task execution aborted
+  because runner became unresponsive". O `instalar.sh` já define `N8N_RUNNERS_HEARTBEAT_INTERVAL=300`; numa
+  instalação anterior, acrescente essa linha em `environment` no `/opt/kira/docker-compose.yml` e rode
+  `docker compose up -d`.
 
 ## 6. Virada
 1. Na VPS, confira que os sub-workflows estão publicados.

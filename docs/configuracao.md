@@ -379,6 +379,7 @@ Durante os testes ficou uma linha de teste em `kira_logs` (usuário "Teste @test
 A Kira também roda no n8n instalado na VPS.
 
 **Instalação rápida (Rocky Linux ou RHEL 9/10):** baixe o script [`vps/instalar.sh`](../vps/instalar.sh) na VPS e rode como root `bash instalar.sh <endereço da VPS>`. Ele instala o Docker, sobe o n8n e o Caddy (HTTPS automático e gratuito, com Let's Encrypt) e cria na própria VPS a chave que protege as credenciais (`/opt/kira/.env`). Guarde uma cópia dessa chave num lugar seguro: sem ela, as credenciais salvas no n8n não abrem. Logo depois, abra o endereço no navegador e crie a conta de dono. Para atualizar o n8n: `cd /opt/kira && docker compose pull && docker compose up -d`.
+Para trazer a Kira do n8n Cloud, siga o roteiro [migracao-vps.md](migracao-vps.md).
 
 Pontos de atenção:
 

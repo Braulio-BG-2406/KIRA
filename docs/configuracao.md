@@ -101,6 +101,7 @@ Depois, teste também:
 | Teste | O que esperar |
 | --- | --- |
 | Escreva "oi, Kira" | Resposta por texto |
+| Mande uma foto com a legenda "o que tem nesta foto?" | Ela descreve a foto (e lê os textos que aparecem nela) |
 | `/status` | Kira online, data e hora, modo de voz e quantas memórias ela guardou |
 | "Kira, lembre que eu prefiro respostas curtas" | Ela confirma que anotou |
 | `/memorias` | A memória aparece com um número, por exemplo `[1]` |

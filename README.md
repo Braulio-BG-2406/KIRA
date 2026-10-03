@@ -2,7 +2,7 @@
 
 Meu bot particular: a **Kira** é uma assistente pessoal de IA que roda no **n8n**, pensa com o **Google Gemini** e conversa comigo pelo **Telegram**, por texto ou por voz.
 
-> **Status: no ar, já com os ambientes da Kira 2.0** (Trabalho, Negócios e Pessoal, cada um com memórias, tarefas e contatos separados), grátis (chave gratuita do Gemini): Outlook (leitura e rascunhos de resposta com a sua assinatura), Google Drive (leitura), Microsoft Teams (lê e responde quando você pede), pedidos da empresa (base oficial do ERP, atualizada 4 vezes ao dia), a planilha do negócio no modo Negócios (vendas, vendedoras, clientes, estoque e precificação), pesquisa na internet (Busca Google), rascunhos de posts do LinkedIn, imagens com IA, resumo de notícias às 7h em texto e áudio, rascunhos automáticos para e-mails que perguntam de pedidos, o fim do dia às 18h, avisos quando algo falha (com um resumo da saúde toda segunda) e backup semanal das tabelas no Google Drive. Para montar do zero, siga o [guia de configuração](docs/configuracao.md).
+> **Status: no ar, já com os ambientes da Kira 2.0** (Trabalho, Negócios e Pessoal, cada um com memórias, tarefas e contatos separados), grátis (chave gratuita do Gemini): Outlook (leitura e rascunhos de resposta com a sua assinatura), Google Drive (leitura), Microsoft Teams (lê e responde quando você pede), pedidos da empresa (base oficial do ERP, atualizada 4 vezes ao dia), a planilha do negócio no modo Negócios (vendas, vendedoras, clientes, estoque e precificação), pesquisa na internet (Busca Google), fotos (ela lê e descreve o que você manda), rascunhos de posts do LinkedIn, imagens com IA, resumo de notícias às 7h em texto e áudio, rascunhos automáticos para e-mails que perguntam de pedidos, o fim do dia às 18h, avisos quando algo falha (com um resumo da saúde toda segunda) e backup semanal das tabelas no Google Drive. Para montar do zero, siga o [guia de configuração](docs/configuracao.md).
 
 ## Como funciona
 
@@ -39,6 +39,7 @@ Meu bot particular: a **Kira** é uma assistente pessoal de IA que roda no **n8n
 | --- | --- |
 | 💬 Texto | Você escreve, ela responde por escrito, com formatação leve. |
 | 🎙️ Voz | Você manda um áudio, ela transcreve com o Gemini e responde com um áudio (voz do próprio Gemini, grátis) com o texto na legenda. |
+| 📷 Fotos | Você manda uma foto (ou uma imagem como arquivo) com uma pergunta na legenda; o leitor de imagens do Gemini descreve a foto e lê os textos dela, e a Kira responde. Sem legenda, ela diz o que vê e pergunta o que fazer. |
 | 🧠 Memória | Lembra as últimas 20 trocas da conversa e guarda fatos duradouros quando você pede ("Kira, lembre que…"). Também esquece quando você pede. |
 | 🔒 Identificação | Só conversa com os IDs do Telegram liberados, e só no chat privado. |
 | ✨ Personalidade | Calorosa, direta e honesta: não inventa dados que ainda não tem. Veja [persona-kira.md](docs/persona-kira.md). |

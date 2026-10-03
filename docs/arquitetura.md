@@ -35,7 +35,7 @@ Os nomes em **negrito** são os nós do workflow [`n8n/workflows/kira-1.0.json`]
 
 1. **Telegram Trigger** recebe a mensagem (webhook do bot).
 2. **Configuração da Kira** acrescenta as configurações (nome, IDs liberados, modo de voz, voz, fuso, perfil).
-3. **Normalizar entrada** extrai chat, usuário, texto e tipo (`comando`, `voz`, `texto` ou `outro`), confere se o usuário está liberado e decide se a resposta vai por voz.
+3. **Normalizar entrada** extrai chat, usuário, texto (ou a legenda da foto) e tipo (`comando`, `voz`, `texto`, `imagem` ou `outro`), confere se o usuário está liberado e decide se a resposta vai por voz.
 4. **É você?** — quem não está em `ids_autorizados` (ou escreve fora do chat privado) recebe **Resposta: acesso negado**. Com a lista vazia, essa resposta mostra o ID da pessoa (modo de configuração).
 5. **Mostrar "digitando…"** mostra *digitando* ou *gravando voz* no Telegram. Em seguida, **Ambientes da Kira** (a lista de ambientes e o padrão) → **Buscar ambiente** (tabela `kira_config`) → **Ambiente atual** descobrem em qual ambiente a Kira está com você.
 6. **Tipo de mensagem** separa o caminho:
@@ -44,7 +44,8 @@ Os nomes em **negrito** são os nós do workflow [`n8n/workflows/kira-1.0.json`]
      - `/publicar N`: **Buscar rascunho (LinkedIn)** → **Rascunho encontrado?** → **Rascunho tem imagem?** → sem imagem, **Publicar no LinkedIn**; com imagem, **Buscar imagem (LinkedIn)** → **Baixar imagem (LinkedIn)** (do Telegram) → **Publicar no LinkedIn (com imagem)**. Depois, **Marcar como publicado**.
    - **Voz** → **Baixar áudio** → **Transcrever áudio (Gemini)**.
    - **Texto** → segue direto.
-   - **Outro** (foto, documento, figurinha…) → **Resposta: tipo não suportado**.
+   - **Imagem** (foto, ou imagem enviada como arquivo) → **Baixar imagem** (a maior versão da foto) → **Analisar imagem (Gemini)**: o leitor de imagens descreve a foto e transcreve os textos que aparecem nela. A pergunta para a Kira é a legenda (ou "o que tem nesta foto?") mais essa descrição.
+   - **Outro** (documento, vídeo, figurinha…) → **Resposta: tipo não suportado**.
 7. **Pergunta** → **Detectar troca de ambiente** → **Trocar ambiente?**: mensagens curtas como "modo pessoal", "quero o modo negócios" ou "/negocios" trocam o ambiente (**Salvar ambiente** → **Resposta: ambiente ativado**); nos áudios, também vale "moto pessoal", um erro comum da transcrição. Nas outras, **Buscar memórias** → **Memórias do ambiente** (só as do ambiente ativo e as gerais) → **Contexto da conversa** montam o que a Kira precisa: a pergunta, a data e hora, o perfil, o ambiente e as memórias.
 8. **Kira** (AI Agent) responde usando:
    - **Gemini (principal)** e **Gemini (reserva)**: se o principal falhar, a reserva assume;
@@ -59,7 +60,7 @@ Os nomes em **negrito** são os nós do workflow [`n8n/workflows/kira-1.0.json`]
    - **consultar_pedidos**: sub-workflow que lê a base compacta de pedidos, gerada a partir da planilha oficial do ERP (abaixo);
    - **pesquisar_internet**: sub-workflow que pesquisa com a Busca Google do Gemini e devolve a resposta com as fontes;
    - **consultar_negocio**: sub-workflow que lê a planilha do negócio no Google Drive, só no modo Negócios (abaixo).
-9. **Resposta da Kira** (ou **Resposta de erro**, se a transcrição ou a IA falharem) padroniza a resposta.
+9. **Resposta da Kira** (ou **Resposta de erro**, se a transcrição, a leitura da foto ou a IA falharem) padroniza a resposta.
    - Se o Gemini recusar o pedido por causa do histórico ("Bad request"), **Histórico quebrado?** → **Últimas conversas** (as últimas trocas deste chat e ambiente em `kira_logs`) → **Resumo das últimas conversas** → **Reiniciar histórico** (a memória da conversa passa a ter só esse resumo) → **Repetir a pergunta** → **Kira** de novo, uma vez só. A resposta é registrada com a nota "histórico reiniciado".
 10. **Resposta pronta** decide voz ou texto e prepara o texto falado e a legenda.
     - Voz: **Gerar voz (Gemini)** → **Preparar áudio (WAV)** → **Áudio para arquivo** → **Enviar áudio**.
@@ -123,6 +124,8 @@ Todas as tabelas também têm `id`, `createdAt` e `updatedAt`, criados pelo n8n.
 
 ## Decisões e porquês
 
+**Fotos pelo leitor de imagens.** A foto não vai anexada para o agente: na integração do n8n com o Gemini (LangChain), modelos com nome como `gemini-flash-latest` não são reconhecidos como modelos que veem imagens, e o agente recusa a foto ("This model does not support images"). Por isso a foto segue o mesmo caminho do áudio: o nó *Analyze image* do Gemini descreve a imagem e transcreve os textos, e a descrição vai com a legenda para a Kira. Como a descrição entra no histórico da conversa, dá para fazer perguntas sobre a foto depois.
+
 **Transcrição com o Gemini.** O mesmo Gemini que conversa também entende áudio. O nó usa a operação *Analyze audio* com uma instrução em português ("transcreva literalmente…; se não houver fala, responda [inaudível]"), o que dá uma transcrição limpa, sem rótulos.
 
 **Voz com o próprio Gemini, grátis.** O modelo de voz do Gemini (`gemini-3.8-flash-tts`) funciona com a mesma chave gratuita do AI Studio, sem Google Cloud nem faturamento. Ele devolve WAV pronto (modelos mais antigos devolvem áudio cru, PCM); o nó *Preparar áudio (WAV)* acrescenta o cabeçalho WAV quando precisa e calcula a duração. A versão anterior usava o Google Cloud Text-to-Speech, que exige faturamento.
@@ -184,7 +187,7 @@ Todas as tabelas também têm `id`, `createdAt` e `updatedAt`, criados pelo n8n.
 - Os rascunhos automáticos rodam de segunda a sexta, das 7h às 19h30, até 5 e-mails por rodada, e só usam a base de pedidos.
 - A base de pedidos é atualizada de segunda a sábado, às 9h, 12h, 15h e 18h: entre uma leitura e outra, a Kira responde com a versão anterior (e cita a hora dela).
 - O resumo das 7h é enviado por outro workflow: a Kira da conversa não "lembra" dele.
-- Fotos e documentos ainda não são entendidos.
+- Documentos (PDF, Word), vídeos e figurinhas ainda não são entendidos. As fotos passam pelo leitor de imagens: a Kira responde com base na descrição dele, não olhando a foto ela mesma.
 - Mensagens enviadas em sequência muito rápida são processadas em paralelo e podem ser respondidas fora de ordem.
 
 ## Próximos passos
@@ -192,5 +195,5 @@ Todas as tabelas também têm `id`, `createdAt` e `updatedAt`, criados pelo n8n.
 1. **Mais dados de Negócios e Pessoal**: leads e CRM, o segundo negócio e finanças, cada um no seu ambiente e com permissões mínimas.
 2. **Memória persistente da conversa** (por exemplo, *Postgres Chat Memory*), para não perder o contexto em reinícios.
 3. **Kira proativa**: o fim do dia já traz a agenda do próximo dia útil e as tarefas do trabalho; falta juntar ao resumo das 7h a agenda do dia e as tarefas abertas de cada ambiente.
-4. **Fotos e documentos**, aproveitando que o Gemini é multimodal.
+4. **Documentos (PDF e Word) e vídeos**, como já acontece com as fotos.
 5. **Privacidade**: e-mails, Teams, pedidos e a planilha do negócio já passam pelo Gemini no plano gratuito, por escolha do dono; o plano pago evita que o Google use esse conteúdo. Este repositório deve ficar privado se passar a guardar qualquer coisa sensível.

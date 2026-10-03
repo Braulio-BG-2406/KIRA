@@ -102,6 +102,7 @@ Depois, teste também:
 | --- | --- |
 | Escreva "oi, Kira" | Resposta por texto |
 | Mande uma foto com a legenda "o que tem nesta foto?" | Ela descreve a foto (e lê os textos que aparecem nela) |
+| Mande uma foto de um produto e peça "deixe o fundo branco" | Chega a foto editada, com o produto igual, e a legenda "🖼️ Imagem #N (a partir da #M)" |
 | `/status` | Kira online, data e hora, modo de voz e quantas memórias ela guardou |
 | "Kira, lembre que eu prefiro respostas curtas" | Ela confirma que anotou |
 | `/memorias` | A memória aparece com um número, por exemplo `[1]` |
@@ -158,6 +159,8 @@ A ferramenta **gerar_imagem** cria imagens com os modelos de imagem do Gemini ("
 
 - **no LinkedIn**: "Kira, faça um post sobre isso com a imagem 3" (sai junto quando você manda `/publicar N`);
 - **num e-mail**: a ferramenta **anexar_imagem_email** anexa a imagem a um rascunho do Outlook. Nada é enviado.
+
+As fotos que você manda também ganham um número (Foto #N) e a Kira pode **editar a sua própria foto**: "coloque esse anel na mão de uma modelo", "troque o fundo por branco". A foto original vai junto para o Gemini e a peça continua igual. Para ajustar uma imagem já pronta, peça pelo número: "deixa a imagem 3 com o fundo mais claro".
 
 Formatos: quadrado (padrão, bom para o LinkedIn), retrato, paisagem (e-mail e banner) ou story.
 

@@ -37,6 +37,10 @@
             {
               "name": "modelo",
               "type": "string"
+            },
+            {
+              "name": "imagem_base",
+              "type": "number"
             }
           ]
         }
@@ -54,8 +58,161 @@
       "parameters": {
         "mode": "runOnceForAllItems",
         "language": "javaScript",
-        "jsCode": "// Prepara o pedido de imagem ao Gemini: confere a descrição, escolhe o formato e o modelo.\n// Modelos de imagem do Gemini (\"Nano Banana\"): o principal e um reserva, usado se o principal falhar.\nconst MODELO_PRINCIPAL = 'gemini-3.1-flash-image';\nconst MODELO_RESERVA = 'gemini-2.5-flash-image';\n\nconst FORMATOS = {\n  quadrado: '1:1', quadrada: '1:1', feed: '1:1',\n  retrato: '4:5', vertical: '4:5',\n  story: '9:16', stories: '9:16', reels: '9:16',\n  paisagem: '16:9', horizontal: '16:9', banner: '16:9', widescreen: '16:9',\n};\nconst PROPORCOES = ['1:1', '2:3', '3:2', '3:4', '4:3', '4:5', '5:4', '9:16', '16:9', '21:9'];\n\nconst entrada = $input.first().json;\nconst descricao = String(entrada.descricao ?? '').trim();\nif (!descricao) throw new Error('Faltou a descrição da imagem.');\n\nconst pedido = String(entrada.formato ?? '').trim().toLowerCase();\nconst formato = PROPORCOES.includes(pedido) ? pedido : FORMATOS[pedido] ?? '1:1';\nconst modelo = String(entrada.modelo ?? '').trim().replace(/^models\\//, '') || MODELO_PRINCIPAL;\nconst corpo = {\n  contents: [{ role: 'user', parts: [{ text: descricao }] }],\n  generationConfig: { responseModalities: ['TEXT', 'IMAGE'], imageConfig: { aspectRatio: formato } },\n};\n\nreturn [\n  {\n    json: {\n      descricao,\n      legenda: String(entrada.legenda ?? '').trim().slice(0, 900),\n      formato,\n      chat_id: String(entrada.chat_id ?? '').trim(),\n      user_id: String(entrada.user_id ?? '').trim(),\n      modelo,\n      modelo_reserva: modelo === MODELO_RESERVA ? MODELO_PRINCIPAL : MODELO_RESERVA,\n      corpo: JSON.stringify(corpo),\n    },\n  },\n];\n"
+        "jsCode": "// Prepara o pedido de imagem ao Gemini: confere a descrição, escolhe o formato e o modelo.\n// Modelos de imagem do Gemini (\"Nano Banana\"): o principal e um reserva, usado se o principal falhar.\n// Com imagem_base (o número de uma foto do dono ou de uma imagem já gerada), o pedido vira uma edição dessa imagem.\nconst MODELO_PRINCIPAL = 'gemini-3.1-flash-image';\nconst MODELO_RESERVA = 'gemini-2.5-flash-image';\n\nconst FORMATOS = {\n  quadrado: '1:1', quadrada: '1:1', feed: '1:1',\n  retrato: '4:5', vertical: '4:5',\n  story: '9:16', stories: '9:16', reels: '9:16',\n  paisagem: '16:9', horizontal: '16:9', banner: '16:9', widescreen: '16:9',\n  original: '', manter: '', mesmo: '',\n};\nconst PROPORCOES = ['1:1', '2:3', '3:2', '3:4', '4:3', '4:5', '5:4', '9:16', '16:9', '21:9'];\n\nconst entrada = $input.first().json;\nconst descricao = String(entrada.descricao ?? '').trim();\nif (!descricao) throw new Error('Faltou a descrição da imagem.');\n\nconst imagemBase = Math.max(0, Math.floor(Number(entrada.imagem_base) || 0));\nconst pedido = String(entrada.formato ?? '').trim().toLowerCase();\n// Na edição sem formato pedido, a imagem nova mantém o formato da imagem base.\nconst formato = PROPORCOES.includes(pedido) ? pedido : FORMATOS[pedido] ?? (imagemBase && !pedido ? '' : '1:1');\nconst modelo = String(entrada.modelo ?? '').trim().replace(/^models\\//, '') || MODELO_PRINCIPAL;\nconst corpo = {\n  contents: [{ role: 'user', parts: [{ text: descricao }] }],\n  generationConfig: { responseModalities: ['TEXT', 'IMAGE'], ...(formato ? { imageConfig: { aspectRatio: formato } } : {}) },\n};\n\nreturn [\n  {\n    json: {\n      descricao,\n      legenda: String(entrada.legenda ?? '').trim().slice(0, 900),\n      formato,\n      chat_id: String(entrada.chat_id ?? '').trim(),\n      user_id: String(entrada.user_id ?? '').trim(),\n      modelo,\n      modelo_reserva: modelo === MODELO_RESERVA ? MODELO_PRINCIPAL : MODELO_RESERVA,\n      imagem_base: imagemBase,\n      corpo: JSON.stringify(corpo),\n    },\n  },\n];\n"
       }
+    },
+    {
+      "id": "b3df522f-0f65-472d-a9cc-f051670dc381",
+      "name": "Editar uma imagem?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        440,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-editar",
+              "leftValue": "={{ Number($json.imagem_base) || 0 }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "ce3ea3c6-1da5-46c4-a250-baab35ec9acd",
+      "name": "Buscar imagem base",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        660,
+        100
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "kira_imagens"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $json.imagem_base }}"
+            },
+            {
+              "keyName": "user_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.user_id }}"
+            }
+          ]
+        },
+        "limit": 1
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "43e69b8c-902d-40c7-a999-046f870834e0",
+      "name": "Imagem base encontrada?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        880,
+        100
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-base",
+              "leftValue": "={{ $json.file_id ?? '' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "5b28c010-2a40-4e81-a8c5-dd3fc0ea559c",
+      "name": "Baixar imagem base",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1100,
+        0
+      ],
+      "parameters": {
+        "resource": "file",
+        "operation": "get",
+        "fileId": "={{ $json.file_id }}",
+        "download": true,
+        "additionalFields": {}
+      },
+      "credentials": {},
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "fae59c17-569e-4c42-ad27-6d0961754439",
+      "name": "Imagem base em base64",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        1320,
+        0
+      ],
+      "parameters": {
+        "operation": "binaryToPropery",
+        "destinationKey": "imagem_base64"
+      }
+    },
+    {
+      "id": "a31ca6ce-dee3-40dc-a1e7-ba59ee8c8b25",
+      "name": "Pedido com a imagem base",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Edição: manda a imagem base junto com o pedido, para o Gemini mudar só o que foi pedido.\nconst pedido = $('Preparar pedido').first().json;\nconst baixada = $('Baixar imagem base').first();\nconst imagem = String($input.first().json.imagem_base64 ?? '');\nif (!imagem) throw new Error(`Não consegui ler a imagem #${pedido.imagem_base}.`);\n\n// Tipo da imagem: o que o Telegram informou ou a extensão do arquivo (fotos do Telegram são JPEG).\nconst TIPOS = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', heic: 'image/heic', heif: 'image/heif' };\nconst informado = String(baixada.binary?.data?.mimeType ?? '');\nconst extensao = String(baixada.json?.result?.file_path ?? '').split('.').pop().toLowerCase();\nconst mime = Object.values(TIPOS).includes(informado) ? informado : TIPOS[extensao] ?? 'image/jpeg';\n\nconst instrucao = [\n  `Edite a imagem enviada. Pedido: ${pedido.descricao}`,\n  'Mude só o que o pedido pede. A peça ou o produto da imagem deve continuar idêntico (formato, cores, materiais, pedras e detalhes), a menos que o pedido mande mudar.',\n  'O resultado deve parecer uma foto real e bem acabada.',\n].join('\\n');\nconst corpo = JSON.parse(pedido.corpo);\ncorpo.contents = [{ role: 'user', parts: [{ inlineData: { mimeType: mime, data: imagem } }, { text: instrucao }] }];\n\nreturn [\n  {\n    json: {\n      ...pedido,\n      descricao: `Edição da imagem #${pedido.imagem_base}: ${pedido.descricao}`,\n      corpo: JSON.stringify(corpo),\n    },\n  },\n];\n"
+      },
+      "onError": "continueErrorOutput"
     },
     {
       "id": "7e5adeed-1969-454e-aa5d-dd2acc636abf",
@@ -63,7 +220,7 @@
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
       "position": [
-        440,
+        1760,
         300
       ],
       "parameters": {
@@ -155,12 +312,43 @@
       }
     },
     {
+      "id": "a20e977e-09fe-41f2-a3fd-ee85db287ae6",
+      "name": "Imagem base não encontrada",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1100,
+        200
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "base-ok",
+              "name": "ok",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "base-erro",
+              "name": "erro",
+              "value": "={{ 'Não encontrei a imagem #' + $('Preparar pedido').first().json.imagem_base + '. Só dá para editar fotos que o dono mandou aqui no Telegram e imagens que você gerou. Peça para ele mandar a foto de novo.' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
       "id": "59b2604a-5877-4a73-a8a8-445d13e28450",
       "name": "Gerar imagem (Gemini)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.5,
       "position": [
-        660,
+        1980,
         300
       ],
       "parameters": {
@@ -170,7 +358,7 @@
         "nodeCredentialType": "googlePalmApi",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ $('Preparar pedido').first().json.corpo }}",
+        "jsonBody": "={{ $('Pedido com a imagem base').isExecuted ? $('Pedido com a imagem base').first().json.corpo : $('Preparar pedido').first().json.corpo }}",
         "options": {
           "timeout": 120000
         }
@@ -184,7 +372,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1100,
+        2420,
         300
       ],
       "parameters": {
@@ -200,7 +388,7 @@
       "type": "n8n-nodes-base.convertToFile",
       "typeVersion": 1.1,
       "position": [
-        1320,
+        2640,
         300
       ],
       "parameters": {
@@ -218,7 +406,7 @@
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
-        1540,
+        2860,
         300
       ],
       "parameters": {
@@ -228,7 +416,7 @@
         "binaryData": true,
         "binaryPropertyName": "data",
         "additionalFields": {
-          "caption": "={{ ('🖼️ Imagem #' + $('Registrar imagem').first().json.id + ($('Preparar pedido').first().json.legenda ? ' — ' + $('Preparar pedido').first().json.legenda : '')).slice(0, 1024) }}"
+          "caption": "={{ ('🖼️ Imagem #' + $('Registrar imagem').first().json.id + ($('Preparar pedido').first().json.imagem_base ? ' (a partir da #' + $('Preparar pedido').first().json.imagem_base + ')' : '') + ($('Preparar pedido').first().json.legenda ? ' — ' + $('Preparar pedido').first().json.legenda : '')).slice(0, 1024) }}"
         }
       },
       "credentials": {},
@@ -240,7 +428,7 @@
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
       "position": [
-        1760,
+        3080,
         300
       ],
       "parameters": {
@@ -288,7 +476,7 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        1980,
+        3300,
         300
       ],
       "parameters": {
@@ -311,7 +499,7 @@
             {
               "id": "img-msg",
               "name": "mensagem",
-              "value": "={{ 'A imagem #' + $('Registrar imagem').first().json.id + ' já está no Telegram do dono. Diga o número dela na resposta e não repita a descrição inteira. Para um post do LinkedIn com esta imagem, passe imagem_id em rascunho_linkedin; para anexar a um rascunho de e-mail, use anexar_imagem_email.' }}",
+              "value": "={{ 'A imagem #' + $('Registrar imagem').first().json.id + ($('Preparar pedido').first().json.imagem_base ? ' (edição da imagem #' + $('Preparar pedido').first().json.imagem_base + ')' : '') + ' já está no Telegram do dono. Diga o número dela na resposta e não repita a descrição inteira. Para ajustar esta imagem, use gerar_imagem com imagem_base igual a este número. Para um post do LinkedIn com esta imagem, passe imagem_id em rascunho_linkedin; para anexar a um rascunho de e-mail, use anexar_imagem_email.' }}",
               "type": "string"
             }
           ]
@@ -325,7 +513,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.5,
       "position": [
-        880,
+        2200,
         500
       ],
       "parameters": {
@@ -335,7 +523,7 @@
         "nodeCredentialType": "googlePalmApi",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ $('Preparar pedido').first().json.corpo }}",
+        "jsonBody": "={{ $('Pedido com a imagem base').isExecuted ? $('Pedido com a imagem base').first().json.corpo : $('Preparar pedido').first().json.corpo }}",
         "options": {
           "timeout": 120000
         }
@@ -349,7 +537,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1540,
+        2860,
         600
       ],
       "parameters": {
@@ -376,7 +564,101 @@
       "main": [
         [
           {
+            "node": "Editar uma imagem?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Editar uma imagem?": {
+      "main": [
+        [
+          {
+            "node": "Buscar imagem base",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
             "node": "Registrar imagem",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar imagem base": {
+      "main": [
+        [
+          {
+            "node": "Imagem base encontrada?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Imagem base encontrada?": {
+      "main": [
+        [
+          {
+            "node": "Baixar imagem base",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Imagem base não encontrada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Baixar imagem base": {
+      "main": [
+        [
+          {
+            "node": "Imagem base em base64",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Explicar falha",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Imagem base em base64": {
+      "main": [
+        [
+          {
+            "node": "Pedido com a imagem base",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pedido com a imagem base": {
+      "main": [
+        [
+          {
+            "node": "Registrar imagem",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Explicar falha",
             "type": "main",
             "index": 0
           }

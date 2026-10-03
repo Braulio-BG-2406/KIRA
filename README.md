@@ -39,7 +39,7 @@ Meu bot particular: a **Kira** é uma assistente pessoal de IA que roda no **n8n
 | --- | --- |
 | 💬 Texto | Você escreve, ela responde por escrito, com formatação leve. |
 | 🎙️ Voz | Você manda um áudio, ela transcreve com o Gemini e responde com um áudio (voz do próprio Gemini, grátis) com o texto na legenda. |
-| 📷 Fotos | Você manda uma foto (ou uma imagem como arquivo) com uma pergunta na legenda; o leitor de imagens do Gemini descreve a foto e lê os textos dela, e a Kira responde. Sem legenda, ela diz o que vê e pergunta o que fazer. |
+| 📷 Fotos | Você manda uma foto (ou uma imagem como arquivo) com uma pergunta na legenda; o leitor de imagens do Gemini descreve a foto e lê os textos dela, e a Kira responde. Sem legenda, ela diz o que vê e pergunta o que fazer. A foto fica guardada com um número (Foto #N) e a Kira **edita a sua própria foto** quando você pede (trocar o fundo, melhorar a luz, colocar a peça na mão de uma modelo), mantendo o produto igual. |
 | 🧠 Memória | Lembra as últimas 20 trocas da conversa e guarda fatos duradouros quando você pede ("Kira, lembre que…"). Também esquece quando você pede. |
 | 🔒 Identificação | Só conversa com os IDs do Telegram liberados, e só no chat privado. |
 | ✨ Personalidade | Calorosa, direta e honesta: não inventa dados que ainda não tem. Veja [persona-kira.md](docs/persona-kira.md). |

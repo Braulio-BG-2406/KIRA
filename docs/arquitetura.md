@@ -44,7 +44,7 @@ Os nomes em **negrito** são os nós do workflow [`n8n/workflows/kira-1.0.json`]
      - `/publicar N`: **Buscar rascunho (LinkedIn)** → **Rascunho encontrado?** → **Rascunho tem imagem?** → sem imagem, **Publicar no LinkedIn**; com imagem, **Buscar imagem (LinkedIn)** → **Baixar imagem (LinkedIn)** (do Telegram) → **Publicar no LinkedIn (com imagem)**. Depois, **Marcar como publicado**.
    - **Voz** → **Baixar áudio** → **Transcrever áudio (Gemini)**.
    - **Texto** → segue direto.
-   - **Imagem** (foto, ou imagem enviada como arquivo) → **Baixar imagem** (a maior versão da foto) → **Analisar imagem (Gemini)**: o leitor de imagens descreve a foto e transcreve os textos que aparecem nela. A pergunta para a Kira é a legenda (ou "o que tem nesta foto?") mais essa descrição.
+   - **Imagem** (foto, ou imagem enviada como arquivo) → **Baixar imagem** (a maior versão da foto) → **Analisar imagem (Gemini)**: o leitor de imagens descreve a foto e transcreve os textos que aparecem nela → **Guardar foto**: a foto entra em `kira_imagens` e ganha um número (Foto #N). A pergunta para a Kira é a legenda (ou "o que tem nesta foto?") mais o número e a descrição. Se a tabela falhar, a conversa segue sem o número.
    - **Outro** (documento, vídeo, figurinha…) → **Resposta: tipo não suportado**.
 7. **Pergunta** → **Detectar troca de ambiente** → **Trocar ambiente?**: mensagens curtas como "modo pessoal", "quero o modo negócios" ou "/negocios" trocam o ambiente (**Salvar ambiente** → **Resposta: ambiente ativado**); nos áudios, também vale "moto pessoal", um erro comum da transcrição. Nas outras, **Buscar memórias** → **Memórias do ambiente** (só as do ambiente ativo e as gerais) → **Contexto da conversa** montam o que a Kira precisa: a pergunta, a data e hora, o perfil, o ambiente e as memórias.
 8. **Kira** (AI Agent) responde usando:
@@ -70,7 +70,7 @@ Os nomes em **negrito** são os nós do workflow [`n8n/workflows/kira-1.0.json`]
 
 ### Sub-workflows (ferramentas)
 
-- **Kira — gerar imagem (ferramenta)**: **Preparar pedido** (descrição, formato e modelo) → **Registrar imagem** (`kira_imagens`, para ter o número) → **Gerar imagem (Gemini)** (se falhar, **Gerar imagem (reserva)** com outro modelo) → **Extrair imagem** → **Imagem para arquivo** → **Enviar imagem** (foto no Telegram, legenda "🖼️ Imagem #N") → **Guardar arquivo** (o `file_id` do Telegram) → **Imagem pronta**. Qualquer falha cai em **Explicar falha**, que devolve à Kira um motivo curto (por exemplo, fim da cota gratuita).
+- **Kira — gerar imagem (ferramenta)**: **Preparar pedido** (descrição, formato e modelo) → **Editar uma imagem?** (com `imagem_base`: **Buscar imagem base** em `kira_imagens`, só as do próprio dono → **Baixar imagem base** do Telegram → **Imagem base em base64** → **Pedido com a imagem base**, que manda a foto junto com o pedido e a instrução de manter a peça igual; número que não existe cai em **Imagem base não encontrada**) → **Registrar imagem** (`kira_imagens`, para ter o número) → **Gerar imagem (Gemini)** (se falhar, **Gerar imagem (reserva)** com outro modelo) → **Extrair imagem** → **Imagem para arquivo** → **Enviar imagem** (foto no Telegram, legenda "🖼️ Imagem #N", ou "🖼️ Imagem #N (a partir da #M)" na edição) → **Guardar arquivo** (o `file_id` do Telegram) → **Imagem pronta**. Qualquer falha cai em **Explicar falha**, que devolve à Kira um motivo curto (por exemplo, fim da cota gratuita).
 - **Kira — anexar imagem ao e-mail (ferramenta)**: **Buscar imagem** (só do próprio usuário) → **Baixar imagem** (do Telegram) → **Imagem em base64** → **Anexar ao rascunho** (Microsoft Graph, anexo do rascunho) → **Anexo pronto**.
 - **Kira — Teams (ferramenta)**: **Qual ação?** separa listar, ler e enviar. Listar: **Buscar conversas** (Graph, com participantes e última mensagem) → **Resumir conversas** (tira o dono da lista, filtra por nome, ordena pela mais recente). Ler: **Buscar mensagens** → **Resumir mensagens** (texto limpo, em ordem). Enviar: **Preparar envio** (HTML seguro) → **Enviar mensagem** → **Mensagem enviada**. Erros viram **Explicar falha**.
 - **Kira — pesquisar na internet (ferramenta)**: **Preparar pesquisa** (a pergunta, a data de hoje e as regras; liga a Busca Google e, se houver link, a leitura da página) → **Pesquisar (Gemini + Google)** (se falhar, **Pesquisar (reserva)** com outro modelo) → **Extrair resposta** (o texto final, sem os "pensamentos" do modelo, e até 6 fontes sem repetição). Falhas viram **Explicar falha** (por exemplo, fim da cota gratuita).
@@ -117,7 +117,7 @@ Os nomes em **negrito** são os nós do workflow [`n8n/workflows/kira-1.0.json`]
 | `kira_contatos` | `user_id`, `contexto`, `nome`, `empresa`, `telefone`, `email`, `notas` | Contatos por ambiente |
 | `kira_emails_auto` | `message_id`, `status` (`rascunho`, `ignorado` ou `erro`), `motivo` | E-mails já analisados pelos rascunhos automáticos (guardados por 10 dias) |
 | `kira_linkedin` | `texto`, `status` (`pendente` ou `publicado`), `post_urn`, `erro`, `imagem_id` | Rascunhos de posts; o `id` é o número usado no `/publicar N` |
-| `kira_imagens` | `user_id`, `chat_id`, `file_id`, `descricao`, `legenda`, `formato`, `modelo` | Imagens geradas; o `id` é o número da imagem (#N) e o arquivo fica no Telegram (`file_id`) |
+| `kira_imagens` | `user_id`, `chat_id`, `file_id`, `descricao`, `legenda`, `formato`, `modelo` | Imagens geradas e fotos que você mandou (`modelo` = "foto do Telegram"); o `id` é o número da imagem (#N) e o arquivo fica no Telegram (`file_id`) |
 | `kira_saude` | `workflow_id`, `workflow`, `no`, `erro`, `execucao_id`, `modo` | Falhas das automações, anotadas pela Saúde da Kira (guardadas por 90 dias); a primeira do dia de cada automação vira aviso |
 
 Todas as tabelas também têm `id`, `createdAt` e `updatedAt`, criados pelo n8n.
@@ -125,6 +125,8 @@ Todas as tabelas também têm `id`, `createdAt` e `updatedAt`, criados pelo n8n.
 ## Decisões e porquês
 
 **Fotos pelo leitor de imagens.** A foto não vai anexada para o agente: na integração do n8n com o Gemini (LangChain), modelos com nome como `gemini-flash-latest` não são reconhecidos como modelos que veem imagens, e o agente recusa a foto ("This model does not support images"). Por isso a foto segue o mesmo caminho do áudio: o nó *Analyze image* do Gemini descreve a imagem e transcreve os textos, e a descrição vai com a legenda para a Kira. Como a descrição entra no histórico da conversa, dá para fazer perguntas sobre a foto depois.
+
+**Editar a própria foto, não criar outra.** Para um post com o produto, uma imagem criada do zero mostra uma peça que não existe. Por isso a foto recebida fica guardada com um número e a ferramenta `gerar_imagem` aceita `imagem_base`: a foto original vai junto para o modelo de imagem do Gemini, com a instrução de mudar só o que foi pedido e manter a peça idêntica. Sem formato pedido, a imagem editada mantém o formato da foto. Também serve para ajustar uma imagem já gerada ("deixa a #3 com o fundo mais claro").
 
 **Transcrição com o Gemini.** O mesmo Gemini que conversa também entende áudio. O nó usa a operação *Analyze audio* com uma instrução em português ("transcreva literalmente…; se não houver fala, responda [inaudível]"), o que dá uma transcrição limpa, sem rótulos.
 
@@ -188,6 +190,7 @@ Todas as tabelas também têm `id`, `createdAt` e `updatedAt`, criados pelo n8n.
 - A base de pedidos é atualizada de segunda a sábado, às 9h, 12h, 15h e 18h: entre uma leitura e outra, a Kira responde com a versão anterior (e cita a hora dela).
 - O resumo das 7h é enviado por outro workflow: a Kira da conversa não "lembra" dele.
 - Documentos (PDF, Word), vídeos e figurinhas ainda não são entendidos. As fotos passam pelo leitor de imagens: a Kira responde com base na descrição dele, não olhando a foto ela mesma.
+- A edição de fotos usa a mesma cota gratuita de imagens do Gemini e o resultado é feito por IA: confira a peça antes de postar.
 - Mensagens enviadas em sequência muito rápida são processadas em paralelo e podem ser respondidas fora de ordem.
 
 ## Próximos passos

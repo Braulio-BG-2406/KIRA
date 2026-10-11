@@ -374,11 +374,12 @@ Workflow separado: **Kira — Backup semanal (domingo 3h)** ([`kira-backup.json`
 No modo **Negócios**, a ferramenta **instagram** cuida do Instagram profissional da loja:
 
 - **Rascunho com prévia:** "Kira, faz um post pro Instagram com a imagem #12". Ela escreve a legenda, guarda o rascunho numerado na tabela `kira_instagram` e manda a **prévia** (a imagem com a legenda) no Telegram.
+- **Reels (vídeo):** mande o vídeo no Telegram, no modo Negócios. A Kira guarda e responde com o número dele (Vídeo #N). Depois peça "Kira, faz um Reels com o vídeo #N": ela escreve a legenda, guarda o rascunho e manda a **prévia do vídeo** no Telegram. O robô do Telegram só baixa vídeos de até **20 MB**: mande o vídeo normal (o Telegram comprime), não como arquivo, e de preferência em pé (9:16).
 - **Publicar só com o seu comando:** o post só vai para o Instagram quando você manda `/instagram N` (N é o número do rascunho). A IA não tem como publicar: a publicação é um ramo fixo do workflow, disparado só pelo comando.
 - **Últimos posts:** "Kira, como está o Instagram da loja?" traz seguidores, total de posts e os últimos posts com curtidas e comentários.
 - Fora do modo Negócios, a ferramenta recusa e pede para você trocar de ambiente.
 
-Como funciona por dentro: o sub-workflow **Kira — Instagram (ferramenta)** ([`kira-instagram.json`](../n8n/workflows/kira-instagram.json)) usa a API do Instagram com login do Facebook (`graph.facebook.com`). O Instagram só aceita imagem por um **link público**, por isso o próprio workflow tem um webhook (**Imagem pública**) que entrega a imagem guardada no Telegram, já em JPEG e no formato aceito (entre 4:5 em pé e 1,91:1 deitada: corta até 12% ou completa com faixas para não perder a peça). O link leva uma chave aleatória que só vale enquanto o post está sendo publicado e é apagada logo depois. Antes de publicar, ele espera o Instagram terminar de processar a imagem (até 1 minuto).
+Como funciona por dentro: o sub-workflow **Kira — Instagram (ferramenta)** ([`kira-instagram.json`](../n8n/workflows/kira-instagram.json)) usa a API do Instagram com login do Facebook (`graph.facebook.com`). O Instagram só aceita mídia por um **link público**, por isso o próprio workflow tem um webhook (**Imagem pública**) que entrega a imagem guardada no Telegram, já em JPEG e no formato aceito (entre 4:5 em pé e 1,91:1 deitada: corta até 12% ou completa com faixas para não perder a peça), ou o vídeo do Reels, como veio do Telegram. O link leva uma chave aleatória que só vale enquanto o post está sendo publicado e é apagada logo depois. Antes de publicar, ele espera o Instagram terminar de processar a mídia (até 1 minuto para foto e 6 minutos para vídeo; no Reels, a Kira avisa "⏳" no Telegram enquanto isso).
 
 O que você precisa (tudo grátis):
 - Instagram **profissional** (conta comercial ou de criador) **ligado a uma Página do Facebook**: no Instagram, **Editar perfil → Página → Conectar**.
@@ -391,12 +392,12 @@ Passo a passo:
 3. Clique no **ⓘ** ao lado do token → **Abrir na Ferramenta de Token de Acesso** → **Estender token de acesso**. Copie o token novo, cole de volta no campo do Explorador e consulte `me/accounts?fields=name,access_token,instagram_business_account`.
 4. Na resposta, no bloco da Página da loja (o que tem `instagram_business_account`), copie o valor de `access_token`. Esse token da Página **não vence** (para de valer só se você trocar a senha do Facebook ou tirar o app das integrações). Não cole esse token em nenhum chat.
 5. No n8n, crie a credencial **Query Auth**: **Name** `access_token`, **Value** o token da Página, **Allowed HTTP Request Domains → Specific Domains** `graph.facebook.com`. Dê um nome como "Instagram da loja".
-6. Crie a tabela `kira_instagram` (colunas na [arquitetura](arquitetura.md#dados)).
-7. Importe o sub-workflow e selecione a credencial do Instagram nos 6 nós HTTP (**Conta do Instagram**, **Criar post**, **Status do post**, **Publicar post**, **Link do post** e **Buscar posts**) e a do Telegram em **Mostrar prévia** e **Baixar imagem (link)**. Publique (o webhook da imagem só funciona publicado).
+6. Crie as tabelas `kira_instagram` e `kira_videos` (colunas na [arquitetura](arquitetura.md#dados)).
+7. Importe o sub-workflow e selecione a credencial do Instagram nos 7 nós HTTP (**Conta do Instagram**, **Criar post**, **Criar Reels**, **Status do post**, **Publicar post**, **Link do post** e **Buscar posts**) e a do Telegram em **Mostrar prévia**, **Mostrar prévia (vídeo)**, **Avisar processamento**, **Baixar imagem (link)** e **Baixar vídeo (link)**. Publique (o webhook da imagem só funciona publicado).
 8. Na Kira, aponte a ferramenta **instagram** e o nó **Publicar no Instagram** (grupo **Comandos**) para esse sub-workflow e publique.
-9. Teste: no modo Negócios, peça "Kira, como está o Instagram da loja?". Depois peça um post com uma imagem, confira a prévia e mande `/instagram N`.
+9. Teste: no modo Negócios, peça "Kira, como está o Instagram da loja?". Depois peça um post com uma imagem (ou mande um vídeo curto e peça um Reels), confira a prévia e mande `/instagram N`.
 
-Limites: até 100 posts por dia (regra do Instagram), legenda com até 2.200 caracteres e 30 hashtags, um post por imagem (sem carrossel por enquanto). As execuções que dão certo não ficam guardadas no n8n, porque as respostas de leitura do Facebook trazem links com a chave de acesso; se algo falhar, o motivo fica na coluna `erro` da tabela `kira_instagram` e a Kira conta no Telegram.
+Limites: até 100 posts por dia (regra do Instagram), legenda com até 2.200 caracteres e 30 hashtags, um post por imagem ou vídeo (sem carrossel por enquanto). Reels: vídeo de até 20 MB pelo Telegram; o Instagram aceita de 3 segundos a 15 minutos. As execuções que dão certo não ficam guardadas no n8n, porque as respostas de leitura do Facebook trazem links com a chave de acesso; se algo falhar, o motivo fica na coluna `erro` da tabela `kira_instagram` e a Kira conta no Telegram.
 
 ## Personalizar
 

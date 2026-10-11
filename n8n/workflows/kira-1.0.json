@@ -138,7 +138,7 @@
             {
               "id": "n-tipo-entrada",
               "name": "tipo_entrada",
-              "value": "={{ ($json.message.voice || $json.message.audio) ? 'voz' : (['/start', '/ajuda', '/help', '/comandos', '/status', '/memorias', '/memoria', '/limpar', '/reset', '/id', '/publicar', '/instagram'].includes((($json.message.text ?? '').trim().split(/\\s+/)[0] || '').split('@')[0].toLowerCase()) ? 'comando' : (($json.message.photo || String($json.message.document?.mime_type ?? '').startsWith('image/')) ? 'imagem' : (($json.message.text ?? '').trim() ? 'texto' : 'outro'))) }}",
+              "value": "={{ ($json.message.voice || $json.message.audio) ? 'voz' : (['/start', '/ajuda', '/help', '/comandos', '/status', '/memorias', '/memoria', '/limpar', '/reset', '/id', '/publicar', '/instagram'].includes((($json.message.text ?? '').trim().split(/\\s+/)[0] || '').split('@')[0].toLowerCase()) ? 'comando' : (($json.message.video || $json.message.video_note || String($json.message.document?.mime_type ?? '').startsWith('video/')) ? 'video' : (($json.message.photo || String($json.message.document?.mime_type ?? '').startsWith('image/')) ? 'imagem' : (($json.message.text ?? '').trim() ? 'texto' : 'outro')))) }}",
               "type": "string"
             },
             {
@@ -169,6 +169,42 @@
               "id": "imagem-mime",
               "name": "imagem_mime",
               "value": "={{ $json.message.photo ? 'image/jpeg' : String($json.message.document?.mime_type ?? '') }}",
+              "type": "string"
+            },
+            {
+              "id": "n-video-file-id",
+              "name": "video_file_id",
+              "value": "={{ $json.message.video?.file_id ?? $json.message.video_note?.file_id ?? (String($json.message.document?.mime_type ?? '').startsWith('video/') ? $json.message.document.file_id : '') }}",
+              "type": "string"
+            },
+            {
+              "id": "n-video-duracao",
+              "name": "video_duracao",
+              "value": "={{ Number($json.message.video?.duration ?? $json.message.video_note?.duration ?? 0) }}",
+              "type": "number"
+            },
+            {
+              "id": "n-video-tamanho",
+              "name": "video_tamanho",
+              "value": "={{ Number($json.message.video?.file_size ?? $json.message.video_note?.file_size ?? $json.message.document?.file_size ?? 0) }}",
+              "type": "number"
+            },
+            {
+              "id": "n-video-largura",
+              "name": "video_largura",
+              "value": "={{ Number($json.message.video?.width ?? $json.message.video_note?.length ?? 0) }}",
+              "type": "number"
+            },
+            {
+              "id": "n-video-altura",
+              "name": "video_altura",
+              "value": "={{ Number($json.message.video?.height ?? $json.message.video_note?.length ?? 0) }}",
+              "type": "number"
+            },
+            {
+              "id": "n-video-mime",
+              "name": "video_mime",
+              "value": "={{ String($json.message.video?.mime_type ?? $json.message.document?.mime_type ?? 'video/mp4') }}",
               "type": "string"
             },
             {
@@ -428,6 +464,30 @@
                     "id": "tipo-imagem",
                     "leftValue": "={{ $('Normalizar entrada').first().json.tipo_entrada }}",
                     "rightValue": "imagem",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "renameOutput": true,
+              "outputKey": "Vídeo",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "tipo-video",
+                    "leftValue": "={{ $('Normalizar entrada').first().json.tipo_entrada }}",
+                    "rightValue": "video",
                     "operator": {
                       "type": "string",
                       "operation": "equals"
@@ -840,6 +900,7 @@
             "chat_id": "={{ $('Normalizar entrada').first().json.chat_id }}",
             "rascunho_id": "={{ Number(String($('Normalizar entrada').first().json.texto).trim().split(/\\s+/)[1]) || 0 }}",
             "imagem_id": 0,
+            "video_id": 0,
             "legenda": "",
             "quantidade": 5
           },
@@ -893,6 +954,15 @@
             {
               "id": "imagem_id",
               "displayName": "imagem_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number"
+            },
+            {
+              "id": "video_id",
+              "displayName": "video_id",
               "required": false,
               "defaultMatch": false,
               "display": true,
@@ -1070,7 +1140,7 @@
             {
               "id": "p-pergunta",
               "name": "pergunta",
-              "value": "={{ $('Normalizar entrada').first().json.tipo_entrada === 'voz' ? ((($json.content?.parts ?? []).filter(p => !p.thought).map(p => p.text ?? '').join(' ') || $json.text || '').trim() || '[inaudível]') : ($('Normalizar entrada').first().json.tipo_entrada === 'imagem' ? (($('Normalizar entrada').first().json.texto || 'Mandei esta foto sem legenda. O que tem nela? Responda em poucas palavras e pergunte o que eu quero fazer com ela.') + '\\n\\n[' + (Number($json.id) > 0 && $json.file_id ? 'Foto #' + $json.id + ' (guardada). ' : '') + 'Descrição da foto, feita pelo leitor de imagens]\\n' + (((($('Analisar imagem (Gemini)').first().json.content?.parts ?? []).filter(p => !p.thought).map(p => p.text ?? '').join(' ') || $('Analisar imagem (Gemini)').first().json.text || '').trim()) || '(sem descrição)')) : $('Normalizar entrada').first().json.texto) }}",
+              "value": "={{ $('Normalizar entrada').first().json.tipo_entrada === 'voz' ? ((($json.content?.parts ?? []).filter(p => !p.thought).map(p => p.text ?? '').join(' ') || $json.text || '').trim() || '[inaudível]') : ($('Normalizar entrada').first().json.tipo_entrada === 'imagem' ? (($('Normalizar entrada').first().json.texto || 'Mandei esta foto sem legenda. O que tem nela? Responda em poucas palavras e pergunte o que eu quero fazer com ela.') + '\\n\\n[' + (Number($json.id) > 0 && $json.file_id ? 'Foto #' + $json.id + ' (guardada). ' : '') + 'Descrição da foto, feita pelo leitor de imagens]\\n' + (((($('Analisar imagem (Gemini)').first().json.content?.parts ?? []).filter(p => !p.thought).map(p => p.text ?? '').join(' ') || $('Analisar imagem (Gemini)').first().json.text || '').trim()) || '(sem descrição)')) : ($('Normalizar entrada').first().json.tipo_entrada === 'video' ? (($('Normalizar entrada').first().json.texto || 'Mandei este vídeo sem legenda. Diga o número dele e pergunte o que eu quero fazer com ele (por exemplo, um Reels para o Instagram da loja).') + '\\n\\n[' + (Number($json.id) > 0 ? 'Vídeo #' + $json.id + ' (guardado). ' : 'Não consegui guardar o vídeo. ') + 'Duração: ' + $('Normalizar entrada').first().json.video_duracao + ' s; tamanho: ' + (Math.round($('Normalizar entrada').first().json.video_tamanho / 104857.6) / 10) + ' MB; ' + $('Normalizar entrada').first().json.video_largura + 'x' + $('Normalizar entrada').first().json.video_altura + '. Você não vê o conteúdo do vídeo.' + ($('Normalizar entrada').first().json.video_tamanho > 20971520 ? ' Passa de 20 MB: o robô do Telegram não consegue baixar, então não dá para publicar. Peça para ele mandar de novo sem a opção arquivo ou mais curto.' : '') + ']') : $('Normalizar entrada').first().json.texto)) }}",
               "type": "string"
             }
           ]
@@ -1226,6 +1296,125 @@
       "onError": "continueRegularOutput"
     },
     {
+      "id": "f9b1f501-c576-4c92-a667-dcac5e1c4305",
+      "name": "Guardar vídeo",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1460,
+        780
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "kira_videos"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "user_id": "={{ $('Normalizar entrada').first().json.user_id }}",
+            "chat_id": "={{ $('Normalizar entrada').first().json.chat_id }}",
+            "file_id": "={{ $('Normalizar entrada').first().json.video_file_id }}",
+            "duracao": "={{ $('Normalizar entrada').first().json.video_duracao }}",
+            "tamanho": "={{ $('Normalizar entrada').first().json.video_tamanho }}",
+            "largura": "={{ $('Normalizar entrada').first().json.video_largura }}",
+            "altura": "={{ $('Normalizar entrada').first().json.video_altura }}",
+            "mime": "={{ $('Normalizar entrada').first().json.video_mime }}",
+            "legenda": "={{ $('Normalizar entrada').first().json.texto }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "user_id",
+              "displayName": "user_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "chat_id",
+              "displayName": "chat_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "file_id",
+              "displayName": "file_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "duracao",
+              "displayName": "duracao",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "tamanho",
+              "displayName": "tamanho",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "largura",
+              "displayName": "largura",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "altura",
+              "displayName": "altura",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "mime",
+              "displayName": "mime",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "legenda",
+              "displayName": "legenda",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
       "id": "3b88c9f0-5518-4b4d-abb1-c97ea8215a73",
       "name": "Resposta: tipo não suportado",
       "type": "n8n-nodes-base.set",
@@ -1242,7 +1431,7 @@
             {
               "id": "tn-texto",
               "name": "texto_resposta",
-              "value": "Por enquanto eu entendo **texto**, **áudio** 🎙️ e **fotos** 📷. Documentos, vídeos e outros tipos de mensagem chegam nas próximas versões!",
+              "value": "Por enquanto eu entendo **texto**, **áudio** 🎙️, **fotos** 📷 e guardo **vídeos** 🎬 (para o Instagram). Documentos e outros tipos de mensagem chegam nas próximas versões!",
               "type": "string"
             },
             {
@@ -3235,7 +3424,7 @@
         800
       ],
       "parameters": {
-        "description": "Instagram da loja (só no modo Negócios). acao rascunho: guarda um post (imagem_id + legenda) e já manda a prévia no Telegram. NÃO publica: quem publica é o dono, mandando /instagram <número do rascunho>. acao rascunhos: lista os rascunhos que esperam publicação. acao posts: seguidores, total de posts e os últimos posts com curtidas e comentários. Todo post precisa de uma imagem: gere ou edite antes com gerar_imagem (ou use a Foto #N dele). Depois de guardar, mostre a legenda completa e o número do rascunho e diga que, para publicar, ele manda /instagram <número>. Nunca diga que publicou.",
+        "description": "Instagram da loja (só no modo Negócios). acao rascunho: guarda um post (imagem_id + legenda, ou video_id + legenda para um Reels) e já manda a prévia no Telegram. NÃO publica: quem publica é o dono, mandando /instagram <número do rascunho>. acao rascunhos: lista os rascunhos que esperam publicação. acao posts: seguidores, total de posts e os últimos posts com curtidas e comentários. Todo post precisa de uma imagem ou de um vídeo: gere ou edite a imagem antes com gerar_imagem (ou use a Foto #N dele); para Reels, use o Vídeo #N que ele mandou. Depois de guardar, mostre a legenda completa e o número do rascunho e diga que, para publicar, ele manda /instagram <número>. Nunca diga que publicou.",
         "source": "database",
         "workflowId": {
           "__rl": true,
@@ -3250,7 +3439,8 @@
             "origem": "kira",
             "user_id": "={{ $('Normalizar entrada').first().json.user_id }}",
             "chat_id": "={{ $('Normalizar entrada').first().json.chat_id }}",
-            "imagem_id": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('imagem_id', 'Número da imagem do post (o #N de gerar_imagem ou da Foto #N dele); 0 quando não for rascunho', 'number', 0) }}",
+            "imagem_id": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('imagem_id', 'Número da imagem do post (o #N de gerar_imagem ou da Foto #N dele); 0 para Reels ou quando não for rascunho', 'number', 0) }}",
+            "video_id": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('video_id', 'Número do vídeo para um Reels (o Vídeo #N que ele mandou); 0 para post de foto ou quando não for rascunho', 'number', 0) }}",
             "legenda": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('legenda', 'Legenda completa do post, com emojis e hashtags (até 2.200 caracteres e 30 hashtags); vazio quando não for rascunho', 'string', '') }}",
             "rascunho_id": 0,
             "quantidade": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('quantidade', 'Quantos posts recentes mostrar, de 1 a 10', 'number', 5) }}"
@@ -3305,6 +3495,15 @@
             {
               "id": "imagem_id",
               "displayName": "imagem_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number"
+            },
+            {
+              "id": "video_id",
+              "displayName": "video_id",
               "required": false,
               "defaultMatch": false,
               "display": true,
@@ -4076,6 +4275,13 @@
         ],
         [
           {
+            "node": "Guardar vídeo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
             "node": "Resposta: tipo não suportado",
             "type": "main",
             "index": 0
@@ -4381,6 +4587,17 @@
       ]
     },
     "Guardar foto": {
+      "main": [
+        [
+          {
+            "node": "Pergunta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar vídeo": {
       "main": [
         [
           {
@@ -5101,7 +5318,7 @@
         "7e4f0dd5-3c0a-407f-acf0-955357fec71f",
         "9f5f139a-c92d-4af2-a579-500ed350c138"
       ],
-      "description": "Mostra \"digitando…\", descobre o ambiente ativo (tabela kira_config) e separa a mensagem por tipo: comando, voz, texto, imagem ou outro."
+      "description": "Mostra \"digitando…\", descobre o ambiente ativo (tabela kira_config) e separa a mensagem por tipo: comando, voz, texto, imagem, vídeo ou outro."
     },
     {
       "id": "82a385bc-b448-4b8a-a81e-148b3637fba2",

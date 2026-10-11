@@ -338,7 +338,7 @@ teste('fotos: foto ou imagem enviada como arquivo vai para o leitor de imagens; 
   // caminho: Tipo de mensagem (Imagem) → Baixar imagem → Analisar imagem (Gemini) → Guardar foto → Pergunta; o resto → tipo não suportado
   const saidas = (no) => workflow.connections[no].main.map((s) => (s ?? []).map((c) => c.node));
   assert.deepEqual(saidas('Tipo de mensagem')[3], ['Baixar imagem']);
-  assert.deepEqual(saidas('Tipo de mensagem')[4], ['Resposta: tipo não suportado']);
+  assert.deepEqual(saidas('Tipo de mensagem')[5], ['Resposta: tipo não suportado']);
   assert.deepEqual(saidas('Baixar imagem'), [['Analisar imagem (Gemini)'], ['Resposta de erro']]);
   assert.deepEqual(saidas('Analisar imagem (Gemini)'), [['Guardar foto'], ['Resposta de erro']]);
   assert.deepEqual(saidas('Guardar foto'), [['Pergunta']]);
@@ -376,6 +376,57 @@ teste('fotos: foto ou imagem enviada como arquivo vai para o leitor de imagens; 
   assert.match(nos['Kira'].parameters.options.systemMessage, /origem === 'imagem' \? 'FOTO:/);
   assert.match(JSON.stringify(nos['Resposta: tipo não suportado'].parameters), /\*\*fotos\*\* 📷/);
   assert.match(JSON.stringify(nos['Resposta de erro'].parameters), /Não consegui abrir a sua foto/);
+});
+
+teste('vídeos: o vídeo do Telegram fica guardado (Vídeo #N) para virar Reels; a Kira não assiste ao vídeo', () => {
+  const normal = Object.fromEntries(nos['Normalizar entrada'].parameters.assignments.assignments.map((a) => [a.name, a.value]));
+  const avaliar = (expressao, json) => new Function('$json', `return (${expressao.slice(3, -2)})`)(json);
+  const tipo = (message) => avaliar(normal.tipo_entrada, { message });
+  assert.equal(tipo({ video: { file_id: 'v', duration: 12 } }), 'video');
+  assert.equal(tipo({ video_note: { file_id: 'r', length: 240 } }), 'video');
+  assert.equal(tipo({ document: { file_id: 'd', mime_type: 'video/mp4' } }), 'video');
+  assert.equal(tipo({ document: { file_id: 'd', mime_type: 'image/png' } }), 'imagem');
+  const video = { video: { file_id: 'v1', duration: 15, file_size: 4500000, width: 720, height: 1280, mime_type: 'video/mp4' } };
+  assert.deepEqual(
+    ['video_file_id', 'video_duracao', 'video_tamanho', 'video_largura', 'video_altura', 'video_mime'].map((c) => avaliar(normal[c], { message: video })),
+    ['v1', 15, 4500000, 720, 1280, 'video/mp4'],
+  );
+  assert.equal(avaliar(normal.video_file_id, { message: { document: { file_id: 'd2', mime_type: 'video/quicktime', file_size: 9 } } }), 'd2');
+  assert.equal(avaliar(normal.video_file_id, { message: { text: 'oi' } }), '');
+  // caminho: Tipo de mensagem (Vídeo) → Guardar vídeo → Pergunta; sem baixar o arquivo (o robô do Telegram baixa até 20 MB)
+  const saidas = (no) => workflow.connections[no].main.map((s) => (s ?? []).map((c) => c.node));
+  assert.deepEqual(saidas('Tipo de mensagem')[4], ['Guardar vídeo']);
+  assert.deepEqual(saidas('Guardar vídeo'), [['Pergunta']]);
+  const regra = nos['Tipo de mensagem'].parameters.rules.values[4];
+  assert.deepEqual([regra.outputKey, regra.conditions.conditions[0].rightValue], ['Vídeo', 'video']);
+  assert.deepEqual(nos['Telegram Trigger'].parameters.additionalFields, {});
+  const guardar = nos['Guardar vídeo'];
+  assert.equal(guardar.parameters.dataTableId.value, 'kira_videos');
+  assert.match(guardar.parameters.columns.value.file_id, /video_file_id/);
+  assert.match(guardar.parameters.columns.value.user_id, /user_id/);
+  assert.equal(guardar.onError, 'continueRegularOutput');
+  // a pergunta leva o número do vídeo e os dados dele; acima de 20 MB, avisa que não dá para publicar
+  const expressao = nos['Pergunta'].parameters.assignments.assignments[0].value;
+  const montar = (texto, tamanho, json) =>
+    new Function('$', '$json', `return (${expressao.slice(3, -2)})`)(
+      () => ({ first: () => ({ json: { tipo_entrada: 'video', texto, video_duracao: 15, video_tamanho: tamanho, video_largura: 720, video_altura: 1280 } }) }),
+      json,
+    );
+  assert.equal(
+    montar('faz um reels', 4718592, { id: 3, file_id: 'v1' }),
+    'faz um reels\n\n[Vídeo #3 (guardado). Duração: 15 s; tamanho: 4.5 MB; 720x1280. Você não vê o conteúdo do vídeo.]',
+  );
+  assert.match(montar('', 1000, { id: 3 }), /^Mandei este vídeo sem legenda/);
+  assert.match(montar('x', 25 * 1048576, { id: 4 }), /Passa de 20 MB/);
+  assert.match(montar('x', 1000, {}), /Não consegui guardar o vídeo/);
+  assert.match(JSON.stringify(nos['Resposta: tipo não suportado'].parameters), /\*\*vídeos\*\* 🎬/);
+  // a ferramenta instagram recebe imagem_id ou video_id; o /instagram manda video_id 0
+  assert.match(nos['instagram'].parameters.workflowInputs.value.video_id, /\$fromAI\('video_id'/);
+  assert.match(nos['instagram'].parameters.description, /video_id \+ legenda para um Reels/);
+  assert.equal(nos['Publicar no Instagram'].parameters.workflowInputs.value.video_id, 0);
+  for (const no of ['instagram', 'Publicar no Instagram']) {
+    assert.ok(nos[no].parameters.workflowInputs.schema.some((c) => c.id === 'video_id' && c.type === 'number'), `${no} sem video_id`);
+  }
 });
 
 teste('workflow: todas as conexões apontam para nós que existem', () => {
@@ -2119,12 +2170,13 @@ const lerTabelas = {
   'Ler kira_emails_auto': [{ id: 3 }],
   'Ler kira_saude': [{ error: 'Data table not found' }],
   'Ler kira_instagram': [{}],
+  'Ler kira_videos': [{ id: 1, file_id: 'v1' }],
 };
 teste('backup: junta as tabelas num JSON, conta as linhas e anota a tabela que não abriu', () => {
   const [r] = executar(noDe(backup, 'Montar backup').parameters.jsCode, { nosAnteriores: lerTabelas });
   assert.equal(r.arquivo, 'kira-backup-2026-10-04.json');
   assert.equal(r.pasta_id, 'pasta1');
-  assert.deepEqual(r.linhas, { kira_config: 1, kira_memoria: 2, kira_tarefas: 0, kira_contatos: 0, kira_logs: 1, kira_linkedin: 0, kira_imagens: 0, kira_emails_auto: 1, kira_instagram: 0 });
+  assert.deepEqual(r.linhas, { kira_config: 1, kira_memoria: 2, kira_tarefas: 0, kira_contatos: 0, kira_logs: 1, kira_linkedin: 0, kira_imagens: 0, kira_emails_auto: 1, kira_instagram: 0, kira_videos: 1 });
   assert.deepEqual(r.falhas, ['kira_saude (Data table not found)']);
   const vazio = Object.fromEntries(Object.entries(lerTabelas).map(([k, v]) => [k, k.startsWith('Ler ') ? [{ error: { message: 'sem acesso' } }] : v]));
   assert.throws(() => executar(noDe(backup, 'Montar backup').parameters.jsCode, { nosAnteriores: vazio }), /nenhuma tabela/);
@@ -2146,7 +2198,7 @@ teste('backup: o arquivo leva os registros; backup parcial para com erro (avisa)
   const montado = itens[0].json;
   assert.throws(() => rodarBackup('Conferência (só números)', { 'Montar backup': montado }, [{ id: 'arq1' }]), /sem estas tabelas: kira_saude/);
   assert.throws(() => rodarBackup('Conferência (só números)', { 'Montar backup': { ...montado, falhas: [] } }, [{}]), /não confirmou/);
-  assert.equal(rodarBackup('Conferência (só números)', { 'Montar backup': { ...montado, falhas: [] } }, [{ id: 'arq1' }])[0].tabelas, 9);
+  assert.equal(rodarBackup('Conferência (só números)', { 'Montar backup': { ...montado, falhas: [] } }, [{ id: 'arq1' }])[0].tabelas, 10);
   const arquivos = [
     { id: 'a', name: 'kira-backup-2026-09-20.json', createdTime: '2026-09-20T06:00:00Z' },
     { id: 'b', name: 'kira-backup-2026-10-04.json', createdTime: '2026-10-04T06:00:00Z' },
@@ -2201,7 +2253,7 @@ teste('instagram: só no modo Negócios, e publicar só pelo comando do dono', (
   assert.match(pedidoInsta({ acao: 'publicar', origem: 'comando', rascunho_id: 0 }).mensagem, /\/instagram 3/);
 });
 teste('instagram: rascunho precisa de imagem e legenda dentro dos limites do Instagram', () => {
-  assert.match(pedidoInsta({ acao: 'rascunho', ambiente: 'NEGOCIOS', legenda: 'x', imagem_id: 0 }).mensagem, /precisa de uma imagem/);
+  assert.match(pedidoInsta({ acao: 'rascunho', ambiente: 'NEGOCIOS', legenda: 'x', imagem_id: 0 }).mensagem, /precisa de uma imagem ou de um vídeo/);
   assert.match(pedidoInsta({ acao: 'rascunho', ambiente: 'NEGOCIOS', legenda: '', imagem_id: 3 }).mensagem, /Faltou a legenda/);
   assert.match(pedidoInsta({ acao: 'rascunho', ambiente: 'NEGOCIOS', legenda: 'a'.repeat(2201), imagem_id: 3 }).mensagem, /2201 caracteres/);
   const hashtags = Array.from({ length: 31 }, (_, i) => `#tag${i}`).join(' ');
@@ -2280,6 +2332,56 @@ teste('instagram: últimos posts e rascunhos só com números e textos curtos (s
   assert.equal(rodarInsta('Listar rascunhos', { entrada: [{}] })[0].json.total, 0);
   assert.equal(insta.settings.saveDataSuccessExecution, 'none');
   assert.equal(noDe(insta, 'Buscar posts').parameters.genericAuthType, 'httpQueryAuth');
+});
+teste('instagram: Reels com o vídeo guardado (video_id), nunca imagem e vídeo juntos', () => {
+  const reels = pedidoInsta({ acao: 'rascunho', ambiente: 'NEGOCIOS', legenda: 'Novidade #loja', video_id: '7' });
+  assert.deepEqual([reels.rota, reels.video_id, reels.imagem_id], ['rascunho', 7, 0]);
+  assert.match(pedidoInsta({ acao: 'rascunho', ambiente: 'NEGOCIOS', legenda: 'x', imagem_id: 3, video_id: 7 }).mensagem, /Escolha só um/);
+  assert.match(pedidoInsta({ acao: 'rascunho', ambiente: 'NEGOCIOS', legenda: 'x' }).mensagem, /imagem ou de um vídeo/);
+  assert.equal(pedidoInsta({ acao: 'rascunho', ambiente: 'PESSOAL', legenda: 'x', video_id: 7 }).rota, 'recusar');
+  const ligacoes = (nome) => (insta.connections[nome]?.main ?? []).map((saida) => (saida ?? []).map((l) => l.node));
+  // rascunho: vídeo do próprio dono, até 20 MB (limite do robô do Telegram), prévia com sendVideo
+  assert.deepEqual(ligacoes('Qual caminho?')[0], ['Foto ou vídeo?']);
+  assert.deepEqual(ligacoes('Foto ou vídeo?'), [['Buscar vídeo do post'], ['Buscar imagem do post']]);
+  assert.deepEqual(ligacoes('Vídeo do post serve?'), [['Guardar rascunho'], ['Vídeo do post não serve']]);
+  assert.deepEqual(ligacoes('Prévia de vídeo?'), [['Mostrar prévia (vídeo)'], ['Mostrar prévia']]);
+  assert.deepEqual(noDe(insta, 'Buscar vídeo do post').parameters.filters.conditions.map((c) => c.keyName), ['id', 'user_id']);
+  assert.equal(noDe(insta, 'Buscar vídeo do post').parameters.dataTableId.value, 'kira_videos');
+  const serve = noDe(insta, 'Vídeo do post serve?').parameters.conditions.conditions[0].leftValue;
+  assert.match(serve, /20 \* 1024 \* 1024/);
+  assert.equal(noDe(insta, 'Mostrar prévia (vídeo)').parameters.operation, 'sendVideo');
+  assert.match(noDe(insta, 'Guardar rascunho').parameters.columns.value.video_id, /video_id/);
+  // publicar: Reels (media_type REELS + video_url), aviso de processamento e espera mais longa
+  const conferir = (r) => rodarInsta('Conferir rascunho', { nos: { 'Validar pedido': { rascunho_id: 4 } }, entrada: [r] })[0].json;
+  const r = conferir({ id: 4, status: 'pendente', imagem_id: 0, video_id: 7, legenda: 'x' });
+  assert.deepEqual([r.pode, r.reels], [true, true]);
+  assert.equal(conferir({ id: 4, status: 'pendente', imagem_id: 3, video_id: 0, legenda: 'x' }).reels, false);
+  assert.match(conferir({ id: 4, status: 'pendente', imagem_id: 0, video_id: 0, legenda: 'x' }).mensagem, /sem imagem, sem vídeo/);
+  assert.deepEqual(ligacoes('Conta do Instagram')[0], ['É Reels?']);
+  assert.deepEqual(ligacoes('É Reels?'), [['Criar Reels'], ['Criar post']]);
+  assert.deepEqual(ligacoes('Criar Reels'), [['Avisar processamento'], ['Explicar falha']]);
+  assert.deepEqual(ligacoes('Criar post')[0], ['Post criado']);
+  assert.deepEqual(ligacoes('Avisar processamento'), [['Post criado']]);
+  const corpo = Object.fromEntries(noDe(insta, 'Criar Reels').parameters.bodyParameters.parameters.map((p) => [p.name, p.value]));
+  assert.equal(corpo.media_type, 'REELS');
+  assert.match(corpo.video_url, /link_imagem/);
+  assert.match(noDe(insta, 'Publicar post').parameters.bodyParameters.parameters[0].value, /Post criado/);
+  assert.match(noDe(insta, 'Status do post').parameters.url, /Post criado/);
+  assert.match(noDe(insta, 'Esperar o Instagram').parameters.amount, /reels \? 10 : 3/);
+  const proc = (runIndex, reels) =>
+    rodarInsta('Conferir processamento', { nos: { 'Conferir rascunho': { reels } }, entrada: [{ status_code: 'IN_PROGRESS' }], runIndex })[0].json.situacao;
+  assert.deepEqual([proc(19, true), proc(35, true), proc(19, false)], ['esperar', 'falhou', 'falhou']);
+  const falha = rodarInsta('Explicar falha', { nos: { 'Validar pedido': { rascunho_id: 4 } }, entrada: [{ error: { message: 'The video duration is too short (2207026)' } }] })[0].json;
+  assert.match(falha.dica, /não aceitou o vídeo/);
+  const lista = rodarInsta('Listar rascunhos', { entrada: [{ id: 2, status: 'pendente', imagem_id: 0, video_id: 7, legenda: 'a' }] })[0].json;
+  assert.equal(lista.rascunhos[0].video, 7);
+  // link temporário: aceita rascunho de vídeo e entrega o MP4 como veio do Telegram
+  assert.match(noDe(insta, 'Chave válida?').parameters.conditions.conditions[0].leftValue, /Number\(\$json\.video_id\) > 0/);
+  assert.deepEqual(ligacoes('Chave válida?')[0], ['Vídeo ou foto? (link)']);
+  assert.deepEqual(ligacoes('Vídeo ou foto? (link)'), [['Buscar vídeo (link)'], ['Buscar imagem (link)']]);
+  assert.deepEqual(ligacoes('Baixar vídeo (link)'), [['Entregar vídeo'], ['Imagem não encontrada']]);
+  const tipo = noDe(insta, 'Entregar vídeo').parameters.options.responseHeaders.entries.find((h) => h.name === 'Content-Type');
+  assert.equal(tipo.value, 'video/mp4');
 });
 teste('expressões: nenhum "}}" no meio de uma expressão (o n8n fecharia a expressão antes da hora)', () => {
   for (const arquivo of readdirSync(new URL('n8n/workflows/', raiz))) {

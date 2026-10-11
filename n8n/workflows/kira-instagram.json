@@ -39,6 +39,10 @@
               "type": "number"
             },
             {
+              "name": "video_id",
+              "type": "number"
+            },
+            {
               "name": "legenda",
               "type": "string"
             },
@@ -66,7 +70,7 @@
       "parameters": {
         "mode": "runOnceForAllItems",
         "language": "javaScript",
-        "jsCode": "// Confere o pedido e escolhe o caminho. O ambiente vem do workflow da Kira (nó \"Ambiente atual\"), nunca da IA.\n// A IA só guarda rascunhos e consulta; publicar só vem do comando /instagram <número>, mandado pelo dono.\nconst AMBIENTE = 'NEGOCIOS';\nconst ACOES_DA_KIRA = ['rascunho', 'rascunhos', 'posts'];\nconst LIMITE_LEGENDA = 2200;\nconst LIMITE_HASHTAGS = 30;\n\nconst e = $input.first().json;\nconst texto = (v) => String(v ?? '').trim();\nconst inteiro = (v) => Math.max(0, Math.floor(Number(v) || 0));\nconst pedido = {\n  acao: texto(e.acao).toLowerCase(),\n  origem: texto(e.origem).toLowerCase(),\n  ambiente: texto(e.ambiente).toUpperCase(),\n  user_id: texto(e.user_id),\n  chat_id: texto(e.chat_id),\n  legenda: texto(e.legenda),\n  imagem_id: inteiro(e.imagem_id),\n  rascunho_id: inteiro(e.rascunho_id),\n  quantidade: Math.min(10, Math.max(1, inteiro(e.quantidade) || 5)),\n};\nconst recusar = (mensagem) => [{ json: { ...pedido, rota: 'recusar', ok: false, mensagem } }];\n\nif (pedido.acao === 'publicar') {\n  // O rascunho já nasceu no modo Negócios; o comando do dono publica em qualquer ambiente.\n  if (pedido.origem !== 'comando') {\n    return recusar('A publicação no Instagram só acontece quando o dono manda /instagram <número>. Mostre o rascunho e peça para ele mandar o comando.');\n  }\n  if (!pedido.rascunho_id) return recusar('Me diga qual rascunho publicar, por exemplo: /instagram 3');\n  if (!pedido.user_id) return recusar('Não consegui identificar quem pediu a publicação.');\n  return [{ json: { ...pedido, rota: 'publicar' } }];\n}\nif (pedido.ambiente !== AMBIENTE) {\n  return recusar('O Instagram da loja é do ambiente Negócios. Diga ao dono, em uma frase, que ele pode trocar dizendo \"modo negócios\". Não use nem invente dados do Instagram aqui.');\n}\nif (!ACOES_DA_KIRA.includes(pedido.acao)) return recusar('Ação inválida. Use rascunho, rascunhos ou posts.');\nif (!pedido.user_id) return recusar('Não consegui identificar o dono.');\nif (pedido.acao === 'rascunho') {\n  if (!pedido.imagem_id) {\n    return recusar('Todo post do Instagram precisa de uma imagem. Gere ou edite uma com gerar_imagem (ou use o número de uma foto do dono) e passe imagem_id.');\n  }\n  if (!pedido.legenda) return recusar('Faltou a legenda do post.');\n  if (pedido.legenda.length > LIMITE_LEGENDA) {\n    return recusar(`A legenda tem ${pedido.legenda.length} caracteres e o Instagram aceita até ${LIMITE_LEGENDA}. Encurte e tente de novo.`);\n  }\n  const hashtags = (pedido.legenda.match(/#[\\p{L}\\p{N}_]+/gu) || []).length;\n  if (hashtags > LIMITE_HASHTAGS) return recusar(`A legenda tem ${hashtags} hashtags e o Instagram aceita até ${LIMITE_HASHTAGS}.`);\n}\nreturn [{ json: { ...pedido, rota: pedido.acao } }];\n"
+        "jsCode": "// Confere o pedido e escolhe o caminho. O ambiente vem do workflow da Kira (nó \"Ambiente atual\"), nunca da IA.\n// A IA só guarda rascunhos e consulta; publicar só vem do comando /instagram <número>, mandado pelo dono.\nconst AMBIENTE = 'NEGOCIOS';\nconst ACOES_DA_KIRA = ['rascunho', 'rascunhos', 'posts'];\nconst LIMITE_LEGENDA = 2200;\nconst LIMITE_HASHTAGS = 30;\n\nconst e = $input.first().json;\nconst texto = (v) => String(v ?? '').trim();\nconst inteiro = (v) => Math.max(0, Math.floor(Number(v) || 0));\nconst pedido = {\n  acao: texto(e.acao).toLowerCase(),\n  origem: texto(e.origem).toLowerCase(),\n  ambiente: texto(e.ambiente).toUpperCase(),\n  user_id: texto(e.user_id),\n  chat_id: texto(e.chat_id),\n  legenda: texto(e.legenda),\n  imagem_id: inteiro(e.imagem_id),\n  video_id: inteiro(e.video_id),\n  rascunho_id: inteiro(e.rascunho_id),\n  quantidade: Math.min(10, Math.max(1, inteiro(e.quantidade) || 5)),\n};\nconst recusar = (mensagem) => [{ json: { ...pedido, rota: 'recusar', ok: false, mensagem } }];\n\nif (pedido.acao === 'publicar') {\n  // O rascunho já nasceu no modo Negócios; o comando do dono publica em qualquer ambiente.\n  if (pedido.origem !== 'comando') {\n    return recusar('A publicação no Instagram só acontece quando o dono manda /instagram <número>. Mostre o rascunho e peça para ele mandar o comando.');\n  }\n  if (!pedido.rascunho_id) return recusar('Me diga qual rascunho publicar, por exemplo: /instagram 3');\n  if (!pedido.user_id) return recusar('Não consegui identificar quem pediu a publicação.');\n  return [{ json: { ...pedido, rota: 'publicar' } }];\n}\nif (pedido.ambiente !== AMBIENTE) {\n  return recusar('O Instagram da loja é do ambiente Negócios. Diga ao dono, em uma frase, que ele pode trocar dizendo \"modo negócios\". Não use nem invente dados do Instagram aqui.');\n}\nif (!ACOES_DA_KIRA.includes(pedido.acao)) return recusar('Ação inválida. Use rascunho, rascunhos ou posts.');\nif (!pedido.user_id) return recusar('Não consegui identificar o dono.');\nif (pedido.acao === 'rascunho') {\n  if (!pedido.imagem_id && !pedido.video_id) {\n    return recusar('Todo post do Instagram precisa de uma imagem ou de um vídeo. Para foto, gere ou edite uma com gerar_imagem (ou use o número de uma foto do dono) e passe imagem_id; para Reels, passe video_id (o Vídeo #N que ele mandou).');\n  }\n  if (pedido.imagem_id && pedido.video_id) return recusar('Escolha só um: imagem_id (post de foto) ou video_id (Reels).');\n  if (!pedido.legenda) return recusar('Faltou a legenda do post.');\n  if (pedido.legenda.length > LIMITE_LEGENDA) {\n    return recusar(`A legenda tem ${pedido.legenda.length} caracteres e o Instagram aceita até ${LIMITE_LEGENDA}. Encurte e tente de novo.`);\n  }\n  const hashtags = (pedido.legenda.match(/#[\\p{L}\\p{N}_]+/gu) || []).length;\n  if (hashtags > LIMITE_HASHTAGS) return recusar(`A legenda tem ${hashtags} hashtags e o Instagram aceita até ${LIMITE_HASHTAGS}.`);\n}\nreturn [{ json: { ...pedido, rota: pedido.acao } }];\n"
       }
     },
     {
@@ -187,6 +191,358 @@
       }
     },
     {
+      "id": "93190f65-22c8-4f54-a531-308e31006108",
+      "name": "Foto ou vídeo?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        560,
+        160
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "fotoOuVideo-cond",
+              "leftValue": "={{ Number($json.video_id) > 0 }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "bb289240-4894-446c-a653-f251a744e38f",
+      "name": "Buscar vídeo do post",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        700,
+        -120
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "kira_videos"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $json.video_id }}"
+            },
+            {
+              "keyName": "user_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.user_id }}"
+            }
+          ]
+        },
+        "limit": 1
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "2b667a57-1f2c-4dd8-a929-cf71ebf3885d",
+      "name": "Vídeo do post serve?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        920,
+        -120
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "videoDoPostServe-cond",
+              "leftValue": "={{ String($json.file_id ?? '').trim() !== '' && Number($json.tamanho || 0) <= 20 * 1024 * 1024 }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "9670cf0f-f9b6-4830-a289-445528a1c0b9",
+      "name": "Guardar rascunho",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1140,
+        80
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "kira_instagram"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "user_id": "={{ $('Validar pedido').first().json.user_id }}",
+            "chat_id": "={{ $('Validar pedido').first().json.chat_id }}",
+            "imagem_id": "={{ $('Validar pedido').first().json.imagem_id }}",
+            "video_id": "={{ $('Validar pedido').first().json.video_id }}",
+            "legenda": "={{ $('Validar pedido').first().json.legenda }}",
+            "status": "pendente"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "user_id",
+              "displayName": "user_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "chat_id",
+              "displayName": "chat_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "imagem_id",
+              "displayName": "imagem_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "video_id",
+              "displayName": "video_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "legenda",
+              "displayName": "legenda",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "004415dc-a9f0-4cdc-a0ee-fbab4721e99b",
+      "name": "Prévia de vídeo?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1360,
+        80
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "previaDeVideo-cond",
+              "leftValue": "={{ Number($('Validar pedido').first().json.video_id) > 0 }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "bd16729e-3620-46d9-a1f0-5995089666a7",
+      "name": "Mostrar prévia (vídeo)",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1580,
+        0
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendVideo",
+        "chatId": "={{ $('Validar pedido').first().json.chat_id }}",
+        "binaryData": false,
+        "file": "={{ $('Buscar vídeo do post').first().json.file_id }}",
+        "additionalFields": {
+          "caption": "={{ ('📸 Prévia do post ' + $('Guardar rascunho').first().json.id + ' do Instagram' + (Number($('Validar pedido').first().json.video_id) > 0 ? ' (Reels)' : '') + '\\n\\n' + $('Validar pedido').first().json.legenda).slice(0, 960) + '\\n\\nPara publicar: /instagram ' + $('Guardar rascunho').first().json.id }}"
+        }
+      },
+      "credentials": {},
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "e8b8cc56-d2a9-42d5-ab38-4fbe4287db1c",
+      "name": "Rascunho pronto",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1800,
+        80
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "rascunhoPronto-0",
+              "name": "ok",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "rascunhoPronto-1",
+              "name": "rascunho_id",
+              "value": "={{ $('Guardar rascunho').first().json.id }}",
+              "type": "number"
+            },
+            {
+              "id": "rascunhoPronto-2",
+              "name": "imagem_id",
+              "value": "={{ $('Validar pedido').first().json.imagem_id }}",
+              "type": "number"
+            },
+            {
+              "id": "rascunhoPronto-3",
+              "name": "video_id",
+              "value": "={{ $('Validar pedido').first().json.video_id }}",
+              "type": "number"
+            },
+            {
+              "id": "rascunhoPronto-4",
+              "name": "mensagem",
+              "value": "={{ 'Rascunho ' + $('Guardar rascunho').first().json.id + ' do Instagram guardado com ' + (Number($('Validar pedido').first().json.video_id) > 0 ? 'o vídeo #' + Number($('Validar pedido').first().json.video_id) + ' (Reels)' : 'a imagem #' + $('Validar pedido').first().json.imagem_id) + ((Number($('Validar pedido').first().json.video_id) > 0 ? ($('Mostrar prévia (vídeo)').isExecuted && $('Mostrar prévia (vídeo)').first().json.ok) : ($('Mostrar prévia').isExecuted && $('Mostrar prévia').first().json.ok)) ? ', e a prévia já foi enviada no Telegram' : ' (a prévia NÃO foi enviada no Telegram: diga isso e lembre o número)') + '. Mostre a legenda completa e diga que, para publicar, ele manda /instagram ' + $('Guardar rascunho').first().json.id + '. Nada foi publicado.' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "508ddfc4-eab7-44ed-ac42-b94a304a6a81",
+      "name": "Mostrar prévia",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1580,
+        160
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendPhoto",
+        "chatId": "={{ $('Validar pedido').first().json.chat_id }}",
+        "binaryData": false,
+        "file": "={{ $('Buscar imagem do post').first().json.file_id }}",
+        "additionalFields": {
+          "caption": "={{ ('📸 Prévia do post ' + $('Guardar rascunho').first().json.id + ' do Instagram' + (Number($('Validar pedido').first().json.video_id) > 0 ? ' (Reels)' : '') + '\\n\\n' + $('Validar pedido').first().json.legenda).slice(0, 960) + '\\n\\nPara publicar: /instagram ' + $('Guardar rascunho').first().json.id }}"
+        }
+      },
+      "credentials": {},
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "804d43c0-bfe9-4785-a80f-9844c9b85f7a",
+      "name": "Vídeo do post não serve",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1140,
+        -40
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "videoDoPostNaoServe-0",
+              "name": "ok",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "videoDoPostNaoServe-1",
+              "name": "mensagem",
+              "value": "={{ !String($json.file_id ?? '').trim() ? 'Não encontrei o vídeo #' + $('Validar pedido').first().json.video_id + '. Confira o número.' : 'O vídeo #' + $('Validar pedido').first().json.video_id + ' tem ' + Math.round(Number($json.tamanho) / 1048576) + ' MB e o robô do Telegram só consegue baixar até 20 MB. Peça para ele mandar o vídeo de novo sem a opção arquivo (o Telegram comprime) ou mais curto.' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
       "id": "3f8bcd9b-4651-4740-a108-8425628e87d9",
       "name": "Buscar imagem do post",
       "type": "n8n-nodes-base.dataTable",
@@ -253,150 +609,6 @@
             }
           ],
           "combinator": "and"
-        },
-        "options": {}
-      }
-    },
-    {
-      "id": "9670cf0f-f9b6-4830-a289-445528a1c0b9",
-      "name": "Guardar rascunho",
-      "type": "n8n-nodes-base.dataTable",
-      "typeVersion": 1.1,
-      "position": [
-        1140,
-        80
-      ],
-      "parameters": {
-        "resource": "row",
-        "operation": "insert",
-        "dataTableId": {
-          "__rl": true,
-          "mode": "name",
-          "value": "kira_instagram"
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "user_id": "={{ $('Validar pedido').first().json.user_id }}",
-            "chat_id": "={{ $('Validar pedido').first().json.chat_id }}",
-            "imagem_id": "={{ $('Validar pedido').first().json.imagem_id }}",
-            "legenda": "={{ $('Validar pedido').first().json.legenda }}",
-            "status": "pendente"
-          },
-          "matchingColumns": [],
-          "schema": [
-            {
-              "id": "user_id",
-              "displayName": "user_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "chat_id",
-              "displayName": "chat_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "imagem_id",
-              "displayName": "imagem_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "number",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "legenda",
-              "displayName": "legenda",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "status",
-              "displayName": "status",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            }
-          ]
-        },
-        "options": {}
-      },
-      "executeOnce": true
-    },
-    {
-      "id": "508ddfc4-eab7-44ed-ac42-b94a304a6a81",
-      "name": "Mostrar prévia",
-      "type": "n8n-nodes-base.telegram",
-      "typeVersion": 1.2,
-      "position": [
-        1360,
-        80
-      ],
-      "parameters": {
-        "resource": "message",
-        "operation": "sendPhoto",
-        "chatId": "={{ $('Validar pedido').first().json.chat_id }}",
-        "binaryData": false,
-        "file": "={{ $('Buscar imagem do post').first().json.file_id }}",
-        "additionalFields": {
-          "caption": "={{ ('📸 Prévia do post ' + $('Guardar rascunho').first().json.id + ' do Instagram\\n\\n' + $('Validar pedido').first().json.legenda).slice(0, 960) + '\\n\\nPara publicar: /instagram ' + $('Guardar rascunho').first().json.id }}"
-        }
-      },
-      "credentials": {},
-      "onError": "continueRegularOutput"
-    },
-    {
-      "id": "e8b8cc56-d2a9-42d5-ab38-4fbe4287db1c",
-      "name": "Rascunho pronto",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [
-        1580,
-        80
-      ],
-      "parameters": {
-        "mode": "manual",
-        "includeOtherFields": false,
-        "assignments": {
-          "assignments": [
-            {
-              "id": "rascunhoPronto-0",
-              "name": "ok",
-              "value": true,
-              "type": "boolean"
-            },
-            {
-              "id": "rascunhoPronto-1",
-              "name": "rascunho_id",
-              "value": "={{ $('Guardar rascunho').first().json.id }}",
-              "type": "number"
-            },
-            {
-              "id": "rascunhoPronto-2",
-              "name": "imagem_id",
-              "value": "={{ $('Validar pedido').first().json.imagem_id }}",
-              "type": "number"
-            },
-            {
-              "id": "rascunhoPronto-3",
-              "name": "mensagem",
-              "value": "={{ 'Rascunho ' + $('Guardar rascunho').first().json.id + ' do Instagram guardado com a imagem #' + $('Validar pedido').first().json.imagem_id + ($('Mostrar prévia').first().json.ok ? ', e a prévia já foi enviada no Telegram' : ' (a prévia NÃO foi enviada no Telegram: diga isso e lembre o número da imagem)') + '. Mostre a legenda completa e diga que, para publicar, ele manda /instagram ' + $('Guardar rascunho').first().json.id + '. Nada foi publicado.' }}",
-              "type": "string"
-            }
-          ]
         },
         "options": {}
       }
@@ -481,7 +693,7 @@
       "parameters": {
         "mode": "runOnceForAllItems",
         "language": "javaScript",
-        "jsCode": "// Confere se o rascunho pode ser publicado agora. \"publicando\" travado há mais de 10 minutos pode tentar de novo.\nconst pedido = $('Validar pedido').first().json;\nconst r = $input.first().json ?? {};\nconst numero = pedido.rascunho_id;\nconst parado = r.status === 'publicando' && Date.now() - new Date(r.updatedAt).getTime() > 10 * 60 * 1000;\nlet mensagem = '';\nif (!r.id) mensagem = `Não encontrei o rascunho ${numero} do Instagram. Peça para eu preparar o post de novo.`;\nelse if (r.status === 'publicado') mensagem = `O rascunho ${numero} já foi publicado no Instagram${r.permalink ? `: ${r.permalink}` : '.'}`;\nelse if (!['pendente', 'erro', 'publicando'].includes(r.status)) mensagem = `O rascunho ${numero} não pode ser publicado (situação: ${r.status || 'desconhecida'}).`;\nelse if (r.status === 'publicando' && !parado) mensagem = `O rascunho ${numero} está sendo publicado agora. Espere um pouco e veja no Instagram.`;\nelse if (!(Number(r.imagem_id) > 0) || !String(r.legenda ?? '').trim()) mensagem = `O rascunho ${numero} está sem imagem ou sem legenda. Peça para eu preparar o post de novo.`;\nreturn [{ json: { ...r, rascunho_id: numero, pode: !mensagem, ok: !mensagem, mensagem } }];\n"
+        "jsCode": "// Confere se o rascunho pode ser publicado agora. \"publicando\" travado há mais de 10 minutos pode tentar de novo.\nconst pedido = $('Validar pedido').first().json;\nconst r = $input.first().json ?? {};\nconst numero = pedido.rascunho_id;\nconst parado = r.status === 'publicando' && Date.now() - new Date(r.updatedAt).getTime() > 10 * 60 * 1000;\nlet mensagem = '';\nif (!r.id) mensagem = `Não encontrei o rascunho ${numero} do Instagram. Peça para eu preparar o post de novo.`;\nelse if (r.status === 'publicado') mensagem = `O rascunho ${numero} já foi publicado no Instagram${r.permalink ? `: ${r.permalink}` : '.'}`;\nelse if (!['pendente', 'erro', 'publicando'].includes(r.status)) mensagem = `O rascunho ${numero} não pode ser publicado (situação: ${r.status || 'desconhecida'}).`;\nelse if (r.status === 'publicando' && !parado) mensagem = `O rascunho ${numero} está sendo publicado agora. Espere um pouco e veja no Instagram.`;\nelse if (!(Number(r.imagem_id) > 0 || Number(r.video_id) > 0) || !String(r.legenda ?? '').trim()) mensagem = `O rascunho ${numero} está sem imagem, sem vídeo ou sem legenda. Peça para eu preparar o post de novo.`;\nreturn [{ json: { ...r, rascunho_id: numero, reels: Number(r.video_id) > 0, pode: !mensagem, ok: !mensagem, mensagem } }];\n"
       }
     },
     {
@@ -634,13 +846,47 @@
       "onError": "continueErrorOutput"
     },
     {
-      "id": "ed32e699-0fcc-4683-a7c4-a0b371bb0b38",
-      "name": "Criar post",
+      "id": "dbb4b5b1-a53d-4453-a09c-7cfb5b718522",
+      "name": "É Reels?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1960,
+        480
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "eReels-cond",
+              "leftValue": "={{ $('Conferir rascunho').first().json.reels === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "431684af-634d-4c43-ae4a-7d7479900957",
+      "name": "Criar Reels",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        2020,
-        480
+        2180,
+        400
       ],
       "parameters": {
         "method": "POST",
@@ -652,21 +898,75 @@
         "bodyParameters": {
           "parameters": [
             {
-              "name": "image_url",
+              "name": "media_type",
+              "value": "REELS"
+            },
+            {
+              "name": "video_url",
               "value": "={{ $('Gerar link da imagem').first().json.link_imagem }}"
             },
             {
               "name": "caption",
               "value": "={{ $('Gerar link da imagem').first().json.legenda }}"
+            },
+            {
+              "name": "share_to_feed",
+              "value": "true"
             }
           ]
         },
         "options": {
-          "timeout": 60000
+          "timeout": 120000
         }
       },
       "credentials": {},
       "onError": "continueErrorOutput"
+    },
+    {
+      "id": "c1c7ea2a-d305-41c8-ac02-68e833b977d3",
+      "name": "Avisar processamento",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2400,
+        400
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $('Validar pedido').first().json.chat_id }}",
+        "text": "={{ '⏳ Mandei o vídeo do rascunho ' + $('Conferir rascunho').first().json.id + ' para o Instagram. Ele leva alguns minutos para processar; aviso aqui quando publicar.' }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "credentials": {},
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "a5fc79db-8da1-45c0-a723-cb921eab7d56",
+      "name": "Post criado",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2620,
+        480
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "postCriado-0",
+              "name": "creation_id",
+              "value": "={{ $('Criar Reels').isExecuted ? $('Criar Reels').first().json.id : $('Criar post').first().json.id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
     },
     {
       "id": "c176257a-ecc0-438a-a155-b18552d21234",
@@ -674,12 +974,12 @@
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
       "position": [
-        2240,
+        2840,
         480
       ],
       "parameters": {
         "resume": "timeInterval",
-        "amount": 3,
+        "amount": "={{ $('Conferir rascunho').first().json.reels ? 10 : 3 }}",
         "unit": "seconds"
       }
     },
@@ -689,12 +989,12 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        2460,
+        3060,
         480
       ],
       "parameters": {
         "method": "GET",
-        "url": "={{ 'https://graph.facebook.com/' + $('Criar post').first().json.id }}",
+        "url": "={{ 'https://graph.facebook.com/' + $('Post criado').first().json.creation_id }}",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpQueryAuth",
         "sendQuery": true,
@@ -719,13 +1019,13 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2680,
+        3280,
         480
       ],
       "parameters": {
         "mode": "runOnceForAllItems",
         "language": "javaScript",
-        "jsCode": "// Confere se o Instagram terminou de processar a imagem antes de publicar (tenta por até 1 minuto).\nconst MAX_TENTATIVAS = 20;\nconst r = $input.first().json ?? {};\nconst codigo = String(r.status_code ?? '');\nconst tentativa = $runIndex + 1;\nlet situacao = 'esperar';\nlet motivo = '';\nif (codigo === 'FINISHED') situacao = 'pronto';\nelse if (['ERROR', 'EXPIRED', 'PUBLISHED'].includes(codigo)) {\n  situacao = 'falhou';\n  motivo = `O Instagram não aceitou o post: ${r.status || codigo}`;\n} else if (tentativa >= MAX_TENTATIVAS) {\n  situacao = 'falhou';\n  motivo = 'O Instagram demorou demais para processar a imagem. Tente de novo em alguns minutos.';\n}\nreturn [{ json: { situacao, status_code: codigo, tentativa, ...(motivo ? { error: { message: motivo } } : {}) } }];\n"
+        "jsCode": "// Confere se o Instagram terminou de processar a mídia antes de publicar: até 1 minuto para foto e 6 minutos para\n// vídeo (Reels, conferido a cada 10 segundos).\nlet reels = false;\ntry {\n  reels = $('Conferir rascunho').first().json.reels === true;\n} catch (e) {\n  reels = false;\n}\nconst MAX_TENTATIVAS = reels ? 36 : 20;\nconst r = $input.first().json ?? {};\nconst codigo = String(r.status_code ?? '');\nconst tentativa = $runIndex + 1;\nlet situacao = 'esperar';\nlet motivo = '';\nif (codigo === 'FINISHED') situacao = 'pronto';\nelse if (['ERROR', 'EXPIRED', 'PUBLISHED'].includes(codigo)) {\n  situacao = 'falhou';\n  motivo = `O Instagram não aceitou o post: ${r.status || codigo}`;\n} else if (tentativa >= MAX_TENTATIVAS) {\n  situacao = 'falhou';\n  motivo = `O Instagram demorou demais para processar ${reels ? 'o vídeo' : 'a imagem'}. Tente de novo em alguns minutos.`;\n}\nreturn [{ json: { situacao, status_code: codigo, tentativa, ...(motivo ? { error: { message: motivo } } : {}) } }];\n"
       }
     },
     {
@@ -734,7 +1034,7 @@
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3.4,
       "position": [
-        2900,
+        3500,
         480
       ],
       "parameters": {
@@ -803,7 +1103,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        3120,
+        3720,
         480
       ],
       "parameters": {
@@ -817,7 +1117,7 @@
           "parameters": [
             {
               "name": "creation_id",
-              "value": "={{ $('Criar post').first().json.id }}"
+              "value": "={{ $('Post criado').first().json.creation_id }}"
             }
           ]
         },
@@ -837,7 +1137,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        3340,
+        3940,
         480
       ],
       "parameters": {
@@ -867,7 +1167,7 @@
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
       "position": [
-        3560,
+        4160,
         480
       ],
       "parameters": {
@@ -957,7 +1257,7 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        3780,
+        4380,
         480
       ],
       "parameters": {
@@ -1000,14 +1300,49 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2900,
+        3500,
         760
       ],
       "parameters": {
         "mode": "runOnceForAllItems",
         "language": "javaScript",
-        "jsCode": "// Traduz o erro do Facebook/Instagram em uma frase curta (sem chaves nem links).\nconst pedido = $('Validar pedido').first().json;\nconst item = $input.first().json ?? {};\nfunction motivoDoErro(v) {\n  const e = v?.error ?? v;\n  for (const c of [e?.description, e?.message, typeof e === 'string' ? e : '']) {\n    if (!c) continue;\n    const s = String(c);\n    const ini = s.indexOf('{');\n    const fim = s.lastIndexOf('}');\n    let trecho = ini >= 0 && fim > ini ? s.slice(ini, fim + 1) : '';\n    for (let i = 0; trecho && i < 2; i++) {\n      try {\n        const j = JSON.parse(trecho);\n        const g = j.error ?? j;\n        return String(g.error_user_msg || g.message || s);\n      } catch (x) {\n        trecho = trecho.replace(/\\\\\"/g, '\"').replace(/\\\\\\\\/g, '\\\\');\n      }\n    }\n    return s;\n  }\n  return 'erro desconhecido';\n}\nlet motivo = motivoDoErro(item)\n  .replace(/access_token=[^&\\s\"]+/gi, 'access_token=…')\n  .replace(/EAA[A-Za-z0-9]{20,}/g, '…')\n  .replace(/\\s+/g, ' ')\n  .trim()\n  .slice(0, 300);\nconst DICAS = [\n  [/aspect ratio|proporç/i, 'o formato da imagem não é aceito pelo Instagram'],\n  [/could not be fetched|only photo or video|media type|URI/i, 'o Instagram não conseguiu baixar a imagem pelo link temporário'],\n  [/permission|permiss/i, 'falta permissão no app da Meta'],\n  [/session has expired|expired|invalid oauth|Error validating access token/i, 'a chave do Instagram venceu ou foi desligada; é preciso gerar outra'],\n  [/limit|limite/i, 'o limite de publicações do dia foi atingido'],\n];\nconst dica = DICAS.find(([re]) => re.test(motivo))?.[1];\nreturn [{ json: { ...pedido, ok: false, motivo, dica: dica ?? '' } }];\n"
+        "jsCode": "// Traduz o erro do Facebook/Instagram em uma frase curta (sem chaves nem links).\nconst pedido = $('Validar pedido').first().json;\nconst item = $input.first().json ?? {};\nfunction motivoDoErro(v) {\n  const e = v?.error ?? v;\n  for (const c of [e?.description, e?.message, typeof e === 'string' ? e : '']) {\n    if (!c) continue;\n    const s = String(c);\n    const ini = s.indexOf('{');\n    const fim = s.lastIndexOf('}');\n    let trecho = ini >= 0 && fim > ini ? s.slice(ini, fim + 1) : '';\n    for (let i = 0; trecho && i < 2; i++) {\n      try {\n        const j = JSON.parse(trecho);\n        const g = j.error ?? j;\n        return String(g.error_user_msg || g.message || s);\n      } catch (x) {\n        trecho = trecho.replace(/\\\\\"/g, '\"').replace(/\\\\\\\\/g, '\\\\');\n      }\n    }\n    return s;\n  }\n  return 'erro desconhecido';\n}\nlet motivo = motivoDoErro(item)\n  .replace(/access_token=[^&\\s\"]+/gi, 'access_token=…')\n  .replace(/EAA[A-Za-z0-9]{20,}/g, '…')\n  .replace(/\\s+/g, ' ')\n  .trim()\n  .slice(0, 300);\nconst DICAS = [\n  [/aspect ratio|proporç/i, 'o formato da imagem não é aceito pelo Instagram'],\n  [/video|vídeo|duration|2207026|2207057/i, 'o Instagram não aceitou o vídeo (formato, duração ou tamanho)'],\n  [/could not be fetched|only photo or video|media type|URI/i, 'o Instagram não conseguiu baixar a imagem pelo link temporário'],\n  [/permission|permiss/i, 'falta permissão no app da Meta'],\n  [/session has expired|expired|invalid oauth|Error validating access token/i, 'a chave do Instagram venceu ou foi desligada; é preciso gerar outra'],\n  [/limit|limite/i, 'o limite de publicações do dia foi atingido'],\n];\nconst dica = DICAS.find(([re]) => re.test(motivo))?.[1];\nreturn [{ json: { ...pedido, ok: false, motivo, dica: dica ?? '' } }];\n"
       }
+    },
+    {
+      "id": "ed32e699-0fcc-4683-a7c4-a0b371bb0b38",
+      "name": "Criar post",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2180,
+        560
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://graph.facebook.com/' + $json.instagram_business_account.id + '/media' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "image_url",
+              "value": "={{ $('Gerar link da imagem').first().json.link_imagem }}"
+            },
+            {
+              "name": "caption",
+              "value": "={{ $('Gerar link da imagem').first().json.legenda }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "credentials": {},
+      "onError": "continueErrorOutput"
     },
     {
       "id": "a1b9126f-8596-4af0-a1cf-f513880d0669",
@@ -1130,7 +1465,7 @@
       "parameters": {
         "mode": "runOnceForAllItems",
         "language": "javaScript",
-        "jsCode": "// Lista os rascunhos do Instagram que ainda não foram publicados (os mais novos primeiro).\nconst PENDENTES = ['pendente', 'erro'];\nconst lista = $input\n  .all()\n  .map((item) => item.json)\n  .filter((r) => r && r.id && PENDENTES.includes(r.status))\n  .sort((a, b) => b.id - a.id)\n  .slice(0, 10);\nreturn [\n  {\n    json: {\n      ok: true,\n      total: lista.length,\n      rascunhos: lista.map((r) => ({\n        rascunho: r.id,\n        imagem: Number(r.imagem_id) || 0,\n        status: r.status === 'erro' ? 'falhou na última tentativa' : 'pendente',\n        legenda: String(r.legenda ?? '').slice(0, 200),\n        ...(r.erro ? { erro: String(r.erro).slice(0, 200) } : {}),\n      })),\n      mensagem: lista.length\n        ? 'Para publicar um rascunho, o dono manda /instagram <número>.'\n        : 'Não há rascunhos do Instagram esperando publicação.',\n    },\n  },\n];\n"
+        "jsCode": "// Lista os rascunhos do Instagram que ainda não foram publicados (os mais novos primeiro).\nconst PENDENTES = ['pendente', 'erro'];\nconst lista = $input\n  .all()\n  .map((item) => item.json)\n  .filter((r) => r && r.id && PENDENTES.includes(r.status))\n  .sort((a, b) => b.id - a.id)\n  .slice(0, 10);\nreturn [\n  {\n    json: {\n      ok: true,\n      total: lista.length,\n      rascunhos: lista.map((r) => ({\n        rascunho: r.id,\n        imagem: Number(r.imagem_id) || 0,\n        video: Number(r.video_id) || 0,\n        status: r.status === 'erro' ? 'falhou na última tentativa' : 'pendente',\n        legenda: String(r.legenda ?? '').slice(0, 200),\n        ...(r.erro ? { erro: String(r.erro).slice(0, 200) } : {}),\n      })),\n      mensagem: lista.length\n        ? 'Para publicar um rascunho, o dono manda /instagram <número>.'\n        : 'Não há rascunhos do Instagram esperando publicação.',\n    },\n  },\n];\n"
       }
     },
     {
@@ -1170,7 +1505,7 @@
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
       "position": [
-        3120,
+        3720,
         760
       ],
       "parameters": {
@@ -1240,7 +1575,7 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        3340,
+        3940,
         760
       ],
       "parameters": {
@@ -1369,7 +1704,7 @@
           "conditions": [
             {
               "id": "chaveValida-cond",
-              "leftValue": "={{ String($('Imagem pública').first().json.query?.t ?? '').length >= 32 && $json.token_imagem === String($('Imagem pública').first().json.query?.t ?? '') && Number($json.imagem_id) > 0 }}",
+              "leftValue": "={{ String($('Imagem pública').first().json.query?.t ?? '').length >= 32 && $json.token_imagem === String($('Imagem pública').first().json.query?.t ?? '') && (Number($json.imagem_id) > 0 || Number($json.video_id) > 0) }}",
               "rightValue": "",
               "operator": {
                 "type": "boolean",
@@ -1384,12 +1719,131 @@
       }
     },
     {
+      "id": "33600517-c93c-4522-a2df-7a035cd2a40d",
+      "name": "Vídeo ou foto? (link)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        600,
+        1700
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "videoOuFotoLink-cond",
+              "leftValue": "={{ Number($json.video_id) > 0 }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "c071bc19-87fc-40b1-a01d-fd9f5cb078bb",
+      "name": "Buscar vídeo (link)",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        820,
+        1900
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "kira_videos"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $json.video_id }}"
+            },
+            {
+              "keyName": "user_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.user_id }}"
+            }
+          ]
+        },
+        "limit": 1
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "b2c01dee-2e2c-473b-aec7-47302a28036d",
+      "name": "Baixar vídeo (link)",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1040,
+        1900
+      ],
+      "parameters": {
+        "resource": "file",
+        "operation": "get",
+        "fileId": "={{ $json.file_id ?? '' }}",
+        "download": true,
+        "additionalFields": {}
+      },
+      "credentials": {},
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "408efab1-dc50-450e-abbc-6a85e800e794",
+      "name": "Entregar vídeo",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1260,
+        1900
+      ],
+      "parameters": {
+        "respondWith": "binary",
+        "responseDataSource": "automatically",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "video/mp4"
+              },
+              {
+                "name": "Cache-Control",
+                "value": "no-store"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
       "id": "b6cba4ef-ee8d-4ce1-ab14-1c9ccfa4b4cc",
       "name": "Buscar imagem (link)",
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
       "position": [
-        660,
+        820,
         1620
       ],
       "parameters": {
@@ -1426,7 +1880,7 @@
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
-        880,
+        1040,
         1620
       ],
       "parameters": {
@@ -1445,7 +1899,7 @@
       "type": "n8n-nodes-base.editImage",
       "typeVersion": 1.1,
       "position": [
-        1100,
+        1260,
         1620
       ],
       "parameters": {
@@ -1460,7 +1914,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1320,
+        1480,
         1620
       ],
       "parameters": {
@@ -1476,7 +1930,7 @@
       "type": "n8n-nodes-base.editImage",
       "typeVersion": 1.1,
       "position": [
-        1540,
+        1700,
         1620
       ],
       "parameters": {
@@ -1513,7 +1967,7 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        1760,
+        1920,
         1620
       ],
       "parameters": {
@@ -1542,8 +1996,8 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        1760,
-        1860
+        1920,
+        2100
       ],
       "parameters": {
         "respondWith": "text",
@@ -1590,7 +2044,7 @@
       "main": [
         [
           {
-            "node": "Buscar imagem do post",
+            "node": "Foto ou vídeo?",
             "type": "main",
             "index": 0
           }
@@ -1625,6 +2079,104 @@
         ]
       ]
     },
+    "Foto ou vídeo?": {
+      "main": [
+        [
+          {
+            "node": "Buscar vídeo do post",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Buscar imagem do post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar vídeo do post": {
+      "main": [
+        [
+          {
+            "node": "Vídeo do post serve?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Vídeo do post serve?": {
+      "main": [
+        [
+          {
+            "node": "Guardar rascunho",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Vídeo do post não serve",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar rascunho": {
+      "main": [
+        [
+          {
+            "node": "Prévia de vídeo?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prévia de vídeo?": {
+      "main": [
+        [
+          {
+            "node": "Mostrar prévia (vídeo)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mostrar prévia",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mostrar prévia (vídeo)": {
+      "main": [
+        [
+          {
+            "node": "Rascunho pronto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mostrar prévia": {
+      "main": [
+        [
+          {
+            "node": "Rascunho pronto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Buscar imagem do post": {
       "main": [
         [
@@ -1648,28 +2200,6 @@
         [
           {
             "node": "Imagem do post não encontrada",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Guardar rascunho": {
-      "main": [
-        [
-          {
-            "node": "Mostrar prévia",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Mostrar prévia": {
-      "main": [
-        [
-          {
-            "node": "Rascunho pronto",
             "type": "main",
             "index": 0
           }
@@ -1742,7 +2272,7 @@
       "main": [
         [
           {
-            "node": "Criar post",
+            "node": "É Reels?",
             "type": "main",
             "index": 0
           }
@@ -1756,11 +2286,29 @@
         ]
       ]
     },
-    "Criar post": {
+    "É Reels?": {
       "main": [
         [
           {
-            "node": "Esperar o Instagram",
+            "node": "Criar Reels",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Criar post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Criar Reels": {
+      "main": [
+        [
+          {
+            "node": "Avisar processamento",
             "type": "main",
             "index": 0
           }
@@ -1768,6 +2316,28 @@
         [
           {
             "node": "Explicar falha",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Avisar processamento": {
+      "main": [
+        [
+          {
+            "node": "Post criado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post criado": {
+      "main": [
+        [
+          {
+            "node": "Esperar o Instagram",
             "type": "main",
             "index": 0
           }
@@ -1890,6 +2460,24 @@
         ]
       ]
     },
+    "Criar post": {
+      "main": [
+        [
+          {
+            "node": "Post criado",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Explicar falha",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Buscar posts": {
       "main": [
         [
@@ -1968,7 +2556,54 @@
       "main": [
         [
           {
+            "node": "Vídeo ou foto? (link)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Imagem não encontrada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Vídeo ou foto? (link)": {
+      "main": [
+        [
+          {
+            "node": "Buscar vídeo (link)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
             "node": "Buscar imagem (link)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar vídeo (link)": {
+      "main": [
+        [
+          {
+            "node": "Baixar vídeo (link)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Baixar vídeo (link)": {
+      "main": [
+        [
+          {
+            "node": "Entregar vídeo",
             "type": "main",
             "index": 0
           }

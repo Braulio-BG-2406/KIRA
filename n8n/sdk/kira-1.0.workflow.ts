@@ -104,7 +104,7 @@ const normalizar = node({
           {
             id: 'n-tipo-entrada',
             name: 'tipo_entrada',
-            value: expr("{{ ($json.message.voice || $json.message.audio) ? 'voz' : (['/start', '/ajuda', '/help', '/comandos', '/status', '/memorias', '/memoria', '/limpar', '/reset', '/id', '/publicar', '/instagram'].includes((($json.message.text ?? '').trim().split(/\\s+/)[0] || '').split('@')[0].toLowerCase()) ? 'comando' : (($json.message.photo || String($json.message.document?.mime_type ?? '').startsWith('image/')) ? 'imagem' : (($json.message.text ?? '').trim() ? 'texto' : 'outro'))) }}"),
+            value: expr("{{ ($json.message.voice || $json.message.audio) ? 'voz' : (['/start', '/ajuda', '/help', '/comandos', '/status', '/memorias', '/memoria', '/limpar', '/reset', '/id', '/publicar', '/instagram'].includes((($json.message.text ?? '').trim().split(/\\s+/)[0] || '').split('@')[0].toLowerCase()) ? 'comando' : (($json.message.video || $json.message.video_note || String($json.message.document?.mime_type ?? '').startsWith('video/')) ? 'video' : (($json.message.photo || String($json.message.document?.mime_type ?? '').startsWith('image/')) ? 'imagem' : (($json.message.text ?? '').trim() ? 'texto' : 'outro')))) }}"),
             type: 'string',
           },
           {
@@ -122,6 +122,12 @@ const normalizar = node({
             type: 'string',
           },
           { id: 'imagem-mime', name: 'imagem_mime', value: expr("{{ $json.message.photo ? 'image/jpeg' : String($json.message.document?.mime_type ?? '') }}"), type: 'string' },
+          { id: 'n-video-file-id', name: 'video_file_id', value: expr("{{ $json.message.video?.file_id ?? $json.message.video_note?.file_id ?? (String($json.message.document?.mime_type ?? '').startsWith('video/') ? $json.message.document.file_id : '') }}"), type: 'string' },
+          { id: 'n-video-duracao', name: 'video_duracao', value: expr("{{ Number($json.message.video?.duration ?? $json.message.video_note?.duration ?? 0) }}"), type: 'number' },
+          { id: 'n-video-tamanho', name: 'video_tamanho', value: expr("{{ Number($json.message.video?.file_size ?? $json.message.video_note?.file_size ?? $json.message.document?.file_size ?? 0) }}"), type: 'number' },
+          { id: 'n-video-largura', name: 'video_largura', value: expr("{{ Number($json.message.video?.width ?? $json.message.video_note?.length ?? 0) }}"), type: 'number' },
+          { id: 'n-video-altura', name: 'video_altura', value: expr("{{ Number($json.message.video?.height ?? $json.message.video_note?.length ?? 0) }}"), type: 'number' },
+          { id: 'n-video-mime', name: 'video_mime', value: expr("{{ String($json.message.video?.mime_type ?? $json.message.document?.mime_type ?? 'video/mp4') }}"), type: 'string' },
           {
             id: 'n-na-lista',
             name: 'usuario_na_lista',
@@ -238,6 +244,17 @@ const tipoMensagem = switchCase({
               options: { caseSensitive: true, leftValue: '', typeValidation: 'strict', version: 2 },
               conditions: [
                 { id: 'tipo-imagem', leftValue: expr("{{ $('Normalizar entrada').first().json.tipo_entrada }}"), rightValue: 'imagem', operator: { type: 'string', operation: 'equals' } },
+              ],
+              combinator: 'and',
+            },
+          },
+          {
+            renameOutput: true,
+            outputKey: 'Vídeo',
+            conditions: {
+              options: { caseSensitive: true, leftValue: '', typeValidation: 'strict', version: 2 },
+              conditions: [
+                { id: 'tipo-video', leftValue: expr("{{ $('Normalizar entrada').first().json.tipo_entrada }}"), rightValue: 'video', operator: { type: 'string', operation: 'equals' } },
               ],
               combinator: 'and',
             },
@@ -382,6 +399,7 @@ const publicarNoInstagram = node({
           chat_id: expr("{{ $('Normalizar entrada').first().json.chat_id }}"),
           rascunho_id: expr("{{ Number(String($('Normalizar entrada').first().json.texto).trim().split(/\\s+/)[1]) || 0 }}"),
           imagem_id: 0,
+          video_id: 0,
           legenda: '',
           quantidade: 5,
         },
@@ -393,6 +411,7 @@ const publicarNoInstagram = node({
           { id: 'user_id', displayName: 'user_id', required: false, defaultMatch: false, display: true, canBeUsedToMatch: true, type: 'string' },
           { id: 'chat_id', displayName: 'chat_id', required: false, defaultMatch: false, display: true, canBeUsedToMatch: true, type: 'string' },
           { id: 'imagem_id', displayName: 'imagem_id', required: false, defaultMatch: false, display: true, canBeUsedToMatch: true, type: 'number' },
+          { id: 'video_id', displayName: 'video_id', required: false, defaultMatch: false, display: true, canBeUsedToMatch: true, type: 'number' },
           { id: 'legenda', displayName: 'legenda', required: false, defaultMatch: false, display: true, canBeUsedToMatch: true, type: 'string' },
           { id: 'rascunho_id', displayName: 'rascunho_id', required: false, defaultMatch: false, display: true, canBeUsedToMatch: true, type: 'number' },
           { id: 'quantidade', displayName: 'quantidade', required: false, defaultMatch: false, display: true, canBeUsedToMatch: true, type: 'number' },
@@ -899,6 +918,51 @@ const guardarFoto = node({
   output: [{ id: 2, user_id: '111111111', chat_id: '111111111', file_id: 'AgACAgEAAxkBAAIC', descricao: 'Foto que o dono mandou no Telegram', legenda: '', formato: '', modelo: 'foto do Telegram' }],
 });
 
+// Vídeo do Telegram: a Kira não assiste ao vídeo; só guarda o arquivo com um número (Vídeo #N) para virar um
+// Reels do Instagram. O robô do Telegram só baixa arquivos de até 20 MB.
+const guardarVideo = node({
+  type: 'n8n-nodes-base.dataTable',
+  version: 1.1,
+  config: {
+    name: 'Guardar vídeo',
+    parameters: {
+      resource: 'row',
+      operation: 'insert',
+      dataTableId: { __rl: true, mode: 'name', value: 'kira_videos' },
+      columns: {
+        mappingMode: 'defineBelow',
+        value: {
+          user_id: expr("{{ $('Normalizar entrada').first().json.user_id }}"),
+          chat_id: expr("{{ $('Normalizar entrada').first().json.chat_id }}"),
+          file_id: expr("{{ $('Normalizar entrada').first().json.video_file_id }}"),
+          duracao: expr("{{ $('Normalizar entrada').first().json.video_duracao }}"),
+          tamanho: expr("{{ $('Normalizar entrada').first().json.video_tamanho }}"),
+          largura: expr("{{ $('Normalizar entrada').first().json.video_largura }}"),
+          altura: expr("{{ $('Normalizar entrada').first().json.video_altura }}"),
+          mime: expr("{{ $('Normalizar entrada').first().json.video_mime }}"),
+          legenda: expr("{{ $('Normalizar entrada').first().json.texto }}"),
+        },
+        matchingColumns: [],
+        schema: [
+          { id: 'user_id', displayName: 'user_id', required: false, defaultMatch: false, display: true, type: 'string', canBeUsedToMatch: true },
+          { id: 'chat_id', displayName: 'chat_id', required: false, defaultMatch: false, display: true, type: 'string', canBeUsedToMatch: true },
+          { id: 'file_id', displayName: 'file_id', required: false, defaultMatch: false, display: true, type: 'string', canBeUsedToMatch: true },
+          { id: 'duracao', displayName: 'duracao', required: false, defaultMatch: false, display: true, type: 'number', canBeUsedToMatch: true },
+          { id: 'tamanho', displayName: 'tamanho', required: false, defaultMatch: false, display: true, type: 'number', canBeUsedToMatch: true },
+          { id: 'largura', displayName: 'largura', required: false, defaultMatch: false, display: true, type: 'number', canBeUsedToMatch: true },
+          { id: 'altura', displayName: 'altura', required: false, defaultMatch: false, display: true, type: 'number', canBeUsedToMatch: true },
+          { id: 'mime', displayName: 'mime', required: false, defaultMatch: false, display: true, type: 'string', canBeUsedToMatch: true },
+          { id: 'legenda', displayName: 'legenda', required: false, defaultMatch: false, display: true, type: 'string', canBeUsedToMatch: true },
+        ],
+      },
+      options: {},
+    },
+    onError: 'continueRegularOutput',
+    position: [1460, 780],
+  },
+  output: [{ id: 3, user_id: '111111111', chat_id: '111111111', file_id: 'BAACAgEAAxkBAAIC', duracao: 15, tamanho: 4500000, largura: 720, altura: 1280, mime: 'video/mp4', legenda: '' }],
+});
+
 const pergunta = node({
   type: 'n8n-nodes-base.set',
   version: 3.5,
@@ -912,7 +976,7 @@ const pergunta = node({
           {
             id: 'p-pergunta',
             name: 'pergunta',
-            value: expr("{{ $('Normalizar entrada').first().json.tipo_entrada === 'voz' ? ((($json.content?.parts ?? []).filter(p => !p.thought).map(p => p.text ?? '').join(' ') || $json.text || '').trim() || '[inaudível]') : ($('Normalizar entrada').first().json.tipo_entrada === 'imagem' ? (($('Normalizar entrada').first().json.texto || 'Mandei esta foto sem legenda. O que tem nela? Responda em poucas palavras e pergunte o que eu quero fazer com ela.') + '\\n\\n[' + (Number($json.id) > 0 && $json.file_id ? 'Foto #' + $json.id + ' (guardada). ' : '') + 'Descrição da foto, feita pelo leitor de imagens]\\n' + (((($('Analisar imagem (Gemini)').first().json.content?.parts ?? []).filter(p => !p.thought).map(p => p.text ?? '').join(' ') || $('Analisar imagem (Gemini)').first().json.text || '').trim()) || '(sem descrição)')) : $('Normalizar entrada').first().json.texto) }}"),
+            value: expr("{{ $('Normalizar entrada').first().json.tipo_entrada === 'voz' ? ((($json.content?.parts ?? []).filter(p => !p.thought).map(p => p.text ?? '').join(' ') || $json.text || '').trim() || '[inaudível]') : ($('Normalizar entrada').first().json.tipo_entrada === 'imagem' ? (($('Normalizar entrada').first().json.texto || 'Mandei esta foto sem legenda. O que tem nela? Responda em poucas palavras e pergunte o que eu quero fazer com ela.') + '\\n\\n[' + (Number($json.id) > 0 && $json.file_id ? 'Foto #' + $json.id + ' (guardada). ' : '') + 'Descrição da foto, feita pelo leitor de imagens]\\n' + (((($('Analisar imagem (Gemini)').first().json.content?.parts ?? []).filter(p => !p.thought).map(p => p.text ?? '').join(' ') || $('Analisar imagem (Gemini)').first().json.text || '').trim()) || '(sem descrição)')) : ($('Normalizar entrada').first().json.tipo_entrada === 'video' ? (($('Normalizar entrada').first().json.texto || 'Mandei este vídeo sem legenda. Diga o número dele e pergunte o que eu quero fazer com ele (por exemplo, um Reels para o Instagram da loja).') + '\\n\\n[' + (Number($json.id) > 0 ? 'Vídeo #' + $json.id + ' (guardado). ' : 'Não consegui guardar o vídeo. ') + 'Duração: ' + $('Normalizar entrada').first().json.video_duracao + ' s; tamanho: ' + (Math.round($('Normalizar entrada').first().json.video_tamanho / 104857.6) / 10) + ' MB; ' + $('Normalizar entrada').first().json.video_largura + 'x' + $('Normalizar entrada').first().json.video_altura + '. Você não vê o conteúdo do vídeo.' + ($('Normalizar entrada').first().json.video_tamanho > 20971520 ? ' Passa de 20 MB: o robô do Telegram não consegue baixar, então não dá para publicar. Peça para ele mandar de novo sem a opção arquivo ou mais curto.' : '') + ']') : $('Normalizar entrada').first().json.texto)) }}"),
             type: 'string',
           },
         ],
@@ -1609,7 +1673,7 @@ const instagramLoja = tool({
     name: 'instagram',
     parameters: {
       description:
-        "Instagram da loja (só no modo Negócios). acao rascunho: guarda um post (imagem_id + legenda) e já manda a prévia no Telegram. NÃO publica: quem publica é o dono, mandando /instagram <número do rascunho>. acao rascunhos: lista os rascunhos que esperam publicação. acao posts: seguidores, total de posts e os últimos posts com curtidas e comentários. Todo post precisa de uma imagem: gere ou edite antes com gerar_imagem (ou use a Foto #N dele). Depois de guardar, mostre a legenda completa e o número do rascunho e diga que, para publicar, ele manda /instagram <número>. Nunca diga que publicou.",
+        "Instagram da loja (só no modo Negócios). acao rascunho: guarda um post (imagem_id + legenda, ou video_id + legenda para um Reels) e já manda a prévia no Telegram. NÃO publica: quem publica é o dono, mandando /instagram <número do rascunho>. acao rascunhos: lista os rascunhos que esperam publicação. acao posts: seguidores, total de posts e os últimos posts com curtidas e comentários. Todo post precisa de uma imagem ou de um vídeo: gere ou edite a imagem antes com gerar_imagem (ou use a Foto #N dele); para Reels, use o Vídeo #N que ele mandou. Depois de guardar, mostre a legenda completa e o número do rascunho e diga que, para publicar, ele manda /instagram <número>. Nunca diga que publicou.",
       source: 'database',
       workflowId: { __rl: true, mode: 'id', value: '' },
       workflowInputs: {
@@ -1620,7 +1684,8 @@ const instagramLoja = tool({
           origem: 'kira',
           user_id: expr("{{ $('Normalizar entrada').first().json.user_id }}"),
           chat_id: expr("{{ $('Normalizar entrada').first().json.chat_id }}"),
-          imagem_id: fromAi('imagem_id', 'Número da imagem do post (o #N de gerar_imagem ou da Foto #N dele); 0 quando não for rascunho', 'number', 0),
+          imagem_id: fromAi('imagem_id', 'Número da imagem do post (o #N de gerar_imagem ou da Foto #N dele); 0 para Reels ou quando não for rascunho', 'number', 0),
+          video_id: fromAi('video_id', 'Número do vídeo para um Reels (o Vídeo #N que ele mandou); 0 para post de foto ou quando não for rascunho', 'number', 0),
           legenda: fromAi('legenda', 'Legenda completa do post, com emojis e hashtags (até 2.200 caracteres e 30 hashtags); vazio quando não for rascunho', 'string', ''),
           rascunho_id: 0,
           quantidade: fromAi('quantidade', 'Quantos posts recentes mostrar, de 1 a 10', 'number', 5),
@@ -1633,6 +1698,7 @@ const instagramLoja = tool({
           { id: 'user_id', displayName: 'user_id', required: false, defaultMatch: false, display: true, canBeUsedToMatch: true, type: 'string' },
           { id: 'chat_id', displayName: 'chat_id', required: false, defaultMatch: false, display: true, canBeUsedToMatch: true, type: 'string' },
           { id: 'imagem_id', displayName: 'imagem_id', required: false, defaultMatch: false, display: true, canBeUsedToMatch: true, type: 'number' },
+          { id: 'video_id', displayName: 'video_id', required: false, defaultMatch: false, display: true, canBeUsedToMatch: true, type: 'number' },
           { id: 'legenda', displayName: 'legenda', required: false, defaultMatch: false, display: true, canBeUsedToMatch: true, type: 'string' },
           { id: 'rascunho_id', displayName: 'rascunho_id', required: false, defaultMatch: false, display: true, canBeUsedToMatch: true, type: 'number' },
           { id: 'quantidade', displayName: 'quantidade', required: false, defaultMatch: false, display: true, canBeUsedToMatch: true, type: 'number' },
@@ -2263,7 +2329,7 @@ const respostaTipoNaoSuportado = node({
           {
             id: 'tn-texto',
             name: 'texto_resposta',
-            value: 'Por enquanto eu entendo **texto**, **áudio** 🎙️ e **fotos** 📷. Documentos, vídeos e outros tipos de mensagem chegam nas próximas versões!',
+            value: 'Por enquanto eu entendo **texto**, **áudio** 🎙️, **fotos** 📷 e guardo **vídeos** 🎬 (para o Instagram). Documentos e outros tipos de mensagem chegam nas próximas versões!',
             type: 'string',
           },
           { id: 'tn-modo', name: 'modo_resposta', value: 'texto', type: 'string' },
@@ -2275,7 +2341,7 @@ const respostaTipoNaoSuportado = node({
     },
     position: [1460, 620],
   },
-  output: [{ texto_resposta: 'Por enquanto eu entendo **texto**, **áudio** 🎙️ e **fotos** 📷.', modo_resposta: 'texto', status: 'ok', erro: '', entrada: '[mensagem sem texto]' }],
+  output: [{ texto_resposta: 'Por enquanto eu entendo **texto**, **áudio** 🎙️, **fotos** 📷 e guardo **vídeos** 🎬.', modo_resposta: 'texto', status: 'ok', erro: '', entrada: '[mensagem sem texto]' }],
 });
 
 const respostaPronta = node({
@@ -2517,7 +2583,8 @@ export default workflow('kira-1-0', 'Kira 1.0 — Assistente pessoal (Telegram +
             .onCase(1, baixarAudio.to(transcrever.to(pergunta)))
             .onCase(2, pergunta)
             .onCase(3, baixarImagem.to(analisarImagem.to(guardarFoto.to(pergunta))))
-            .onCase(4, respostaTipoNaoSuportado)))),
+            .onCase(4, guardarVideo.to(pergunta))
+            .onCase(5, respostaTipoNaoSuportado)))),
         ),
       )
       .onFalse(respostaAcessoNegado),
@@ -2563,7 +2630,7 @@ export default workflow('kira-1-0', 'Kira 1.0 — Assistente pessoal (Telegram +
     description: 'Lê a mensagem do Telegram e confere se é você (campo ids_autorizados da configuração).',
   })
   .group('Roteamento', [mostrarDigitando, ambientesDaKira, buscarAmbiente, ambienteAtual, tipoMensagem], {
-    description: 'Mostra "digitando…", descobre o ambiente ativo (tabela kira_config) e separa a mensagem por tipo: comando, voz, texto, imagem ou outro.',
+    description: 'Mostra "digitando…", descobre o ambiente ativo (tabela kira_config) e separa a mensagem por tipo: comando, voz, texto, imagem, vídeo ou outro.',
   })
   .group('Comandos', [ehPublicar, buscarRascunho, rascunhoEncontrado, rascunhoTemImagem, buscarImagemLinkedin, baixarImagemLinkedin, publicarLinkedinImagem, publicarLinkedin, marcarPublicado, ehInstagram, publicarNoInstagram, ehLimpar, limparHistorico, memoriaLimpeza, buscarMemoriasComando, respostaComando], {
     description: '/start, /ajuda, /status, /memorias, /limpar, /id, /publicar (LinkedIn) e /instagram (Instagram da loja).',

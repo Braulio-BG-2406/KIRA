@@ -104,7 +104,7 @@ const normalizar = node({
           {
             id: 'n-tipo-entrada',
             name: 'tipo_entrada',
-            value: expr("{{ ($json.message.voice || $json.message.audio) ? 'voz' : (['/start', '/ajuda', '/help', '/comandos', '/status', '/memorias', '/memoria', '/limpar', '/reset', '/id', '/publicar'].includes((($json.message.text ?? '').trim().split(/\\s+/)[0] || '').split('@')[0].toLowerCase()) ? 'comando' : (($json.message.photo || String($json.message.document?.mime_type ?? '').startsWith('image/')) ? 'imagem' : (($json.message.text ?? '').trim() ? 'texto' : 'outro'))) }}"),
+            value: expr("{{ ($json.message.voice || $json.message.audio) ? 'voz' : (['/start', '/ajuda', '/help', '/comandos', '/status', '/memorias', '/memoria', '/limpar', '/reset', '/id', '/publicar', '/instagram'].includes((($json.message.text ?? '').trim().split(/\\s+/)[0] || '').split('@')[0].toLowerCase()) ? 'comando' : (($json.message.photo || String($json.message.document?.mime_type ?? '').startsWith('image/')) ? 'imagem' : (($json.message.text ?? '').trim() ? 'texto' : 'outro'))) }}"),
             type: 'string',
           },
           {
@@ -338,6 +338,77 @@ const ehPublicar = ifElse({
     },
     position: [1360, -560],
   },
+});
+
+// /instagram N: publica no Instagram da loja um rascunho que a Kira preparou. Quem publica é o sub-workflow
+// "Kira — Instagram (ferramenta)" (link temporário da imagem, cria o post, espera o Instagram e publica).
+const ehInstagram = ifElse({
+  version: 2.3,
+  config: {
+    name: 'É /instagram?',
+    parameters: {
+      conditions: {
+        options: { caseSensitive: true, leftValue: '', typeValidation: 'strict', version: 2 },
+        conditions: [
+          {
+            id: 'cond-instagram',
+            leftValue: expr("{{ $('Normalizar entrada').first().json.comando }}"),
+            rightValue: '/instagram',
+            operator: { type: 'string', operation: 'equals' },
+          },
+        ],
+        combinator: 'and',
+      },
+      options: {},
+    },
+    position: [1360, -380],
+  },
+});
+
+const publicarNoInstagram = node({
+  type: 'n8n-nodes-base.executeWorkflow',
+  version: 1.3,
+  config: {
+    name: 'Publicar no Instagram',
+    parameters: {
+      workflowId: { __rl: true, mode: 'id', value: '' },
+      workflowInputs: {
+        mappingMode: 'defineBelow',
+        value: {
+          acao: 'publicar',
+          origem: 'comando',
+          ambiente: expr("{{ $('Ambiente atual').first().json.ambiente }}"),
+          user_id: expr("{{ $('Normalizar entrada').first().json.user_id }}"),
+          chat_id: expr("{{ $('Normalizar entrada').first().json.chat_id }}"),
+          rascunho_id: expr("{{ Number(String($('Normalizar entrada').first().json.texto).trim().split(/\\s+/)[1]) || 0 }}"),
+          imagem_id: 0,
+          legenda: '',
+          quantidade: 5,
+        },
+        matchingColumns: [],
+        schema: [
+          { id: 'acao', displayName: 'acao', required: false, defaultMatch: false, display: true, canBeUsedToMatch: true, type: 'string' },
+          { id: 'ambiente', displayName: 'ambiente', required: false, defaultMatch: false, display: true, canBeUsedToMatch: true, type: 'string' },
+          { id: 'origem', displayName: 'origem', required: false, defaultMatch: false, display: true, canBeUsedToMatch: true, type: 'string' },
+          { id: 'user_id', displayName: 'user_id', required: false, defaultMatch: false, display: true, canBeUsedToMatch: true, type: 'string' },
+          { id: 'chat_id', displayName: 'chat_id', required: false, defaultMatch: false, display: true, canBeUsedToMatch: true, type: 'string' },
+          { id: 'imagem_id', displayName: 'imagem_id', required: false, defaultMatch: false, display: true, canBeUsedToMatch: true, type: 'number' },
+          { id: 'legenda', displayName: 'legenda', required: false, defaultMatch: false, display: true, canBeUsedToMatch: true, type: 'string' },
+          { id: 'rascunho_id', displayName: 'rascunho_id', required: false, defaultMatch: false, display: true, canBeUsedToMatch: true, type: 'number' },
+          { id: 'quantidade', displayName: 'quantidade', required: false, defaultMatch: false, display: true, canBeUsedToMatch: true, type: 'number' },
+        ],
+        attemptToConvertTypes: false,
+        convertFieldsToString: false,
+      },
+      mode: 'once',
+      options: { waitForSubWorkflow: true },
+    },
+    executeOnce: true,
+    onError: 'continueRegularOutput',
+    alwaysOutputData: true,
+    position: [1600, -400],
+  },
+  output: [{ ok: true, mensagem: '✅ Publiquei no Instagram o post do rascunho 5.' }],
 });
 
 const buscarRascunho = node({
@@ -697,7 +768,7 @@ const respostaComando = node({
   version: 2,
   config: {
     name: 'Resposta do comando',
-    parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: "// Monta a resposta dos comandos (/start, /ajuda, /status, /memorias, /limpar, /id, /publicar).\n// O texto segue para \"Resposta pronta\", que cuida da formatação e do envio.\nconst entrada = $('Normalizar entrada').first().json;\nconst config = $('Configuração da Kira').first().json;\nconst ambiente = $('Ambiente atual').first().json;\n\n// Memórias do ambiente ativo e as gerais (as antigas, sem ambiente, usam a categoria).\nfunction lerAmbientes(texto) {\n  try {\n    const lista = JSON.parse(texto || '[]');\n    return (Array.isArray(lista) ? lista : []).filter((a) => a && a.codigo);\n  } catch (e) {\n    return [];\n  }\n}\nconst normalizar = (s) =>\n  String(s ?? '')\n    .toLowerCase()\n    .normalize('NFD')\n    .replace(/\\p{M}/gu, '')\n    .replace(/[^a-z0-9 ]+/g, ' ')\n    .trim();\nconst ambientes = lerAmbientes($('Ambientes da Kira').first().json.ambientes);\nconst apelidos = {};\nfor (const a of ambientes) {\n  for (const n of [a.codigo, a.nome, ...(a.apelidos || [])]) apelidos[normalizar(n)] = String(a.codigo).toUpperCase();\n}\nconst ambienteDa = (m) => String(m.contexto || apelidos[normalizar(m.categoria)] || 'GERAL').toUpperCase();\nconst memorias = $input\n  .all()\n  .map((item) => item.json)\n  .filter((m) => m && m.fato)\n  .map((m) => ({ ...m, ambiente: ambienteDa(m) }))\n  .filter((m) => m.ambiente === ambiente.ambiente || m.ambiente === 'GERAL');\nconst nomesDosAmbientes = ambientes.map((a) => a.nome || a.codigo);\n\nconst nome = config.nome_dono || entrada.nome_usuario || '';\nconst agora = DateTime.now()\n  .setZone(config.fuso_horario || 'America/Sao_Paulo')\n  .setLocale('pt-BR')\n  .toFormat(\"dd/MM/yyyy 'às' HH:mm\");\n\nconst modosDeVoz = {\n  espelho: 'quando você manda áudio, eu respondo em áudio',\n  sempre: 'eu sempre respondo em áudio',\n  nunca: 'eu respondo sempre por texto',\n};\n\nconst listaDeComandos = [\n  '/ajuda — mostra esta lista',\n  '/status — mostra se estou online e como estou configurada',\n  '/memorias — mostra o que eu guardei sobre você',\n  '/limpar — apaga o histórico recente da conversa (as memórias continuam)',\n  '/id — mostra o seu ID do Telegram',\n  ...(nomesDosAmbientes.length ? [`modo <ambiente> — troca de ambiente (${nomesDosAmbientes.join(', ')})`] : []),\n  '/publicar N — publica no LinkedIn o rascunho N que eu preparei (com a imagem, se tiver)',\n].join('\\n');\n\n// Resultado do /publicar N: o post só vai para o LinkedIn por este comando.\nfunction resultadoDoPublicar() {\n  const numero = String(entrada.texto || '').trim().split(/\\s+/)[1] || '';\n  const executou = (no) => {\n    try {\n      return Boolean($(no).isExecuted);\n    } catch (e) {\n      return false;\n    }\n  };\n  const erroDe = (no) => {\n    try {\n      const falha = $(no).all(1)?.[0]?.json?.error;\n      return typeof falha === 'string' ? falha : (falha?.message ?? '');\n    } catch (e) {\n      return '';\n    }\n  };\n  if (!numero) return 'Me diga qual rascunho publicar, por exemplo: /publicar 3';\n  const rascunho = executou('Buscar rascunho (LinkedIn)') ? ($('Buscar rascunho (LinkedIn)').first()?.json ?? {}) : {};\n  if (!rascunho.texto) return `Não encontrei o rascunho ${numero} pendente. Peça para eu escrever o post de novo.`;\n  const imagem = Number(rascunho.imagem_id) || 0;\n  if (executou('Marcar como publicado')) {\n    return `✅ Publiquei no LinkedIn o rascunho ${numero}${imagem ? ` com a imagem #${imagem}` : ''}.`;\n  }\n  if (imagem && !executou('Publicar no LinkedIn (com imagem)')) {\n    const erro = erroDe('Baixar imagem (LinkedIn)');\n    return `😕 Não consegui pegar a imagem #${imagem} do rascunho ${numero}.${erro ? ` Erro: ${erro}` : ''} Nada foi publicado; o rascunho continua guardado.`;\n  }\n  const erro = erroDe(imagem ? 'Publicar no LinkedIn (com imagem)' : 'Publicar no LinkedIn');\n  return `😕 Não consegui publicar o rascunho ${numero} no LinkedIn.${erro ? ` Erro: ${erro}` : ''} O rascunho continua guardado.`;\n}\n\nlet texto;\nswitch (entrada.comando) {\n  case '/start':\n    texto = [\n      `Olá, ${nome}! Eu sou a **Kira** 👋`,\n      'Sua assistente pessoal, rodando no seu próprio servidor.',\n      '',\n      'Pode falar comigo por **texto**, mandar um **áudio** 🎙️ ou uma **foto** 📷 — quando você fala, eu respondo falando.',\n      '',\n      'Digite /ajuda para ver os comandos.',\n    ].join('\\n');\n    break;\n  case '/ajuda':\n  case '/help':\n  case '/comandos':\n    texto = `**Comandos da Kira**\\n\\n${listaDeComandos}\\n\\nFora isso, é só conversar comigo por texto, áudio ou foto. Também consulto seus e-mails, agenda e Google Drive, preparo rascunhos de resposta no Outlook e posts para o LinkedIn, gero imagens, entendo e edito as suas fotos, pesquiso na internet, consulto os pedidos da base oficial e o Power BI da empresa no modo Trabalho, consulto a planilha do negócio no modo Negócios e leio e respondo no Teams quando você pede. Nada é enviado ou publicado sem você pedir. 🙂`;\n    break;\n  case '/status':\n    texto = [\n      '✅ **Kira 1.0 online**',\n      `🕒 ${agora}`,\n      `🗂️ Ambiente: ${ambiente.ambiente_nome}`,\n      '🧠 Cérebro: Google Gemini',\n      '📬 Outlook: e-mails e agenda (leitura) e rascunhos de resposta',\n      '📁 Google Drive: leitura',\n      '💼 LinkedIn: rascunhos, com ou sem imagem (publica só com /publicar)',\n      '🖼️ Imagens: entendo suas fotos, gero e edito com o Gemini e mando aqui',\n      '💬 Teams: leio e respondo quando você pede',\n      '📦 Pedidos: consulto a base oficial de pedidos (ERP), atualizada de seg a sáb às 9h, 12h, 15h e 18h',\n      '📊 Power BI: consulto os modelos e relatórios da empresa (só leitura, no modo Trabalho)',\n      '💎 Negócio: consulto a planilha do negócio no Google Drive (só no modo Negócios)',\n      '🌐 Internet: pesquiso no Google quando preciso de informação atualizada',\n      `🎙️ Voz: ${modosDeVoz[config.modo_voz] || config.modo_voz}`,\n      `📌 Memórias guardadas: ${memorias.length}`,\n    ].join('\\n');\n    break;\n  case '/memorias':\n  case '/memoria':\n    texto = memorias.length\n      ? [\n          `📌 **O que eu guardei sobre você** — ambiente ${ambiente.ambiente_nome} e gerais (${memorias.length})`,\n          '',\n          ...memorias.map((m) => `- [${m.id}] (${m.ambiente}${m.contexto && m.categoria ? ` · ${m.categoria}` : ''}) ${m.fato}`),\n          '',\n          'Para eu esquecer algo, é só pedir: \"Kira, esqueça a memória 3\".',\n        ].join('\\n')\n      : `Ainda não guardei nenhuma memória no ambiente ${ambiente.ambiente_nome}. É só pedir: \"Kira, lembre que...\" 🙂`;\n    break;\n  case '/limpar':\n  case '/reset':\n    texto = `🧹 Pronto! Apaguei o histórico recente da nossa conversa no ambiente ${ambiente.ambiente_nome}. As memórias guardadas continuam (veja em /memorias).`;\n    break;\n  case '/publicar':\n    texto = resultadoDoPublicar();\n    break;\n  case '/id':\n    texto = `🆔 Seu ID do Telegram: \\`${entrada.user_id}\\`\\nID deste chat: \\`${entrada.chat_id}\\``;\n    break;\n  default:\n    texto = `Não conheço o comando ${entrada.comando}. Digite /ajuda para ver o que eu sei fazer.`;\n}\n\nreturn [\n  {\n    json: {\n      texto_resposta: texto,\n      modo_resposta: 'texto',\n      status: 'comando',\n      erro: '',\n      entrada: entrada.texto,\n    },\n  },\n];\n" },
+    parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: "// Monta a resposta dos comandos (/start, /ajuda, /status, /memorias, /limpar, /id, /publicar).\n// O texto segue para \"Resposta pronta\", que cuida da formatação e do envio.\nconst entrada = $('Normalizar entrada').first().json;\nconst config = $('Configuração da Kira').first().json;\nconst ambiente = $('Ambiente atual').first().json;\n\n// Memórias do ambiente ativo e as gerais (as antigas, sem ambiente, usam a categoria).\nfunction lerAmbientes(texto) {\n  try {\n    const lista = JSON.parse(texto || '[]');\n    return (Array.isArray(lista) ? lista : []).filter((a) => a && a.codigo);\n  } catch (e) {\n    return [];\n  }\n}\nconst normalizar = (s) =>\n  String(s ?? '')\n    .toLowerCase()\n    .normalize('NFD')\n    .replace(/\\p{M}/gu, '')\n    .replace(/[^a-z0-9 ]+/g, ' ')\n    .trim();\nconst ambientes = lerAmbientes($('Ambientes da Kira').first().json.ambientes);\nconst apelidos = {};\nfor (const a of ambientes) {\n  for (const n of [a.codigo, a.nome, ...(a.apelidos || [])]) apelidos[normalizar(n)] = String(a.codigo).toUpperCase();\n}\nconst ambienteDa = (m) => String(m.contexto || apelidos[normalizar(m.categoria)] || 'GERAL').toUpperCase();\nconst memorias = $input\n  .all()\n  .map((item) => item.json)\n  .filter((m) => m && m.fato)\n  .map((m) => ({ ...m, ambiente: ambienteDa(m) }))\n  .filter((m) => m.ambiente === ambiente.ambiente || m.ambiente === 'GERAL');\nconst nomesDosAmbientes = ambientes.map((a) => a.nome || a.codigo);\n\nconst nome = config.nome_dono || entrada.nome_usuario || '';\nconst agora = DateTime.now()\n  .setZone(config.fuso_horario || 'America/Sao_Paulo')\n  .setLocale('pt-BR')\n  .toFormat(\"dd/MM/yyyy 'às' HH:mm\");\n\nconst modosDeVoz = {\n  espelho: 'quando você manda áudio, eu respondo em áudio',\n  sempre: 'eu sempre respondo em áudio',\n  nunca: 'eu respondo sempre por texto',\n};\n\nconst listaDeComandos = [\n  '/ajuda — mostra esta lista',\n  '/status — mostra se estou online e como estou configurada',\n  '/memorias — mostra o que eu guardei sobre você',\n  '/limpar — apaga o histórico recente da conversa (as memórias continuam)',\n  '/id — mostra o seu ID do Telegram',\n  ...(nomesDosAmbientes.length ? [`modo <ambiente> — troca de ambiente (${nomesDosAmbientes.join(', ')})`] : []),\n  '/publicar N — publica no LinkedIn o rascunho N que eu preparei (com a imagem, se tiver)',\n  '/instagram N — publica no Instagram da loja o rascunho N que eu preparei (depois de você conferir a prévia)',\n].join('\\n');\n\n// Resultado do /publicar N: o post só vai para o LinkedIn por este comando.\nfunction resultadoDoPublicar() {\n  const numero = String(entrada.texto || '').trim().split(/\\s+/)[1] || '';\n  const executou = (no) => {\n    try {\n      return Boolean($(no).isExecuted);\n    } catch (e) {\n      return false;\n    }\n  };\n  const erroDe = (no) => {\n    try {\n      const falha = $(no).all(1)?.[0]?.json?.error;\n      return typeof falha === 'string' ? falha : (falha?.message ?? '');\n    } catch (e) {\n      return '';\n    }\n  };\n  if (!numero) return 'Me diga qual rascunho publicar, por exemplo: /publicar 3';\n  const rascunho = executou('Buscar rascunho (LinkedIn)') ? ($('Buscar rascunho (LinkedIn)').first()?.json ?? {}) : {};\n  if (!rascunho.texto) return `Não encontrei o rascunho ${numero} pendente. Peça para eu escrever o post de novo.`;\n  const imagem = Number(rascunho.imagem_id) || 0;\n  if (executou('Marcar como publicado')) {\n    return `✅ Publiquei no LinkedIn o rascunho ${numero}${imagem ? ` com a imagem #${imagem}` : ''}.`;\n  }\n  if (imagem && !executou('Publicar no LinkedIn (com imagem)')) {\n    const erro = erroDe('Baixar imagem (LinkedIn)');\n    return `😕 Não consegui pegar a imagem #${imagem} do rascunho ${numero}.${erro ? ` Erro: ${erro}` : ''} Nada foi publicado; o rascunho continua guardado.`;\n  }\n  const erro = erroDe(imagem ? 'Publicar no LinkedIn (com imagem)' : 'Publicar no LinkedIn');\n  return `😕 Não consegui publicar o rascunho ${numero} no LinkedIn.${erro ? ` Erro: ${erro}` : ''} O rascunho continua guardado.`;\n}\n\n// Resultado do /instagram N: o post só vai para o Instagram por este comando (quem publica é o sub-workflow do Instagram).\nfunction resultadoDoInstagram() {\n  try {\n    const r = $('Publicar no Instagram').first()?.json ?? {};\n    if (r.mensagem) return r.mensagem;\n    if (r.error) return `😕 Não consegui falar com o Instagram agora. Erro: ${typeof r.error === 'string' ? r.error : (r.error.message ?? '')}`;\n  } catch (e) {\n    // o sub-workflow não rodou\n  }\n  return 'Me diga qual rascunho publicar, por exemplo: /instagram 3';\n}\n\nlet texto;\nswitch (entrada.comando) {\n  case '/start':\n    texto = [\n      `Olá, ${nome}! Eu sou a **Kira** 👋`,\n      'Sua assistente pessoal, rodando no seu próprio servidor.',\n      '',\n      'Pode falar comigo por **texto**, mandar um **áudio** 🎙️ ou uma **foto** 📷 — quando você fala, eu respondo falando.',\n      '',\n      'Digite /ajuda para ver os comandos.',\n    ].join('\\n');\n    break;\n  case '/ajuda':\n  case '/help':\n  case '/comandos':\n    texto = `**Comandos da Kira**\\n\\n${listaDeComandos}\\n\\nFora isso, é só conversar comigo por texto, áudio ou foto. Também consulto seus e-mails, agenda e Google Drive, preparo rascunhos de resposta no Outlook e posts para o LinkedIn e para o Instagram da loja, gero imagens, entendo e edito as suas fotos, pesquiso na internet, consulto os pedidos da base oficial e o Power BI da empresa no modo Trabalho, consulto a planilha do negócio no modo Negócios e leio e respondo no Teams quando você pede. Nada é enviado ou publicado sem você pedir. 🙂`;\n    break;\n  case '/status':\n    texto = [\n      '✅ **Kira 1.0 online**',\n      `🕒 ${agora}`,\n      `🗂️ Ambiente: ${ambiente.ambiente_nome}`,\n      '🧠 Cérebro: Google Gemini',\n      '📬 Outlook: e-mails e agenda (leitura) e rascunhos de resposta',\n      '📁 Google Drive: leitura',\n      '💼 LinkedIn: rascunhos, com ou sem imagem (publica só com /publicar)',\n      '📸 Instagram da loja: rascunhos com prévia e últimos posts (só no modo Negócios; publica só com /instagram)',\n      '🖼️ Imagens: entendo suas fotos, gero e edito com o Gemini e mando aqui',\n      '💬 Teams: leio e respondo quando você pede',\n      '📦 Pedidos: consulto a base oficial de pedidos (ERP), atualizada de seg a sáb às 9h, 12h, 15h e 18h',\n      '📊 Power BI: consulto os modelos e relatórios da empresa (só leitura, no modo Trabalho)',\n      '💎 Negócio: consulto a planilha do negócio no Google Drive (só no modo Negócios)',\n      '🌐 Internet: pesquiso no Google quando preciso de informação atualizada',\n      `🎙️ Voz: ${modosDeVoz[config.modo_voz] || config.modo_voz}`,\n      `📌 Memórias guardadas: ${memorias.length}`,\n    ].join('\\n');\n    break;\n  case '/memorias':\n  case '/memoria':\n    texto = memorias.length\n      ? [\n          `📌 **O que eu guardei sobre você** — ambiente ${ambiente.ambiente_nome} e gerais (${memorias.length})`,\n          '',\n          ...memorias.map((m) => `- [${m.id}] (${m.ambiente}${m.contexto && m.categoria ? ` · ${m.categoria}` : ''}) ${m.fato}`),\n          '',\n          'Para eu esquecer algo, é só pedir: \"Kira, esqueça a memória 3\".',\n        ].join('\\n')\n      : `Ainda não guardei nenhuma memória no ambiente ${ambiente.ambiente_nome}. É só pedir: \"Kira, lembre que...\" 🙂`;\n    break;\n  case '/limpar':\n  case '/reset':\n    texto = `🧹 Pronto! Apaguei o histórico recente da nossa conversa no ambiente ${ambiente.ambiente_nome}. As memórias guardadas continuam (veja em /memorias).`;\n    break;\n  case '/publicar':\n    texto = resultadoDoPublicar();\n    break;\n  case '/instagram':\n    texto = resultadoDoInstagram();\n    break;\n  case '/id':\n    texto = `🆔 Seu ID do Telegram: \\`${entrada.user_id}\\`\\nID deste chat: \\`${entrada.chat_id}\\``;\n    break;\n  default:\n    texto = `Não conheço o comando ${entrada.comando}. Digite /ajuda para ver o que eu sei fazer.`;\n}\n\nreturn [\n  {\n    json: {\n      texto_resposta: texto,\n      modo_resposta: 'texto',\n      status: 'comando',\n      erro: '',\n      entrada: entrada.texto,\n    },\n  },\n];\n" },
     position: [2180, -200],
   },
   output: [{ texto_resposta: '**Comandos da Kira** ...', modo_resposta: 'texto', status: 'comando', erro: '', entrada: '/ajuda' }],
@@ -1529,6 +1600,51 @@ const consultarPlanilhaNegocio = tool({
   },
 });
 
+// Instagram da loja: sub-workflow da ferramenta instagram (rascunhos com prévia e últimos posts). Só no modo Negócios:
+// o ambiente vai pelo workflow (não pela IA). Publicar, só o dono, com o comando /instagram <número>.
+const instagramLoja = tool({
+  type: '@n8n/n8n-nodes-langchain.toolWorkflow',
+  version: 2.2,
+  config: {
+    name: 'instagram',
+    parameters: {
+      description:
+        "Instagram da loja (só no modo Negócios). acao rascunho: guarda um post (imagem_id + legenda) e já manda a prévia no Telegram. NÃO publica: quem publica é o dono, mandando /instagram <número do rascunho>. acao rascunhos: lista os rascunhos que esperam publicação. acao posts: seguidores, total de posts e os últimos posts com curtidas e comentários. Todo post precisa de uma imagem: gere ou edite antes com gerar_imagem (ou use a Foto #N dele). Depois de guardar, mostre a legenda completa e o número do rascunho e diga que, para publicar, ele manda /instagram <número>. Nunca diga que publicou.",
+      source: 'database',
+      workflowId: { __rl: true, mode: 'id', value: '' },
+      workflowInputs: {
+        mappingMode: 'defineBelow',
+        value: {
+          acao: fromAi('acao', 'rascunho (guardar um post para o dono aprovar), rascunhos (listar os que esperam publicação) ou posts (últimos posts e números da conta)', 'string', 'posts'),
+          ambiente: expr("{{ $('Ambiente atual').first().json.ambiente }}"),
+          origem: 'kira',
+          user_id: expr("{{ $('Normalizar entrada').first().json.user_id }}"),
+          chat_id: expr("{{ $('Normalizar entrada').first().json.chat_id }}"),
+          imagem_id: fromAi('imagem_id', 'Número da imagem do post (o #N de gerar_imagem ou da Foto #N dele); 0 quando não for rascunho', 'number', 0),
+          legenda: fromAi('legenda', 'Legenda completa do post, com emojis e hashtags (até 2.200 caracteres e 30 hashtags); vazio quando não for rascunho', 'string', ''),
+          rascunho_id: 0,
+          quantidade: fromAi('quantidade', 'Quantos posts recentes mostrar, de 1 a 10', 'number', 5),
+        },
+        matchingColumns: [],
+        schema: [
+          { id: 'acao', displayName: 'acao', required: false, defaultMatch: false, display: true, canBeUsedToMatch: true, type: 'string' },
+          { id: 'ambiente', displayName: 'ambiente', required: false, defaultMatch: false, display: true, canBeUsedToMatch: true, type: 'string' },
+          { id: 'origem', displayName: 'origem', required: false, defaultMatch: false, display: true, canBeUsedToMatch: true, type: 'string' },
+          { id: 'user_id', displayName: 'user_id', required: false, defaultMatch: false, display: true, canBeUsedToMatch: true, type: 'string' },
+          { id: 'chat_id', displayName: 'chat_id', required: false, defaultMatch: false, display: true, canBeUsedToMatch: true, type: 'string' },
+          { id: 'imagem_id', displayName: 'imagem_id', required: false, defaultMatch: false, display: true, canBeUsedToMatch: true, type: 'number' },
+          { id: 'legenda', displayName: 'legenda', required: false, defaultMatch: false, display: true, canBeUsedToMatch: true, type: 'string' },
+          { id: 'rascunho_id', displayName: 'rascunho_id', required: false, defaultMatch: false, display: true, canBeUsedToMatch: true, type: 'number' },
+          { id: 'quantidade', displayName: 'quantidade', required: false, defaultMatch: false, display: true, canBeUsedToMatch: true, type: 'number' },
+        ],
+        attemptToConvertTypes: false,
+        convertFieldsToString: false,
+      },
+    },
+    position: [4800, 800],
+  },
+});
+
 // Power BI: sub-workflow da ferramenta consultar_powerbi, que consulta os modelos do Power BI da empresa pela API
 // oficial (só leitura). O ambiente vai pelo workflow (não pela IA): fora do modo Trabalho, a ferramenta recusa.
 const consultarPowerBi = tool({
@@ -1941,6 +2057,7 @@ const kira = node({
         pesquisarInternet,
         consultarPlanilhaNegocio,
         consultarPowerBi,
+        instagramLoja,
       ],
     },
     onError: 'continueErrorOutput',
@@ -2395,7 +2512,7 @@ export default workflow('kira-1-0', 'Kira 1.0 — Assistente pessoal (Telegram +
               0,
               ehPublicar
                 .onTrue(buscarRascunho.to(rascunhoEncontrado.onTrue(rascunhoTemImagem.onTrue(buscarImagemLinkedin.to(baixarImagemLinkedin.to(publicarLinkedinImagem.to(marcarPublicado)))).onFalse(publicarLinkedin.to(marcarPublicado.to(buscarMemoriasComando)))).onFalse(buscarMemoriasComando)))
-                .onFalse(ehLimpar.onTrue(limparHistorico.to(buscarMemoriasComando)).onFalse(buscarMemoriasComando)),
+                .onFalse(ehInstagram.onTrue(publicarNoInstagram.to(buscarMemoriasComando)).onFalse(ehLimpar.onTrue(limparHistorico.to(buscarMemoriasComando)).onFalse(buscarMemoriasComando))),
             )
             .onCase(1, baixarAudio.to(transcrever.to(pergunta)))
             .onCase(2, pergunta)
@@ -2448,8 +2565,8 @@ export default workflow('kira-1-0', 'Kira 1.0 — Assistente pessoal (Telegram +
   .group('Roteamento', [mostrarDigitando, ambientesDaKira, buscarAmbiente, ambienteAtual, tipoMensagem], {
     description: 'Mostra "digitando…", descobre o ambiente ativo (tabela kira_config) e separa a mensagem por tipo: comando, voz, texto, imagem ou outro.',
   })
-  .group('Comandos', [ehPublicar, buscarRascunho, rascunhoEncontrado, rascunhoTemImagem, buscarImagemLinkedin, baixarImagemLinkedin, publicarLinkedinImagem, publicarLinkedin, marcarPublicado, ehLimpar, limparHistorico, memoriaLimpeza, buscarMemoriasComando, respostaComando], {
-    description: '/start, /ajuda, /status, /memorias, /limpar, /id e /publicar (publica no LinkedIn um rascunho da Kira, com a imagem, se tiver).',
+  .group('Comandos', [ehPublicar, buscarRascunho, rascunhoEncontrado, rascunhoTemImagem, buscarImagemLinkedin, baixarImagemLinkedin, publicarLinkedinImagem, publicarLinkedin, marcarPublicado, ehInstagram, publicarNoInstagram, ehLimpar, limparHistorico, memoriaLimpeza, buscarMemoriasComando, respostaComando], {
+    description: '/start, /ajuda, /status, /memorias, /limpar, /id, /publicar (LinkedIn) e /instagram (Instagram da loja).',
   })
   .group('Foto para texto', [baixarImagem, analisarImagem, guardarFoto], {
     description: 'Baixa a foto do Telegram, o leitor de imagens do Gemini descreve o que há nela (com os textos) e a foto fica guardada com um número (Foto #N) para editar depois; a descrição vai com a legenda para a Kira.',
@@ -2460,8 +2577,8 @@ export default workflow('kira-1-0', 'Kira 1.0 — Assistente pessoal (Telegram +
   .group('Memórias e contexto', [buscarMemorias, memoriasAmbiente, contexto], {
     description: 'Busca as memórias do ambiente ativo e monta o contexto da conversa: nome, perfil, data, ambiente e canal (texto ou voz).',
   })
-  .group('Cérebro da Kira', [kira, geminiPrincipal, geminiReserva, memoriaConversa, salvarMemoria, apagarMemoria, emailsRecentes, buscarEmails, lerEmail, agenda, criarRascunhoResposta, buscarArquivosDrive, lerArquivoDrive, rascunhoLinkedin, buscarConversas, criarTarefa, listarTarefas, concluirTarefa, salvarContato, buscarContatos, gerarImagem, anexarImagemEmail, conversasTeams, lerConversaTeams, enviarMensagemTeams, consultarPedidos, pesquisarInternet, consultarPlanilhaNegocio, consultarPowerBi], {
-    description: 'A Kira (Gemini) responde no ambiente ativo: memórias, tarefas, contatos, Outlook, Drive, Teams, Power BI, pedidos, negócio, internet e imagens.',
+  .group('Cérebro da Kira', [kira, geminiPrincipal, geminiReserva, memoriaConversa, salvarMemoria, apagarMemoria, emailsRecentes, buscarEmails, lerEmail, agenda, criarRascunhoResposta, buscarArquivosDrive, lerArquivoDrive, rascunhoLinkedin, buscarConversas, criarTarefa, listarTarefas, concluirTarefa, salvarContato, buscarContatos, gerarImagem, anexarImagemEmail, conversasTeams, lerConversaTeams, enviarMensagemTeams, consultarPedidos, pesquisarInternet, consultarPlanilhaNegocio, consultarPowerBi, instagramLoja], {
+    description: 'A Kira (Gemini) responde no ambiente ativo: memórias, tarefas, Outlook, Drive, Teams, Power BI, pedidos, negócio, Instagram e imagens.',
   })
   .group('Histórico quebrado', [ultimasConversas, resumoConversas, reiniciarHistorico, memoriaReinicio, repetirPergunta], {
     description: 'Se o Gemini recusar o histórico, reinicia a conversa com um resumo das últimas trocas e repete a pergunta (uma vez).',

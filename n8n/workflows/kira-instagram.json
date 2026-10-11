@@ -1,0 +1,2079 @@
+{
+  "name": "Kira — Instagram (ferramenta)",
+  "nodes": [
+    {
+      "id": "17a153e0-ad35-4c90-a536-151ce18a35f4",
+      "name": "Pedido da Kira",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        600
+      ],
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "acao",
+              "type": "string"
+            },
+            {
+              "name": "ambiente",
+              "type": "string"
+            },
+            {
+              "name": "origem",
+              "type": "string"
+            },
+            {
+              "name": "user_id",
+              "type": "string"
+            },
+            {
+              "name": "chat_id",
+              "type": "string"
+            },
+            {
+              "name": "imagem_id",
+              "type": "number"
+            },
+            {
+              "name": "legenda",
+              "type": "string"
+            },
+            {
+              "name": "rascunho_id",
+              "type": "number"
+            },
+            {
+              "name": "quantidade",
+              "type": "number"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "4df134dc-cc26-4ee7-abc5-8874c4364022",
+      "name": "Validar pedido",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        600
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Confere o pedido e escolhe o caminho. O ambiente vem do workflow da Kira (nó \"Ambiente atual\"), nunca da IA.\n// A IA só guarda rascunhos e consulta; publicar só vem do comando /instagram <número>, mandado pelo dono.\nconst AMBIENTE = 'NEGOCIOS';\nconst ACOES_DA_KIRA = ['rascunho', 'rascunhos', 'posts'];\nconst LIMITE_LEGENDA = 2200;\nconst LIMITE_HASHTAGS = 30;\n\nconst e = $input.first().json;\nconst texto = (v) => String(v ?? '').trim();\nconst inteiro = (v) => Math.max(0, Math.floor(Number(v) || 0));\nconst pedido = {\n  acao: texto(e.acao).toLowerCase(),\n  origem: texto(e.origem).toLowerCase(),\n  ambiente: texto(e.ambiente).toUpperCase(),\n  user_id: texto(e.user_id),\n  chat_id: texto(e.chat_id),\n  legenda: texto(e.legenda),\n  imagem_id: inteiro(e.imagem_id),\n  rascunho_id: inteiro(e.rascunho_id),\n  quantidade: Math.min(10, Math.max(1, inteiro(e.quantidade) || 5)),\n};\nconst recusar = (mensagem) => [{ json: { ...pedido, rota: 'recusar', ok: false, mensagem } }];\n\nif (pedido.acao === 'publicar') {\n  // O rascunho já nasceu no modo Negócios; o comando do dono publica em qualquer ambiente.\n  if (pedido.origem !== 'comando') {\n    return recusar('A publicação no Instagram só acontece quando o dono manda /instagram <número>. Mostre o rascunho e peça para ele mandar o comando.');\n  }\n  if (!pedido.rascunho_id) return recusar('Me diga qual rascunho publicar, por exemplo: /instagram 3');\n  if (!pedido.user_id) return recusar('Não consegui identificar quem pediu a publicação.');\n  return [{ json: { ...pedido, rota: 'publicar' } }];\n}\nif (pedido.ambiente !== AMBIENTE) {\n  return recusar('O Instagram da loja é do ambiente Negócios. Diga ao dono, em uma frase, que ele pode trocar dizendo \"modo negócios\". Não use nem invente dados do Instagram aqui.');\n}\nif (!ACOES_DA_KIRA.includes(pedido.acao)) return recusar('Ação inválida. Use rascunho, rascunhos ou posts.');\nif (!pedido.user_id) return recusar('Não consegui identificar o dono.');\nif (pedido.acao === 'rascunho') {\n  if (!pedido.imagem_id) {\n    return recusar('Todo post do Instagram precisa de uma imagem. Gere ou edite uma com gerar_imagem (ou use o número de uma foto do dono) e passe imagem_id.');\n  }\n  if (!pedido.legenda) return recusar('Faltou a legenda do post.');\n  if (pedido.legenda.length > LIMITE_LEGENDA) {\n    return recusar(`A legenda tem ${pedido.legenda.length} caracteres e o Instagram aceita até ${LIMITE_LEGENDA}. Encurte e tente de novo.`);\n  }\n  const hashtags = (pedido.legenda.match(/#[\\p{L}\\p{N}_]+/gu) || []).length;\n  if (hashtags > LIMITE_HASHTAGS) return recusar(`A legenda tem ${hashtags} hashtags e o Instagram aceita até ${LIMITE_HASHTAGS}.`);\n}\nreturn [{ json: { ...pedido, rota: pedido.acao } }];\n"
+      }
+    },
+    {
+      "id": "7c299708-74a7-4937-a653-d284171a411b",
+      "name": "Qual caminho?",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        440,
+        600
+      ],
+      "parameters": {
+        "mode": "rules",
+        "rules": {
+          "values": [
+            {
+              "renameOutput": true,
+              "outputKey": "Rascunho",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "rota-rascunho",
+                    "leftValue": "={{ $json.rota }}",
+                    "rightValue": "rascunho",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "renameOutput": true,
+              "outputKey": "Publicar",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "rota-publicar",
+                    "leftValue": "={{ $json.rota }}",
+                    "rightValue": "publicar",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "renameOutput": true,
+              "outputKey": "Posts",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "rota-posts",
+                    "leftValue": "={{ $json.rota }}",
+                    "rightValue": "posts",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "renameOutput": true,
+              "outputKey": "Rascunhos",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "rota-rascunhos",
+                    "leftValue": "={{ $json.rota }}",
+                    "rightValue": "rascunhos",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "Recusar"
+        }
+      }
+    },
+    {
+      "id": "3f8bcd9b-4651-4740-a108-8425628e87d9",
+      "name": "Buscar imagem do post",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        700,
+        160
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "kira_imagens"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $json.imagem_id }}"
+            },
+            {
+              "keyName": "user_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.user_id }}"
+            }
+          ]
+        },
+        "limit": 1
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "75826b8e-918e-4a02-a4a3-5c2154a1ae11",
+      "name": "Imagem do post existe?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        920,
+        160
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "imagemDoPostExiste-cond",
+              "leftValue": "={{ String($json.file_id ?? '').trim() !== '' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "9670cf0f-f9b6-4830-a289-445528a1c0b9",
+      "name": "Guardar rascunho",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1140,
+        80
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "kira_instagram"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "user_id": "={{ $('Validar pedido').first().json.user_id }}",
+            "chat_id": "={{ $('Validar pedido').first().json.chat_id }}",
+            "imagem_id": "={{ $('Validar pedido').first().json.imagem_id }}",
+            "legenda": "={{ $('Validar pedido').first().json.legenda }}",
+            "status": "pendente"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "user_id",
+              "displayName": "user_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "chat_id",
+              "displayName": "chat_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "imagem_id",
+              "displayName": "imagem_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "legenda",
+              "displayName": "legenda",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "508ddfc4-eab7-44ed-ac42-b94a304a6a81",
+      "name": "Mostrar prévia",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1360,
+        80
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendPhoto",
+        "chatId": "={{ $('Validar pedido').first().json.chat_id }}",
+        "binaryData": false,
+        "file": "={{ $('Buscar imagem do post').first().json.file_id }}",
+        "additionalFields": {
+          "caption": "={{ ('📸 Prévia do post ' + $('Guardar rascunho').first().json.id + ' do Instagram\\n\\n' + $('Validar pedido').first().json.legenda).slice(0, 960) + '\\n\\nPara publicar: /instagram ' + $('Guardar rascunho').first().json.id }}"
+        }
+      },
+      "credentials": {},
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "e8b8cc56-d2a9-42d5-ab38-4fbe4287db1c",
+      "name": "Rascunho pronto",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1580,
+        80
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "rascunhoPronto-0",
+              "name": "ok",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "rascunhoPronto-1",
+              "name": "rascunho_id",
+              "value": "={{ $('Guardar rascunho').first().json.id }}",
+              "type": "number"
+            },
+            {
+              "id": "rascunhoPronto-2",
+              "name": "imagem_id",
+              "value": "={{ $('Validar pedido').first().json.imagem_id }}",
+              "type": "number"
+            },
+            {
+              "id": "rascunhoPronto-3",
+              "name": "mensagem",
+              "value": "={{ 'Rascunho ' + $('Guardar rascunho').first().json.id + ' do Instagram guardado com a imagem #' + $('Validar pedido').first().json.imagem_id + ($('Mostrar prévia').first().json.ok ? ', e a prévia já foi enviada no Telegram' : ' (a prévia NÃO foi enviada no Telegram: diga isso e lembre o número da imagem)') + '. Mostre a legenda completa e diga que, para publicar, ele manda /instagram ' + $('Guardar rascunho').first().json.id + '. Nada foi publicado.' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "5c716231-97d6-44e9-a728-23adc1a74002",
+      "name": "Imagem do post não encontrada",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1140,
+        260
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "imagemDoPostNaoEncontrada-0",
+              "name": "ok",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "imagemDoPostNaoEncontrada-1",
+              "name": "mensagem",
+              "value": "={{ 'Não encontrei a imagem #' + $('Validar pedido').first().json.imagem_id + ' (ou ela não chegou a ser enviada no Telegram). Gere a imagem de novo ou confira o número.' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "85477538-8841-4f8d-a02f-ae40292e3bdf",
+      "name": "Buscar rascunho",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        700,
+        560
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "kira_instagram"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $json.rascunho_id }}"
+            },
+            {
+              "keyName": "user_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.user_id }}"
+            }
+          ]
+        },
+        "limit": 1
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "d9e02b87-c501-463a-aaa2-fc1e9c080986",
+      "name": "Conferir rascunho",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        920,
+        560
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Confere se o rascunho pode ser publicado agora. \"publicando\" travado há mais de 10 minutos pode tentar de novo.\nconst pedido = $('Validar pedido').first().json;\nconst r = $input.first().json ?? {};\nconst numero = pedido.rascunho_id;\nconst parado = r.status === 'publicando' && Date.now() - new Date(r.updatedAt).getTime() > 10 * 60 * 1000;\nlet mensagem = '';\nif (!r.id) mensagem = `Não encontrei o rascunho ${numero} do Instagram. Peça para eu preparar o post de novo.`;\nelse if (r.status === 'publicado') mensagem = `O rascunho ${numero} já foi publicado no Instagram${r.permalink ? `: ${r.permalink}` : '.'}`;\nelse if (!['pendente', 'erro', 'publicando'].includes(r.status)) mensagem = `O rascunho ${numero} não pode ser publicado (situação: ${r.status || 'desconhecida'}).`;\nelse if (r.status === 'publicando' && !parado) mensagem = `O rascunho ${numero} está sendo publicado agora. Espere um pouco e veja no Instagram.`;\nelse if (!(Number(r.imagem_id) > 0) || !String(r.legenda ?? '').trim()) mensagem = `O rascunho ${numero} está sem imagem ou sem legenda. Peça para eu preparar o post de novo.`;\nreturn [{ json: { ...r, rascunho_id: numero, pode: !mensagem, ok: !mensagem, mensagem } }];\n"
+      }
+    },
+    {
+      "id": "b0d61e2a-8335-422c-a00f-245ffd3c48f6",
+      "name": "Pode publicar?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1140,
+        560
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "podePublicar-cond",
+              "leftValue": "={{ $json.pode === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "cc466c69-c12e-413d-a1b1-f73ec0455639",
+      "name": "Gerar link da imagem",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1360,
+        480
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Cria uma chave aleatória para o link público da imagem. O Instagram baixa a imagem por esse link durante a\n// publicação; a chave só vale enquanto o rascunho está \"publicando\" e é apagada logo depois.\n// O endereço do n8n sai do próprio n8n (o mesmo dos webhooks), sem ficar escrito aqui.\nconst r = $input.first().json;\nconst CAMINHO = 'kira-instagram-imagem';\nlet chave = '';\ntry {\n  chave = (crypto.randomUUID() + crypto.randomUUID()).replace(/-/g, '');\n} catch (e) {\n  chave = '';\n}\nif (chave.length < 32) {\n  const letras = 'abcdefghijklmnopqrstuvwxyz0123456789';\n  chave = Array.from({ length: 48 }, () => letras[Math.floor(Math.random() * letras.length)]).join('');\n}\nconst base = String($execution.resumeUrl ?? '').replace(/\\/webhook-waiting\\/.*$/, '');\nif (!/^https:\\/\\//.test(base)) throw new Error('Não descobri o endereço público (https) do n8n para o link da imagem.');\nreturn [{ json: { ...r, token_imagem: chave, link_imagem: `${base}/webhook/${CAMINHO}?t=${chave}` } }];\n"
+      }
+    },
+    {
+      "id": "621ab3e4-1b32-4374-af9c-88362e9e0b6b",
+      "name": "Marcar publicando",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1580,
+        480
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "kira_instagram"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $json.id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "status": "publicando",
+            "token_imagem": "={{ $json.token_imagem }}",
+            "erro": ""
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "token_imagem",
+              "displayName": "token_imagem",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "erro",
+              "displayName": "erro",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "executeOnce": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "13ca8730-b42f-413b-a400-78993657cafd",
+      "name": "Conta do Instagram",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1800,
+        480
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://graph.facebook.com/me",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "fields",
+              "value": "instagram_business_account"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "credentials": {},
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "ed32e699-0fcc-4683-a7c4-a0b371bb0b38",
+      "name": "Criar post",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2020,
+        480
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://graph.facebook.com/' + $json.instagram_business_account.id + '/media' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "image_url",
+              "value": "={{ $('Gerar link da imagem').first().json.link_imagem }}"
+            },
+            {
+              "name": "caption",
+              "value": "={{ $('Gerar link da imagem').first().json.legenda }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "credentials": {},
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "c176257a-ecc0-438a-a155-b18552d21234",
+      "name": "Esperar o Instagram",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2240,
+        480
+      ],
+      "parameters": {
+        "resume": "timeInterval",
+        "amount": 3,
+        "unit": "seconds"
+      }
+    },
+    {
+      "id": "5e9f169a-1774-4a48-a244-155fad36ca83",
+      "name": "Status do post",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2460,
+        480
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://graph.facebook.com/' + $('Criar post').first().json.id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "fields",
+              "value": "status_code,status"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "credentials": {},
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "6c39b3e6-dd82-4fc9-aaaf-1d6d42ecfc6b",
+      "name": "Conferir processamento",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2680,
+        480
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Confere se o Instagram terminou de processar a imagem antes de publicar (tenta por até 1 minuto).\nconst MAX_TENTATIVAS = 20;\nconst r = $input.first().json ?? {};\nconst codigo = String(r.status_code ?? '');\nconst tentativa = $runIndex + 1;\nlet situacao = 'esperar';\nlet motivo = '';\nif (codigo === 'FINISHED') situacao = 'pronto';\nelse if (['ERROR', 'EXPIRED', 'PUBLISHED'].includes(codigo)) {\n  situacao = 'falhou';\n  motivo = `O Instagram não aceitou o post: ${r.status || codigo}`;\n} else if (tentativa >= MAX_TENTATIVAS) {\n  situacao = 'falhou';\n  motivo = 'O Instagram demorou demais para processar a imagem. Tente de novo em alguns minutos.';\n}\nreturn [{ json: { situacao, status_code: codigo, tentativa, ...(motivo ? { error: { message: motivo } } : {}) } }];\n"
+      }
+    },
+    {
+      "id": "be025849-54e4-4970-ac50-c0fa05630eeb",
+      "name": "Post pronto?",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        2900,
+        480
+      ],
+      "parameters": {
+        "mode": "rules",
+        "rules": {
+          "values": [
+            {
+              "renameOutput": true,
+              "outputKey": "Pronto",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "situacao-pronto",
+                    "leftValue": "={{ $json.situacao }}",
+                    "rightValue": "pronto",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "renameOutput": true,
+              "outputKey": "Esperar",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "situacao-esperar",
+                    "leftValue": "={{ $json.situacao }}",
+                    "rightValue": "esperar",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "Falhou"
+        }
+      }
+    },
+    {
+      "id": "616632d3-d12a-4c9e-ae9d-3b0064fc5abb",
+      "name": "Publicar post",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3120,
+        480
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://graph.facebook.com/' + $('Conta do Instagram').first().json.instagram_business_account.id + '/media_publish' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "creation_id",
+              "value": "={{ $('Criar post').first().json.id }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "credentials": {},
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "6f279ac7-be37-4e0d-aeb0-fb68abb3cffa",
+      "name": "Link do post",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3340,
+        480
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://graph.facebook.com/' + $json.id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "fields",
+              "value": "permalink"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "credentials": {},
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "0867f6b7-81c2-468b-a1bc-436f64cc5759",
+      "name": "Marcar publicado",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        3560,
+        480
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "kira_instagram"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Conferir rascunho').first().json.id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "status": "publicado",
+            "media_id": "={{ $('Publicar post').first().json.id }}",
+            "permalink": "={{ $('Link do post').first().json.permalink ?? '' }}",
+            "token_imagem": "",
+            "erro": ""
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "media_id",
+              "displayName": "media_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "permalink",
+              "displayName": "permalink",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "token_imagem",
+              "displayName": "token_imagem",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "erro",
+              "displayName": "erro",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "executeOnce": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "91f11e98-5967-4ee8-a24d-f9bed3c1cd5c",
+      "name": "Post publicado",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3780,
+        480
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "postPublicado-0",
+              "name": "ok",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "postPublicado-1",
+              "name": "rascunho_id",
+              "value": "={{ $('Conferir rascunho').first().json.id }}",
+              "type": "number"
+            },
+            {
+              "id": "postPublicado-2",
+              "name": "link",
+              "value": "={{ $('Link do post').first().json.permalink ?? '' }}",
+              "type": "string"
+            },
+            {
+              "id": "postPublicado-3",
+              "name": "mensagem",
+              "value": "={{ '✅ Publiquei no Instagram o post do rascunho ' + $('Conferir rascunho').first().json.id + '.' + ($('Link do post').first().json.permalink ? '\\n' + $('Link do post').first().json.permalink : '') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "7fc64074-fe1f-4813-ab97-a2a6f613305a",
+      "name": "Explicar falha",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2900,
+        760
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Traduz o erro do Facebook/Instagram em uma frase curta (sem chaves nem links).\nconst pedido = $('Validar pedido').first().json;\nconst item = $input.first().json ?? {};\nfunction motivoDoErro(v) {\n  const e = v?.error ?? v;\n  for (const c of [e?.description, e?.message, typeof e === 'string' ? e : '']) {\n    if (!c) continue;\n    const s = String(c);\n    const ini = s.indexOf('{');\n    const fim = s.lastIndexOf('}');\n    let trecho = ini >= 0 && fim > ini ? s.slice(ini, fim + 1) : '';\n    for (let i = 0; trecho && i < 2; i++) {\n      try {\n        const j = JSON.parse(trecho);\n        const g = j.error ?? j;\n        return String(g.error_user_msg || g.message || s);\n      } catch (x) {\n        trecho = trecho.replace(/\\\\\"/g, '\"').replace(/\\\\\\\\/g, '\\\\');\n      }\n    }\n    return s;\n  }\n  return 'erro desconhecido';\n}\nlet motivo = motivoDoErro(item)\n  .replace(/access_token=[^&\\s\"]+/gi, 'access_token=…')\n  .replace(/EAA[A-Za-z0-9]{20,}/g, '…')\n  .replace(/\\s+/g, ' ')\n  .trim()\n  .slice(0, 300);\nconst DICAS = [\n  [/aspect ratio|proporç/i, 'o formato da imagem não é aceito pelo Instagram'],\n  [/could not be fetched|only photo or video|media type|URI/i, 'o Instagram não conseguiu baixar a imagem pelo link temporário'],\n  [/permission|permiss/i, 'falta permissão no app da Meta'],\n  [/session has expired|expired|invalid oauth|Error validating access token/i, 'a chave do Instagram venceu ou foi desligada; é preciso gerar outra'],\n  [/limit|limite/i, 'o limite de publicações do dia foi atingido'],\n];\nconst dica = DICAS.find(([re]) => re.test(motivo))?.[1];\nreturn [{ json: { ...pedido, ok: false, motivo, dica: dica ?? '' } }];\n"
+      }
+    },
+    {
+      "id": "a1b9126f-8596-4af0-a1cf-f513880d0669",
+      "name": "Não pode publicar",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1360,
+        700
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "naoPodePublicar-0",
+              "name": "ok",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "naoPodePublicar-1",
+              "name": "mensagem",
+              "value": "={{ $json.mensagem }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "bbc7a6f4-ab20-4935-a8e2-2af912a16deb",
+      "name": "Buscar posts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        700,
+        960
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://graph.facebook.com/me",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "fields",
+              "value": "={{ 'instagram_business_account{username,followers_count,media_count,media.limit(' + $json.quantidade + '){caption,media_type,media_product_type,timestamp,like_count,comments_count,permalink}' + '}' }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "credentials": {},
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "c76dee95-bb7d-4449-a64e-179541a59d5f",
+      "name": "Resumir posts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        920,
+        960
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Resume a conta e os últimos posts. Devolve só números e textos curtos: nunca os links de paginação\n// do Facebook, que carregam a chave de acesso.\nconst FUSO = 'America/Sao_Paulo';\nconst TIPOS = { IMAGE: 'foto', CAROUSEL_ALBUM: 'carrossel', VIDEO: 'vídeo' };\nconst conta = $input.first().json.instagram_business_account;\nif (!conta || !conta.username) throw new Error('A Página do Facebook não tem uma conta do Instagram ligada.');\nconst quando = (iso) => {\n  const d = new Date(String(iso ?? '').replace(/([+-]\\d\\d)(\\d\\d)$/, '$1:$2'));\n  return isNaN(d) ? '' : DateTime.fromJSDate(d).setZone(FUSO).toFormat('dd/MM/yyyy HH:mm');\n};\nconst curta = (s, n) => {\n  const t = String(s ?? '').replace(/\\s+/g, ' ').trim();\n  return t.length > n ? t.slice(0, n - 1) + '…' : t;\n};\nconst posts = (conta.media?.data ?? []).map((p, i) => ({\n  posicao: i + 1,\n  data: quando(p.timestamp),\n  tipo: p.media_product_type === 'REELS' ? 'reels' : TIPOS[p.media_type] ?? String(p.media_type ?? '').toLowerCase(),\n  legenda: curta(p.caption, 150),\n  curtidas: p.like_count ?? null,\n  comentarios: p.comments_count ?? null,\n  link: p.permalink ?? '',\n}));\nreturn [\n  {\n    json: {\n      ok: true,\n      conta: '@' + conta.username,\n      seguidores: conta.followers_count ?? null,\n      total_de_posts: conta.media_count ?? null,\n      posts,\n      observacao: 'Curtidas e comentários contam até agora. Alcance e visualizações ainda não estão liberados.',\n    },\n  },\n];\n"
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "03cc917d-b64b-43f3-ad71-6fab8104f003",
+      "name": "Buscar rascunhos",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        700,
+        1200
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "kira_instagram"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "user_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.user_id }}"
+            }
+          ]
+        },
+        "returnAll": true
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "2254269c-3041-4c40-a9db-e285051c3aeb",
+      "name": "Listar rascunhos",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        920,
+        1200
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Lista os rascunhos do Instagram que ainda não foram publicados (os mais novos primeiro).\nconst PENDENTES = ['pendente', 'erro'];\nconst lista = $input\n  .all()\n  .map((item) => item.json)\n  .filter((r) => r && r.id && PENDENTES.includes(r.status))\n  .sort((a, b) => b.id - a.id)\n  .slice(0, 10);\nreturn [\n  {\n    json: {\n      ok: true,\n      total: lista.length,\n      rascunhos: lista.map((r) => ({\n        rascunho: r.id,\n        imagem: Number(r.imagem_id) || 0,\n        status: r.status === 'erro' ? 'falhou na última tentativa' : 'pendente',\n        legenda: String(r.legenda ?? '').slice(0, 200),\n        ...(r.erro ? { erro: String(r.erro).slice(0, 200) } : {}),\n      })),\n      mensagem: lista.length\n        ? 'Para publicar um rascunho, o dono manda /instagram <número>.'\n        : 'Não há rascunhos do Instagram esperando publicação.',\n    },\n  },\n];\n"
+      }
+    },
+    {
+      "id": "364d9df5-f067-4eef-a299-060d4da26141",
+      "name": "Pedido recusado",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        700,
+        1360
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "pedidoRecusado-0",
+              "name": "ok",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "pedidoRecusado-1",
+              "name": "mensagem",
+              "value": "={{ $json.mensagem }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "697c8a25-42bf-4ef0-a18d-3111d07be881",
+      "name": "Marcar falha",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        3120,
+        760
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "kira_instagram"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Conferir rascunho').first().json.id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "status": "erro",
+            "erro": "={{ $json.motivo }}",
+            "token_imagem": ""
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "erro",
+              "displayName": "erro",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "token_imagem",
+              "displayName": "token_imagem",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "executeOnce": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "4932d6dc-7742-4fe4-ac4e-d377b6fec411",
+      "name": "Falha na publicação",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3340,
+        760
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "falhaNaPublicacao-0",
+              "name": "ok",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "falhaNaPublicacao-1",
+              "name": "mensagem",
+              "value": "={{ '😕 Não consegui publicar no Instagram o rascunho ' + $('Explicar falha').first().json.rascunho_id + ($('Explicar falha').first().json.dica ? ': ' + $('Explicar falha').first().json.dica : '') + '.\\nMotivo: ' + $('Explicar falha').first().json.motivo + '\\nO rascunho continua guardado. Quando quiser, tente de novo com /instagram ' + $('Explicar falha').first().json.rascunho_id + '.' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "3638b125-0fef-4d46-aacb-2e783666bdeb",
+      "name": "Falha nos posts",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1140,
+        1060
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "falhaNosPosts-0",
+              "name": "ok",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "falhaNosPosts-1",
+              "name": "mensagem",
+              "value": "={{ 'Não consegui ler o Instagram agora. Erro: ' + String($json.error?.message ?? $json.error ?? '').slice(0, 300) }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "0d5c422d-4208-4bed-a76c-2a44d7bf9188",
+      "name": "Imagem pública",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        1700
+      ],
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "kira-instagram-imagem",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "0be776fd-26f5-4f19-a48e-c44162ebfa73",
+      "name": "Buscar post pela chave",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        220,
+        1700
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "kira_instagram"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "token_imagem",
+              "condition": "eq",
+              "keyValue": "={{ String($json.query?.t ?? '').slice(0, 100) || 'sem-chave' }}"
+            },
+            {
+              "keyName": "status",
+              "condition": "eq",
+              "keyValue": "publicando"
+            }
+          ]
+        },
+        "limit": 1
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "db89c731-4d6f-4047-a886-a5e374ae0700",
+      "name": "Chave válida?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        440,
+        1700
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "chaveValida-cond",
+              "leftValue": "={{ String($('Imagem pública').first().json.query?.t ?? '').length >= 32 && $json.token_imagem === String($('Imagem pública').first().json.query?.t ?? '') && Number($json.imagem_id) > 0 }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "b6cba4ef-ee8d-4ce1-ab14-1c9ccfa4b4cc",
+      "name": "Buscar imagem (link)",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        660,
+        1620
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "kira_imagens"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $json.imagem_id }}"
+            },
+            {
+              "keyName": "user_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.user_id }}"
+            }
+          ]
+        },
+        "limit": 1
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "de3dff4b-ec38-44f1-abdb-5fb300dd1f57",
+      "name": "Baixar imagem (link)",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        880,
+        1620
+      ],
+      "parameters": {
+        "resource": "file",
+        "operation": "get",
+        "fileId": "={{ $json.file_id ?? '' }}",
+        "download": true,
+        "additionalFields": {}
+      },
+      "credentials": {},
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "e2a997a1-cfdd-4cfb-a8b7-6f3f3ec05aad",
+      "name": "Tamanho da imagem",
+      "type": "n8n-nodes-base.editImage",
+      "typeVersion": 1.1,
+      "position": [
+        1100,
+        1620
+      ],
+      "parameters": {
+        "operation": "information",
+        "dataPropertyName": "data"
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "f0d67c66-02cd-4204-af4d-89c7e6a7256f",
+      "name": "Calcular formato",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        1620
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// O Instagram aceita fotos entre 4:5 (em pé) e 1,91:1 (deitada). Se a imagem passar disso, corta um pouco\n// (até 12%) ou, se precisar cortar mais, completa com faixas para não perder a peça.\nconst MIN = 0.8;\nconst MAX = 1.91;\nconst CORTE_MAXIMO = 0.12;\nconst item = $input.first();\nconst largura = Number(item.json.size?.width) || 0;\nconst altura = Number(item.json.size?.height) || 0;\nif (!largura || !altura) throw new Error('Não consegui ler o tamanho da imagem.');\nlet corteLargura = largura;\nlet corteAltura = altura;\nlet faixaLargura = 0;\nlet faixaAltura = 0;\nconst proporcao = largura / altura;\nif (proporcao < MIN) {\n  const ideal = Math.floor(largura / MIN);\n  if (1 - ideal / altura <= CORTE_MAXIMO) corteAltura = ideal;\n  else faixaLargura = Math.ceil((altura * MIN - largura) / 2);\n} else if (proporcao > MAX) {\n  const ideal = Math.floor(altura * MAX);\n  if (1 - ideal / largura <= CORTE_MAXIMO) corteLargura = ideal;\n  else faixaAltura = Math.ceil((largura / MAX - altura) / 2);\n}\n// Faixas escuras para fotos escuras e brancas para fotos claras.\nconst medias = ['Red', 'Green', 'Blue'].map((canal) => {\n  const m = String(item.json['Channel Statistics']?.[canal]?.Mean ?? '').match(/\\(([\\d.]+)\\)/);\n  return m ? Number(m[1]) : 1;\n});\nconst clara = medias.reduce((a, b) => a + b, 0) / medias.length >= 0.5;\nreturn [\n  {\n    json: {\n      largura,\n      altura,\n      corte_largura: corteLargura,\n      corte_altura: corteAltura,\n      corte_x: Math.floor((largura - corteLargura) / 2),\n      corte_y: Math.floor((altura - corteAltura) / 2),\n      faixa_largura: faixaLargura,\n      faixa_altura: faixaAltura,\n      cor_faixa: clara ? '#FFFFFF' : '#000000',\n    },\n    binary: item.binary,\n  },\n];\n"
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "18af82d7-a885-46d5-a11c-f11e2eac405a",
+      "name": "Ajustar para o Instagram",
+      "type": "n8n-nodes-base.editImage",
+      "typeVersion": 1.1,
+      "position": [
+        1540,
+        1620
+      ],
+      "parameters": {
+        "operation": "multiStep",
+        "dataPropertyName": "data",
+        "operations": {
+          "operations": [
+            {
+              "operation": "crop",
+              "width": "={{ $json.corte_largura }}",
+              "height": "={{ $json.corte_altura }}",
+              "positionX": "={{ $json.corte_x }}",
+              "positionY": "={{ $json.corte_y }}"
+            },
+            {
+              "operation": "border",
+              "borderWidth": "={{ $json.faixa_largura }}",
+              "borderHeight": "={{ $json.faixa_altura }}",
+              "borderColor": "={{ $json.cor_faixa }}"
+            }
+          ]
+        },
+        "options": {
+          "format": "jpeg",
+          "quality": 92,
+          "fileName": "post.jpg"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "d0614371-aac4-48ca-a8af-62ad4591b2ac",
+      "name": "Entregar imagem",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1760,
+        1620
+      ],
+      "parameters": {
+        "respondWith": "binary",
+        "responseDataSource": "automatically",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "image/jpeg"
+              },
+              {
+                "name": "Cache-Control",
+                "value": "no-store"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "86260e2d-a12a-403a-ac74-835d149d1bb8",
+      "name": "Imagem não encontrada",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1760,
+        1860
+      ],
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "Não encontrado.",
+        "options": {
+          "responseCode": 404,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Cache-Control",
+                "value": "no-store"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Pedido da Kira": {
+      "main": [
+        [
+          {
+            "node": "Validar pedido",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar pedido": {
+      "main": [
+        [
+          {
+            "node": "Qual caminho?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Qual caminho?": {
+      "main": [
+        [
+          {
+            "node": "Buscar imagem do post",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Buscar rascunho",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Buscar posts",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Buscar rascunhos",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Pedido recusado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar imagem do post": {
+      "main": [
+        [
+          {
+            "node": "Imagem do post existe?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Imagem do post existe?": {
+      "main": [
+        [
+          {
+            "node": "Guardar rascunho",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Imagem do post não encontrada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar rascunho": {
+      "main": [
+        [
+          {
+            "node": "Mostrar prévia",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mostrar prévia": {
+      "main": [
+        [
+          {
+            "node": "Rascunho pronto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar rascunho": {
+      "main": [
+        [
+          {
+            "node": "Conferir rascunho",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Conferir rascunho": {
+      "main": [
+        [
+          {
+            "node": "Pode publicar?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pode publicar?": {
+      "main": [
+        [
+          {
+            "node": "Gerar link da imagem",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Não pode publicar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gerar link da imagem": {
+      "main": [
+        [
+          {
+            "node": "Marcar publicando",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Marcar publicando": {
+      "main": [
+        [
+          {
+            "node": "Conta do Instagram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Conta do Instagram": {
+      "main": [
+        [
+          {
+            "node": "Criar post",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Explicar falha",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Criar post": {
+      "main": [
+        [
+          {
+            "node": "Esperar o Instagram",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Explicar falha",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Esperar o Instagram": {
+      "main": [
+        [
+          {
+            "node": "Status do post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Status do post": {
+      "main": [
+        [
+          {
+            "node": "Conferir processamento",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Explicar falha",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Conferir processamento": {
+      "main": [
+        [
+          {
+            "node": "Post pronto?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post pronto?": {
+      "main": [
+        [
+          {
+            "node": "Publicar post",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Esperar o Instagram",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Explicar falha",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publicar post": {
+      "main": [
+        [
+          {
+            "node": "Link do post",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Explicar falha",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Link do post": {
+      "main": [
+        [
+          {
+            "node": "Marcar publicado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Marcar publicado": {
+      "main": [
+        [
+          {
+            "node": "Post publicado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Explicar falha": {
+      "main": [
+        [
+          {
+            "node": "Marcar falha",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar posts": {
+      "main": [
+        [
+          {
+            "node": "Resumir posts",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Falha nos posts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resumir posts": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Falha nos posts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar rascunhos": {
+      "main": [
+        [
+          {
+            "node": "Listar rascunhos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Marcar falha": {
+      "main": [
+        [
+          {
+            "node": "Falha na publicação",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Imagem pública": {
+      "main": [
+        [
+          {
+            "node": "Buscar post pela chave",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar post pela chave": {
+      "main": [
+        [
+          {
+            "node": "Chave válida?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chave válida?": {
+      "main": [
+        [
+          {
+            "node": "Buscar imagem (link)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Imagem não encontrada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar imagem (link)": {
+      "main": [
+        [
+          {
+            "node": "Baixar imagem (link)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Baixar imagem (link)": {
+      "main": [
+        [
+          {
+            "node": "Tamanho da imagem",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Imagem não encontrada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tamanho da imagem": {
+      "main": [
+        [
+          {
+            "node": "Calcular formato",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Imagem não encontrada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calcular formato": {
+      "main": [
+        [
+          {
+            "node": "Ajustar para o Instagram",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Imagem não encontrada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ajustar para o Instagram": {
+      "main": [
+        [
+          {
+            "node": "Entregar imagem",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Imagem não encontrada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Sao_Paulo",
+    "callerPolicy": "workflowsFromSameOwner",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "all",
+    "saveManualExecutions": false
+  },
+  "tags": []
+}

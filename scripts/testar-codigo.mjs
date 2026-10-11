@@ -275,6 +275,50 @@ teste('comando /status e /ajuda mostram as imagens e o ambiente', () => {
   assert.match(comando('/status').texto_resposta, /Ambiente: Trabalho/);
   assert.match(comando('/ajuda').texto_resposta, /modo <ambiente> — troca de ambiente \(Trabalho, Negócios, Pessoal\)/);
   assert.match(comando('/ajuda').texto_resposta, /\/publicar N — publica no LinkedIn o rascunho N que eu preparei \(com a imagem, se tiver\)/);
+  assert.match(comando('/ajuda').texto_resposta, /\/instagram N — publica no Instagram da loja o rascunho N/);
+  assert.match(comando('/status').texto_resposta, /Instagram da loja: rascunhos com prévia e últimos posts \(só no modo Negócios; publica só com \/instagram\)/);
+});
+
+// ---------- /instagram: publica no Instagram da loja um rascunho da Kira ----------
+function instagram(texto, saida) {
+  const fixos = {
+    'Normalizar entrada': { ...entradaNormalizada, tipo_entrada: 'comando', comando: '/instagram', texto },
+    'Configuração da Kira': config,
+    'Ambientes da Kira': ambientesDaKira,
+    'Ambiente atual': ambienteAtivo,
+  };
+  const $ = (nome) => {
+    if (nome in fixos) return { isExecuted: true, first: () => ({ json: fixos[nome] }), all: () => [{ json: fixos[nome] }] };
+    if (nome === 'Publicar no Instagram' && saida) return { isExecuted: true, first: () => ({ json: saida }), all: () => [{ json: saida }] };
+    throw new Error(`nó não executado: ${nome}`);
+  };
+  const $input = { first: () => ({ json: {} }), all: () => [] };
+  return new Function('$', '$input', 'DateTime', codigoDo('Resposta do comando'))($, $input, DateTime)[0].json.texto_resposta;
+}
+teste('/instagram: mostra o resultado do sub-workflow do Instagram (publicado, falha ou sem número)', () => {
+  assert.equal(instagram('/instagram 5', { ok: true, mensagem: '✅ Publiquei no Instagram o post do rascunho 5.' }), '✅ Publiquei no Instagram o post do rascunho 5.');
+  assert.match(instagram('/instagram 5', { error: { message: 'timeout' } }), /Não consegui falar com o Instagram agora\. Erro: timeout/);
+  assert.match(instagram('/instagram'), /Me diga qual rascunho publicar, por exemplo: \/instagram 3/);
+});
+teste('/instagram: é comando, chama o sub-workflow como "comando" e o ambiente vem do workflow', () => {
+  const normal = Object.fromEntries(nos['Normalizar entrada'].parameters.assignments.assignments.map((a) => [a.name, a.value]));
+  const tipo = (text) => new Function('$json', `return (${normal.tipo_entrada.slice(3, -2)})`)({ message: { text } });
+  assert.equal(tipo('/instagram 4'), 'comando');
+  const ligacoes = (nome) => (workflow.connections[nome]?.main ?? []).map((saida) => (saida ?? []).map((l) => l.node));
+  assert.deepEqual(ligacoes('É /publicar?')[1], ['É /instagram?']);
+  assert.deepEqual(ligacoes('É /instagram?'), [['Publicar no Instagram'], ['É /limpar?']]);
+  assert.deepEqual(ligacoes('Publicar no Instagram'), [['Buscar memórias (comandos)']]);
+  const valores = nos['Publicar no Instagram'].parameters.workflowInputs.value;
+  assert.equal(valores.acao, 'publicar');
+  assert.equal(valores.origem, 'comando');
+  assert.match(valores.ambiente, /\$\('Ambiente atual'\)/);
+  const ferramenta = nos['instagram'].parameters.workflowInputs.value;
+  assert.equal(ferramenta.origem, 'kira');
+  assert.match(ferramenta.ambiente, /\$\('Ambiente atual'\)/);
+  assert.doesNotMatch(ferramenta.ambiente, /fromAI/);
+  assert.equal(ferramenta.rascunho_id, 0);
+  assert.match(nos['instagram'].parameters.description, /NÃO publica/);
+  assert.equal(workflow.connections['instagram'].ai_tool[0][0].node, 'Kira');
 });
 
 // ---------- Estrutura e segurança do workflow ----------
@@ -2074,12 +2118,13 @@ const lerTabelas = {
   'Ler kira_imagens': [{}],
   'Ler kira_emails_auto': [{ id: 3 }],
   'Ler kira_saude': [{ error: 'Data table not found' }],
+  'Ler kira_instagram': [{}],
 };
 teste('backup: junta as tabelas num JSON, conta as linhas e anota a tabela que não abriu', () => {
   const [r] = executar(noDe(backup, 'Montar backup').parameters.jsCode, { nosAnteriores: lerTabelas });
   assert.equal(r.arquivo, 'kira-backup-2026-10-04.json');
   assert.equal(r.pasta_id, 'pasta1');
-  assert.deepEqual(r.linhas, { kira_config: 1, kira_memoria: 2, kira_tarefas: 0, kira_contatos: 0, kira_logs: 1, kira_linkedin: 0, kira_imagens: 0, kira_emails_auto: 1 });
+  assert.deepEqual(r.linhas, { kira_config: 1, kira_memoria: 2, kira_tarefas: 0, kira_contatos: 0, kira_logs: 1, kira_linkedin: 0, kira_imagens: 0, kira_emails_auto: 1, kira_instagram: 0 });
   assert.deepEqual(r.falhas, ['kira_saude (Data table not found)']);
   const vazio = Object.fromEntries(Object.entries(lerTabelas).map(([k, v]) => [k, k.startsWith('Ler ') ? [{ error: { message: 'sem acesso' } }] : v]));
   assert.throws(() => executar(noDe(backup, 'Montar backup').parameters.jsCode, { nosAnteriores: vazio }), /nenhuma tabela/);
@@ -2101,7 +2146,7 @@ teste('backup: o arquivo leva os registros; backup parcial para com erro (avisa)
   const montado = itens[0].json;
   assert.throws(() => rodarBackup('Conferência (só números)', { 'Montar backup': montado }, [{ id: 'arq1' }]), /sem estas tabelas: kira_saude/);
   assert.throws(() => rodarBackup('Conferência (só números)', { 'Montar backup': { ...montado, falhas: [] } }, [{}]), /não confirmou/);
-  assert.equal(rodarBackup('Conferência (só números)', { 'Montar backup': { ...montado, falhas: [] } }, [{ id: 'arq1' }])[0].tabelas, 8);
+  assert.equal(rodarBackup('Conferência (só números)', { 'Montar backup': { ...montado, falhas: [] } }, [{ id: 'arq1' }])[0].tabelas, 9);
   const arquivos = [
     { id: 'a', name: 'kira-backup-2026-09-20.json', createdTime: '2026-09-20T06:00:00Z' },
     { id: 'b', name: 'kira-backup-2026-10-04.json', createdTime: '2026-10-04T06:00:00Z' },
@@ -2132,8 +2177,123 @@ teste('backup: domingo às 3h, todas as tabelas usadas pela Kira, pasta própria
   assert.equal(backup.settings.saveDataSuccessExecution, 'none');
 });
 
+// ---------- Instagram da loja (sub-workflow) ----------
+const insta = JSON.parse(ler('n8n/workflows/kira-instagram.json'));
+const rodarInsta = (nome, { nos: anteriores = {}, entrada = [{}], execution = {}, runIndex = 0, binarios } = {}) => {
+  const itens = (lista) => lista.map((json, i) => ({ json, ...(binarios?.[i] ? { binary: binarios[i] } : {}) }));
+  const $ = (n) => {
+    if (!(n in anteriores)) throw new Error(`nó não simulado: ${n}`);
+    const lista = itens([].concat(anteriores[n]));
+    return { first: () => lista[0], all: () => lista };
+  };
+  const $input = { first: () => itens(entrada)[0], all: () => itens(entrada) };
+  const dt = { fromJSDate: (d) => ({ setZone() { return this; }, toFormat: () => d.toISOString().slice(0, 16) }) };
+  return new Function('$', '$input', 'DateTime', '$execution', '$runIndex', noDe(insta, nome).parameters.jsCode)($, $input, dt, execution, runIndex);
+};
+const pedidoInsta = (dados) => rodarInsta('Validar pedido', { entrada: [{ user_id: '111', chat_id: '111', ...dados }] })[0].json;
+teste('instagram: só no modo Negócios, e publicar só pelo comando do dono', () => {
+  assert.equal(pedidoInsta({ acao: 'rascunho', ambiente: 'negocios', legenda: 'Oi #a', imagem_id: 3 }).rota, 'rascunho');
+  const fora = pedidoInsta({ acao: 'posts', ambiente: 'PESSOAL' });
+  assert.equal(fora.rota, 'recusar');
+  assert.match(fora.mensagem, /ambiente Negócios/);
+  assert.equal(pedidoInsta({ acao: 'publicar', origem: 'kira', ambiente: 'NEGOCIOS', rascunho_id: 2 }).rota, 'recusar');
+  assert.equal(pedidoInsta({ acao: 'publicar', origem: 'comando', ambiente: 'PESSOAL', rascunho_id: 2 }).rota, 'publicar');
+  assert.match(pedidoInsta({ acao: 'publicar', origem: 'comando', rascunho_id: 0 }).mensagem, /\/instagram 3/);
+});
+teste('instagram: rascunho precisa de imagem e legenda dentro dos limites do Instagram', () => {
+  assert.match(pedidoInsta({ acao: 'rascunho', ambiente: 'NEGOCIOS', legenda: 'x', imagem_id: 0 }).mensagem, /precisa de uma imagem/);
+  assert.match(pedidoInsta({ acao: 'rascunho', ambiente: 'NEGOCIOS', legenda: '', imagem_id: 3 }).mensagem, /Faltou a legenda/);
+  assert.match(pedidoInsta({ acao: 'rascunho', ambiente: 'NEGOCIOS', legenda: 'a'.repeat(2201), imagem_id: 3 }).mensagem, /2201 caracteres/);
+  const hashtags = Array.from({ length: 31 }, (_, i) => `#tag${i}`).join(' ');
+  assert.match(pedidoInsta({ acao: 'rascunho', ambiente: 'NEGOCIOS', legenda: hashtags, imagem_id: 3 }).mensagem, /31 hashtags/);
+  assert.equal(pedidoInsta({ acao: 'posts', ambiente: 'NEGOCIOS', quantidade: 50 }).quantidade, 10);
+});
+teste('instagram: o rascunho é do próprio dono, a prévia vai no Telegram e nada é publicado', () => {
+  const filtros = noDe(insta, 'Buscar imagem do post').parameters.filters.conditions.map((c) => c.keyName);
+  assert.deepEqual(filtros, ['id', 'user_id']);
+  assert.equal(noDe(insta, 'Guardar rascunho').parameters.columns.value.status, 'pendente');
+  assert.match(noDe(insta, 'Mostrar prévia').parameters.additionalFields.caption, /Para publicar: \/instagram/);
+  const mensagem = noDe(insta, 'Rascunho pronto').parameters.assignments.assignments.find((a) => a.name === 'mensagem').value;
+  assert.match(mensagem, /Nada foi publicado/);
+  assert.match(mensagem, /NÃO foi enviada/);
+});
+teste('instagram: confere o rascunho antes de publicar (já publicado, em andamento, cancelado, travado)', () => {
+  const conferir = (r) => rodarInsta('Conferir rascunho', { nos: { 'Validar pedido': { rascunho_id: 4 } }, entrada: [r] })[0].json;
+  assert.match(conferir({}).mensagem, /Não encontrei o rascunho 4/);
+  assert.equal(conferir({ id: 4, status: 'pendente', imagem_id: 3, legenda: 'x' }).pode, true);
+  assert.equal(conferir({ id: 4, status: 'erro', imagem_id: 3, legenda: 'x' }).pode, true);
+  assert.match(conferir({ id: 4, status: 'publicado', permalink: 'https://www.instagram.com/p/1/' }).mensagem, /já foi publicado no Instagram: https/);
+  assert.match(conferir({ id: 4, status: 'cancelado', imagem_id: 3, legenda: 'x' }).mensagem, /cancelado/);
+  assert.equal(conferir({ id: 4, status: 'publicando', updatedAt: new Date().toISOString(), imagem_id: 3, legenda: 'x' }).pode, false);
+  assert.equal(conferir({ id: 4, status: 'publicando', updatedAt: new Date(Date.now() - 3600e3).toISOString(), imagem_id: 3, legenda: 'x' }).pode, true);
+});
+teste('instagram: link temporário da imagem com chave aleatória e o endereço https do próprio n8n', () => {
+  const r = rodarInsta('Gerar link da imagem', { entrada: [{ id: 4 }], execution: { resumeUrl: 'https://n8n.exemplo.com/webhook-waiting/123' } })[0].json;
+  assert.match(r.link_imagem, /^https:\/\/n8n\.exemplo\.com\/webhook\/kira-instagram-imagem\?t=[a-z0-9]{32,}$/);
+  assert.equal(r.link_imagem.split('t=')[1], r.token_imagem);
+  assert.throws(() => rodarInsta('Gerar link da imagem', { entrada: [{}], execution: { resumeUrl: 'http://localhost:5678/webhook-waiting/1' } }), /https/);
+  assert.equal(noDe(insta, 'Imagem pública').parameters.path, 'kira-instagram-imagem');
+  const busca = noDe(insta, 'Buscar post pela chave').parameters.filters.conditions;
+  assert.deepEqual(busca.map((c) => [c.keyName, c.keyValue === 'publicando' ? 'publicando' : '…']), [['token_imagem', '…'], ['status', 'publicando']]);
+  assert.match(noDe(insta, 'Chave válida?').parameters.conditions.conditions[0].leftValue, /length >= 32/);
+  assert.equal(noDe(insta, 'Marcar publicado').parameters.columns.value.token_imagem, '');
+  assert.equal(noDe(insta, 'Marcar falha').parameters.columns.value.token_imagem, '');
+});
+teste('instagram: a imagem sai em JPEG entre 4:5 e 1,91:1 (corta pouco ou completa com faixas)', () => {
+  const info = (w, h, media = '0.2') => ({ size: { width: w, height: h }, 'Channel Statistics': { Red: { Mean: `1 (${media})` }, Green: { Mean: `1 (${media})` }, Blue: { Mean: `1 (${media})` } } });
+  const formato = (w, h, media) => rodarInsta('Calcular formato', { entrada: [info(w, h, media)], binarios: [{ data: { mimeType: 'image/jpeg' } }] })[0];
+  const alta = formato(576, 1280);
+  assert.equal(alta.json.faixa_largura, 224);
+  assert.equal(alta.json.cor_faixa, '#000000');
+  assert.ok(alta.binary.data);
+  const retrato = formato(960, 1280, '0.8').json;
+  assert.deepEqual([retrato.corte_altura, retrato.corte_y, retrato.faixa_largura, retrato.cor_faixa], [1200, 40, 0, '#FFFFFF']);
+  assert.equal(formato(1024, 1024).json.corte_altura, 1024);
+  assert.equal(formato(2100, 1000).json.corte_largura, 1910);
+  assert.equal(formato(3000, 1000).json.faixa_altura, Math.ceil((3000 / 1.91 - 1000) / 2));
+  assert.equal(noDe(insta, 'Ajustar para o Instagram').parameters.options.format, 'jpeg');
+});
+teste('instagram: espera o Instagram processar antes de publicar e explica a falha sem mostrar a chave', () => {
+  const proc = (status_code, runIndex = 0, status) => rodarInsta('Conferir processamento', { entrada: [{ status_code, status }], runIndex })[0].json;
+  assert.equal(proc('FINISHED').situacao, 'pronto');
+  assert.equal(proc('IN_PROGRESS', 3).situacao, 'esperar');
+  assert.equal(proc('IN_PROGRESS', 19).situacao, 'falhou');
+  assert.equal(proc('ERROR', 0, 'Error: bad image').error.message, 'O Instagram não aceitou o post: Error: bad image');
+  const ligacoes = (nome) => (insta.connections[nome]?.main ?? []).map((saida) => (saida ?? []).map((l) => l.node));
+  assert.deepEqual(ligacoes('Post pronto?'), [['Publicar post'], ['Esperar o Instagram'], ['Explicar falha']]);
+  const falha = (item) => rodarInsta('Explicar falha', { nos: { 'Validar pedido': { rascunho_id: 4 } }, entrada: [item] })[0].json;
+  const graph = { error: { message: '400 - "{\\"error\\":{\\"message\\":\\"(#10) Application does not have permission for this action\\",\\"code\\":10}}"' } };
+  assert.equal(falha(graph).motivo, '(#10) Application does not have permission for this action');
+  assert.match(falha(graph).dica, /permissão/);
+  assert.doesNotMatch(falha({ error: { message: 'erro em https://x?access_token=EAAabcdefghijklmnopqrstuvwxyz123' } }).motivo, /EAAabc/);
+});
+teste('instagram: últimos posts e rascunhos só com números e textos curtos (sem links com a chave)', () => {
+  const conta = { username: 'loja', followers_count: 49, media_count: 84, media: { data: [{ timestamp: '2026-10-10T16:46:53+0000', media_type: 'IMAGE', caption: 'Olá', like_count: 1, comments_count: 0, permalink: 'https://www.instagram.com/p/x/' }], paging: { next: 'https://graph.facebook.com/x?access_token=EAA123' } } };
+  const r = rodarInsta('Resumir posts', { entrada: [{ instagram_business_account: conta }] })[0].json;
+  assert.equal(r.conta, '@loja');
+  assert.deepEqual([r.seguidores, r.total_de_posts, r.posts[0].tipo, r.posts[0].curtidas], [49, 84, 'foto', 1]);
+  assert.equal(r.posts[0].data, '2026-10-10T16:46');
+  assert.doesNotMatch(JSON.stringify(r), /access_token/);
+  assert.throws(() => rodarInsta('Resumir posts', { entrada: [{ id: '1' }] }), /não tem uma conta do Instagram/);
+  const lista = rodarInsta('Listar rascunhos', { entrada: [{ id: 1, status: 'publicado' }, { id: 2, status: 'pendente', legenda: 'a' }, { id: 3, status: 'erro', erro: 'x', legenda: 'b' }] })[0].json;
+  assert.deepEqual(lista.rascunhos.map((x) => x.rascunho), [3, 2]);
+  assert.equal(rodarInsta('Listar rascunhos', { entrada: [{}] })[0].json.total, 0);
+  assert.equal(insta.settings.saveDataSuccessExecution, 'none');
+  assert.equal(noDe(insta, 'Buscar posts').parameters.genericAuthType, 'httpQueryAuth');
+});
+teste('expressões: nenhum "}}" no meio de uma expressão (o n8n fecharia a expressão antes da hora)', () => {
+  for (const arquivo of readdirSync(new URL('n8n/workflows/', raiz))) {
+    const visitar = (v, onde) => {
+      if (typeof v === 'string') {
+        if (v.startsWith('={{') && v.split('{{').length === 2) assert.equal(v.indexOf('}}'), v.length - 2, `${arquivo} → ${onde}`);
+      } else if (v && typeof v === 'object') for (const [k, x] of Object.entries(v)) visitar(x, `${onde}.${k}`);
+    };
+    for (const n of JSON.parse(ler(`n8n/workflows/${arquivo}`)).nodes) visitar(n.parameters, n.name);
+  }
+});
+
 teste('nós Code "uma vez por item" não devolvem lista (o n8n recusa e a execução cai)', () => {
-  const arquivos = ['kira-1.0', 'kira-resumo-da-manha', 'kira-gerar-imagem', 'kira-anexar-imagem', 'kira-teams', 'kira-pedidos', 'kira-base-de-pedidos', 'kira-rascunho-resposta', 'kira-rascunhos-automaticos', 'kira-pesquisar-internet', 'kira-planilha-negocio', 'kira-powerbi', 'kira-fim-do-dia', 'kira-saude', 'kira-backup'];
+  const arquivos = ['kira-1.0', 'kira-resumo-da-manha', 'kira-gerar-imagem', 'kira-anexar-imagem', 'kira-teams', 'kira-pedidos', 'kira-base-de-pedidos', 'kira-rascunho-resposta', 'kira-rascunhos-automaticos', 'kira-pesquisar-internet', 'kira-planilha-negocio', 'kira-powerbi', 'kira-fim-do-dia', 'kira-saude', 'kira-backup', 'kira-instagram'];
   for (const arquivo of arquivos) {
     const w = JSON.parse(ler(`n8n/workflows/${arquivo}.json`));
     for (const n of w.nodes.filter((x) => x.type === 'n8n-nodes-base.code' && x.parameters.mode === 'runOnceForEachItem')) {
@@ -2174,6 +2334,8 @@ teste('segurança: nenhum token do Telegram, chave do Google ou caminho de webho
     'n8n/sdk/kira-saude.workflow.ts',
     'n8n/workflows/kira-backup.json',
     'n8n/sdk/kira-backup.workflow.ts',
+    'n8n/workflows/kira-instagram.json',
+    'n8n/sdk/kira-instagram.workflow.ts',
   ];
   for (const arquivo of arquivos) {
     const conteudo = ler(arquivo);

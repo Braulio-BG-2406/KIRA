@@ -2,7 +2,7 @@
 
 Meu bot particular: a **Kira** é uma assistente pessoal de IA que roda no **n8n**, pensa com o **Google Gemini** e conversa comigo pelo **Telegram**, por texto ou por voz.
 
-> **Status: no ar, já com os ambientes da Kira 2.0** (Trabalho, Negócios e Pessoal, cada um com memórias, tarefas e contatos separados), grátis (chave gratuita do Gemini): Outlook (leitura e rascunhos de resposta com a sua assinatura), Google Drive (leitura), Microsoft Teams (lê e responde quando você pede), pedidos da empresa (base oficial do ERP, atualizada 4 vezes ao dia), a planilha do negócio no modo Negócios (vendas, vendedoras, clientes, estoque e precificação), pesquisa na internet (Busca Google), fotos (ela lê e descreve o que você manda), rascunhos de posts do LinkedIn, imagens com IA, resumo de notícias às 7h em texto e áudio, rascunhos automáticos para e-mails que perguntam de pedidos, o fim do dia às 18h, avisos quando algo falha (com um resumo da saúde toda segunda) e backup semanal das tabelas no Google Drive. Para montar do zero, siga o [guia de configuração](docs/configuracao.md).
+> **Status: no ar, já com os ambientes da Kira 2.0** (Trabalho, Negócios e Pessoal, cada um com memórias, tarefas e contatos separados), grátis (chave gratuita do Gemini): Outlook (leitura e rascunhos de resposta com a sua assinatura), Google Drive (leitura), Microsoft Teams (lê e responde quando você pede), pedidos da empresa (base oficial do ERP, atualizada 4 vezes ao dia), a planilha do negócio no modo Negócios (vendas, vendedoras, clientes, estoque e precificação), pesquisa na internet (Busca Google), fotos (ela lê e descreve o que você manda), rascunhos de posts do LinkedIn, o Instagram da loja no modo Negócios (rascunhos com prévia, publicação com `/instagram N` e últimos posts), imagens com IA, resumo de notícias às 7h em texto e áudio, rascunhos automáticos para e-mails que perguntam de pedidos, o fim do dia às 18h, avisos quando algo falha (com um resumo da saúde toda segunda) e backup semanal das tabelas no Google Drive. Para montar do zero, siga o [guia de configuração](docs/configuracao.md).
 
 ## Como funciona
 
@@ -22,6 +22,7 @@ Meu bot particular: a **Kira** é uma assistente pessoal de IA que roda no **n8n
               │                  ◄── Teams: lê e responde quando você pede
               │                  ◄── pedidos: base compacta no OneDrive (gerada da planilha oficial do ERP)
               │                  ◄── modo Negócios: planilha do negócio no Google Drive (lida na hora)
+              │                  ◄── modo Negócios: Instagram da loja (rascunhos; publica só com /instagram)
               │
               ▼
    resposta falada (voz do Gemini) ou escrita ─► Telegram ─► registro em kira_logs
@@ -50,6 +51,7 @@ Meu bot particular: a **Kira** é uma assistente pessoal de IA que roda no **n8n
 | 📬 Outlook | Lê e-mails e agenda quando você pergunta e prepara **rascunhos** de resposta, já com a sua assinatura (imagem e e-mail) e, se você quiser, com imagem anexa. Nunca envia, apaga ou altera nada: você revisa e envia. |
 | 📁 Google Drive | Procura e lê Documentos, Planilhas e Apresentações do Google e arquivos de texto. Só leitura. |
 | 💼 LinkedIn | Escreve o post e guarda como rascunho numerado, com ou sem imagem. Só vai para o LinkedIn quando você manda `/publicar N`. |
+| 📸 Instagram da loja | No modo Negócios, escreve a legenda, guarda o rascunho numerado e manda a prévia no Telegram. Só publica quando você manda `/instagram N`. Também mostra os últimos posts com curtidas e comentários. |
 | 🖼️ Imagens | Gera imagens com o Gemini ("Nano Banana") quando você pede, manda no Telegram e numera (#1, #2…) para usar no LinkedIn ou em e-mails. |
 | 💬 Teams | Lista e lê suas conversas do Microsoft Teams e escreve ou responde em seu nome **quando você pede** ("responde o João que o pedido sai amanhã"). |
 | 📦 Pedidos | Consulta a base oficial de pedidos do ERP, de todas as unidades (pedido, cliente, material, valores, prazos, atraso, NF, compras, solicitações, produção), com os itens dos últimos 120 dias, todos os em aberto e os totais por mês e unidade. Responde citando a fonte e a hora da planilha. |
@@ -77,6 +79,7 @@ Meu bot particular: a **Kira** é uma assistente pessoal de IA que roda no **n8n
 | [`n8n/workflows/kira-rascunho-resposta.json`](n8n/workflows/kira-rascunho-resposta.json) | Sub-workflow que cria o rascunho de resposta com a assinatura (imagem e e-mail), usado pela Kira e pelos rascunhos automáticos (e o SDK em [`n8n/sdk/kira-rascunho-resposta.workflow.ts`](n8n/sdk/kira-rascunho-resposta.workflow.ts)) |
 | [`n8n/workflows/kira-pesquisar-internet.json`](n8n/workflows/kira-pesquisar-internet.json) | Sub-workflow da ferramenta `pesquisar_internet` (e o SDK em [`n8n/sdk/kira-pesquisar-internet.workflow.ts`](n8n/sdk/kira-pesquisar-internet.workflow.ts)) |
 | [`n8n/workflows/kira-planilha-negocio.json`](n8n/workflows/kira-planilha-negocio.json) | Sub-workflow da ferramenta `consultar_negocio`, que lê a planilha do negócio no Google Drive (e o SDK em [`n8n/sdk/kira-planilha-negocio.workflow.ts`](n8n/sdk/kira-planilha-negocio.workflow.ts)) |
+| [`n8n/workflows/kira-instagram.json`](n8n/workflows/kira-instagram.json) | Sub-workflow da ferramenta `instagram` e do comando `/instagram N` (rascunhos, publicação com link temporário da imagem e últimos posts), e o SDK em [`n8n/sdk/kira-instagram.workflow.ts`](n8n/sdk/kira-instagram.workflow.ts) |
 | [`n8n/workflows/kira-powerbi.json`](n8n/workflows/kira-powerbi.json) | Sub-workflow da ferramenta `consultar_powerbi`, que consulta o Power BI pela API oficial (e o SDK em [`n8n/sdk/kira-powerbi.workflow.ts`](n8n/sdk/kira-powerbi.workflow.ts)) |
 | [`n8n/workflows/kira-rascunhos-automaticos.json`](n8n/workflows/kira-rascunhos-automaticos.json) | Workflow dos rascunhos automáticos de e-mails sobre pedidos (e o SDK em [`n8n/sdk/kira-rascunhos-automaticos.workflow.ts`](n8n/sdk/kira-rascunhos-automaticos.workflow.ts)) |
 | [`n8n/workflows/kira-fim-do-dia.json`](n8n/workflows/kira-fim-do-dia.json) | Workflow do fim do dia às 18h (e o SDK em [`n8n/sdk/kira-fim-do-dia.workflow.ts`](n8n/sdk/kira-fim-do-dia.workflow.ts)) |
@@ -103,7 +106,7 @@ Os testes executam o código dos nós dos workflows (formatação para o Telegra
 
 - Tokens e chaves de API ficam **só nas credenciais do n8n**. Nunca no chat, no código ou neste repositório.
 - Este repositório é **público**: o seu nome, o perfil pessoal da Kira, as credenciais, os IDs do Telegram e do LinkedIn e os IDs dos sub-workflows ficam preenchidos apenas no n8n.
-- Nada sai em seu nome sem você: e-mails ficam como rascunho (inclusive os automáticos), posts só vão para o LinkedIn com `/publicar N` e mensagens no Teams só saem quando você pede.
+- Nada sai em seu nome sem você: e-mails ficam como rascunho (inclusive os automáticos), posts só vão para o LinkedIn com `/publicar N` e para o Instagram com `/instagram N`, e mensagens no Teams só saem quando você pede.
 - Os ambientes não se misturam: memórias, histórico, tarefas e contatos de um ambiente não aparecem em outro sem você autorizar. A planilha do negócio só é lida no modo Negócios e o Power BI só no modo Trabalho (a trava fica no sub-workflow, com o ambiente vindo do workflow, não da IA).
 
 ## Roadmap

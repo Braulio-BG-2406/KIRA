@@ -18,7 +18,7 @@ Prefere rodar na VPS? Veja [Rodar na VPS](#rodar-na-vps-opcional) no fim.
 4. [Publicar o workflow](#4-publicar)
 5. [Liberar o seu ID do Telegram](#5-liberar-o-seu-id)
 6. [Fazer o primeiro teste](#6-primeiro-teste-)
-7. Opcionais: [Outlook](#7-outlook-e-mails-agenda-e-rascunhos-de-resposta), [Resumo da manhã às 7h](#8-resumo-da-manhã-às-7h), [Google Drive](#9-google-drive-só-leitura), [LinkedIn](#10-linkedin-rascunhos-e-publicar), [Imagens](#11-imagens-com-ia), [Teams](#12-microsoft-teams), [Pedidos](#13-pedidos-base-oficial-do-erp), [Ambientes](#14-ambientes-kira-20), [Rascunhos automáticos](#15-rascunhos-automáticos-de-e-mails-sobre-pedidos), [Internet](#16-internet-pesquisa-no-google), [Assinatura nos rascunhos](#17-assinatura-nos-rascunhos-de-resposta), [Planilha do negócio](#18-planilha-do-negócio-modo-negócios), [Power BI](#19-power-bi-modo-trabalho), [Fim do dia às 18h](#20-fim-do-dia-às-18h), [Saúde da Kira](#21-saúde-da-kira-avisos-de-falha-e-resumo-de-segunda) e [Backup semanal](#22-backup-semanal-google-drive)
+7. Opcionais: [Outlook](#7-outlook-e-mails-agenda-e-rascunhos-de-resposta), [Resumo da manhã às 7h](#8-resumo-da-manhã-às-7h), [Google Drive](#9-google-drive-só-leitura), [LinkedIn](#10-linkedin-rascunhos-e-publicar), [Imagens](#11-imagens-com-ia), [Teams](#12-microsoft-teams), [Pedidos](#13-pedidos-base-oficial-do-erp), [Ambientes](#14-ambientes-kira-20), [Rascunhos automáticos](#15-rascunhos-automáticos-de-e-mails-sobre-pedidos), [Internet](#16-internet-pesquisa-no-google), [Assinatura nos rascunhos](#17-assinatura-nos-rascunhos-de-resposta), [Planilha do negócio](#18-planilha-do-negócio-modo-negócios), [Power BI](#19-power-bi-modo-trabalho), [Fim do dia às 18h](#20-fim-do-dia-às-18h), [Saúde da Kira](#21-saúde-da-kira-avisos-de-falha-e-resumo-de-segunda), [Backup semanal](#22-backup-semanal-google-drive) e [Instagram da loja](#23-instagram-da-loja-modo-negócios)
 
 ---
 
@@ -356,7 +356,7 @@ Ele só lê os serviços e só escreve na tabela `kira_saude`.
 
 ## 22. Backup semanal (Google Drive)
 
-Workflow separado: **Kira — Backup semanal (domingo 3h)** ([`kira-backup.json`](../n8n/workflows/kira-backup.json)). Todo domingo às 3h, ele copia as tabelas da Kira (configuração, memórias, tarefas, contatos, histórico das conversas, rascunhos do LinkedIn, imagens, e-mails automáticos e falhas) para um arquivo `kira-backup-AAAA-MM-DD.json` na pasta **Kira - backups** do seu Google Drive. A pasta é criada na primeira vez.
+Workflow separado: **Kira — Backup semanal (domingo 3h)** ([`kira-backup.json`](../n8n/workflows/kira-backup.json)). Todo domingo às 3h, ele copia as tabelas da Kira (configuração, memórias, tarefas, contatos, histórico das conversas, rascunhos do LinkedIn e do Instagram, imagens, e-mails automáticos e falhas) para um arquivo `kira-backup-AAAA-MM-DD.json` na pasta **Kira - backups** do seu Google Drive. A pasta é criada na primeira vez.
 
 - Ficam os **8 backups mais recentes**; os mais antigos vão para a lixeira do Drive, que os apaga de vez em 30 dias. Ele só mexe nos arquivos `kira-backup-…` dessa pasta.
 - Se alguma tabela não abrir, o arquivo é salvo sem ela, a Saúde da Kira avisa no Telegram e os backups antigos não são apagados.
@@ -368,6 +368,35 @@ Workflow separado: **Kira — Backup semanal (domingo 3h)** ([`kira-backup.json`
 3. Para fazer o primeiro na hora, abra o workflow e clique em **Execute workflow**: a pasta e o arquivo aparecem no Drive.
 
 **Para recuperar uma tabela:** o arquivo traz, em `tabelas`, as linhas de cada tabela com todas as colunas. Dá para recolocar as linhas pelo n8n (com um workflow que lê o arquivo e grava na tabela); peça ajuda se precisar.
+
+## 23. Instagram da loja (modo Negócios)
+
+No modo **Negócios**, a ferramenta **instagram** cuida do Instagram profissional da loja:
+
+- **Rascunho com prévia:** "Kira, faz um post pro Instagram com a imagem #12". Ela escreve a legenda, guarda o rascunho numerado na tabela `kira_instagram` e manda a **prévia** (a imagem com a legenda) no Telegram.
+- **Publicar só com o seu comando:** o post só vai para o Instagram quando você manda `/instagram N` (N é o número do rascunho). A IA não tem como publicar: a publicação é um ramo fixo do workflow, disparado só pelo comando.
+- **Últimos posts:** "Kira, como está o Instagram da loja?" traz seguidores, total de posts e os últimos posts com curtidas e comentários.
+- Fora do modo Negócios, a ferramenta recusa e pede para você trocar de ambiente.
+
+Como funciona por dentro: o sub-workflow **Kira — Instagram (ferramenta)** ([`kira-instagram.json`](../n8n/workflows/kira-instagram.json)) usa a API do Instagram com login do Facebook (`graph.facebook.com`). O Instagram só aceita imagem por um **link público**, por isso o próprio workflow tem um webhook (**Imagem pública**) que entrega a imagem guardada no Telegram, já em JPEG e no formato aceito (entre 4:5 em pé e 1,91:1 deitada: corta até 12% ou completa com faixas para não perder a peça). O link leva uma chave aleatória que só vale enquanto o post está sendo publicado e é apagada logo depois. Antes de publicar, ele espera o Instagram terminar de processar a imagem (até 1 minuto).
+
+O que você precisa (tudo grátis):
+- Instagram **profissional** (conta comercial ou de criador) **ligado a uma Página do Facebook**: no Instagram, **Editar perfil → Página → Conectar**.
+- Um app seu no [Meta for Developers](https://developers.facebook.com/apps) (tipo **Empresa**), com o caso de uso de gerenciar conteúdo do Instagram e o **login do Facebook**.
+- O n8n acessível pela internet com **https** (o endereço dos webhooks), porque o Instagram baixa a imagem de lá. Na VPS do [guia](migracao-vps.md), isso já está pronto.
+
+Passo a passo:
+1. No app da Meta, em **Casos de uso → Personalizar**, adicione as permissões `instagram_basic`, `instagram_content_publish`, `pages_show_list`, `pages_read_engagement` e `business_management` (e `instagram_manage_insights`, se quiser métricas de alcance depois).
+2. Abra o [Explorador da API do Graph](https://developers.facebook.com/tools/explorer), escolha o seu app, adicione as mesmas permissões e clique em **Generate Access Token**. Na janela do Facebook, escolha a Página e a conta do Instagram da loja e aceite.
+3. Clique no **ⓘ** ao lado do token → **Abrir na Ferramenta de Token de Acesso** → **Estender token de acesso**. Copie o token novo, cole de volta no campo do Explorador e consulte `me/accounts?fields=name,access_token,instagram_business_account`.
+4. Na resposta, no bloco da Página da loja (o que tem `instagram_business_account`), copie o valor de `access_token`. Esse token da Página **não vence** (para de valer só se você trocar a senha do Facebook ou tirar o app das integrações). Não cole esse token em nenhum chat.
+5. No n8n, crie a credencial **Query Auth**: **Name** `access_token`, **Value** o token da Página, **Allowed HTTP Request Domains → Specific Domains** `graph.facebook.com`. Dê um nome como "Instagram da loja".
+6. Crie a tabela `kira_instagram` (colunas na [arquitetura](arquitetura.md#dados)).
+7. Importe o sub-workflow e selecione a credencial do Instagram nos 6 nós HTTP (**Conta do Instagram**, **Criar post**, **Status do post**, **Publicar post**, **Link do post** e **Buscar posts**) e a do Telegram em **Mostrar prévia** e **Baixar imagem (link)**. Publique (o webhook da imagem só funciona publicado).
+8. Na Kira, aponte a ferramenta **instagram** e o nó **Publicar no Instagram** (grupo **Comandos**) para esse sub-workflow e publique.
+9. Teste: no modo Negócios, peça "Kira, como está o Instagram da loja?". Depois peça um post com uma imagem, confira a prévia e mande `/instagram N`.
+
+Limites: até 100 posts por dia (regra do Instagram), legenda com até 2.200 caracteres e 30 hashtags, um post por imagem (sem carrossel por enquanto). As execuções que dão certo não ficam guardadas no n8n, porque as respostas de leitura do Facebook trazem links com a chave de acesso; se algo falhar, o motivo fica na coluna `erro` da tabela `kira_instagram` e a Kira conta no Telegram.
 
 ## Personalizar
 
@@ -414,6 +443,9 @@ Durante os testes ficou uma linha de teste em `kira_logs` (usuário "Teste @test
 | Chegou no Telegram "Não consegui atualizar a base de pedidos" | A planilha estava sendo salva, mudou de colunas ou a credencial expirou | A Kira segue com a última base; veja a execução com erro e tente **Atualizar agora** |
 | O rascunho saiu sem a imagem da assinatura | No Google Drive não há imagem com o trecho de `imagem_drive` no nome, ou ela passa de 1 MB ou não é PNG, JPG ou GIF | Suba a imagem com esse trecho no nome (passo 17); o próximo rascunho já sai com ela |
 | O resumo chegou sem o áudio | Limite diário da voz do Gemini | O texto sempre chega; o áudio volta no dia seguinte (veja a execução em **Executions**) |
+| `/instagram N` diz que o Instagram não conseguiu baixar a imagem | O n8n não está acessível por https ou o sub-workflow do Instagram não está publicado | Publique o **Kira — Instagram (ferramenta)** e confira o endereço https dos webhooks; o rascunho continua guardado |
+| A Kira diz que a chave do Instagram venceu ou foi desligada | O token da Página parou de valer (senha do Facebook trocada, app removido das integrações) | Gere um token novo (passo 23, itens 2 a 4) e troque na credencial do Instagram |
+| No login do Instagram aparece "Sua conta do Instagram não está qualificada para usar a API de Mensagens" | O caminho do "login do Instagram" não aceita algumas contas | Use o caminho do passo 23 (login do Facebook, com o Instagram ligado a uma Página) |
 | A Kira diz que o assunto é de outro ambiente | O ambiente ativo não é o do assunto | Mande "modo <nome>" (o `/status` mostra o ambiente ativo) |
 | Não apareceu rascunho para um e-mail sobre pedido | Fora do horário, e-mail sem palavras de pedido, já respondido, ou a Kira decidiu que não precisava de resposta | Veja as execuções de **Kira — rascunhos automáticos** e a tabela `kira_emails_auto` (coluna `motivo`) |
 | A Kira diz que não conseguiu pesquisar na internet | Limite diário de pesquisas do plano gratuito ou instabilidade | Tente mais tarde; detalhes nas execuções de **Kira — pesquisar na internet** |

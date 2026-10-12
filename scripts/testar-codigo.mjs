@@ -2464,7 +2464,12 @@ teste('vps: o serviço de vídeo (faixa nos Reels) não abre porta na internet e
   assert.match(override, /read_only: true/);
   assert.match(ler('vps/video/Dockerfile'), /USER nobody/);
   const servidor = ler('vps/video/servidor.py');
-  assert.match(servidor, /LIMITE_BYTES = 25 \* 1024 \* 1024/);
+  assert.match(servidor, /LIMITE_BYTES = 40 \* 1024 \* 1024/);
+  assert.match(servidor, /LIMITE_ARQUIVO = 15 \* 1024 \* 1024/);
+  // vídeo vitrine: fotos com zoom suave, transições e música (ou áudio mudo), sem custo de IA
+  assert.match(servidor, /'\/vitrine'/);
+  assert.match(servidor, /xfade=transition=fade/);
+  assert.match(servidor, /anullsrc/);
   assert.match(servidor, /expansion=none/);
   assert.match(servidor, /\+faststart/);
   assert.doesNotMatch(script + servidor, /github\.com\/|raw\.githubusercontent\.com\/[A-Za-z]/);

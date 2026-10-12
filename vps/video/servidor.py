@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-# Kira — serviço de vídeo: coloca uma faixa com texto (por exemplo, o preço) num vídeo para os Reels.
+# Kira — serviço de vídeo para os Reels: coloca uma faixa com texto (por exemplo, o preço) num vídeo e monta o
+# "vídeo vitrine" (fotos do produto com zoom suave, transições e música de fundo), sem custo de IA.
 # Roda num contêiner ao lado do n8n e só o n8n fala com ele, pela rede interna do Docker (nenhuma porta aberta na
 # internet). Usa só a biblioteca padrão do Python e o ffmpeg.
 #
@@ -11,7 +12,16 @@
 # altura: onde fica o centro da faixa, em % da altura do vídeo (40 a 95; padrão 70). No Reels, o Instagram cobre
 # a parte de baixo do vídeo com o nome da conta e a legenda; 70% fica logo acima dessa área.
 # letra: tamanho da letra, em % da altura do vídeo (2 a 7; padrão 4.5). A letra encolhe se o texto não couber.
-# O vídeo sai em H.264 + AAC, com o índice no começo do arquivo (o formato que o Instagram pede).
+#
+#   POST /vitrine?duracao=10   (corpo: formulário multipart com foto1, foto2, foto3 e musica)  -> vídeo MP4 9:16
+#
+# Vitrine: de 1 a 3 fotos (campos foto1, foto2 e foto3; os vazios são ignorados), cada uma com um movimento suave
+# de câmera, ligadas por transições, sobre um fundo desfocado da própria foto (a foto inteira aparece, sem corte).
+# musica (opcional): o arquivo de áudio; repete se for curta, começa e termina suave. Sem música, sai muda.
+# duracao: de 6 a 20 segundos (padrão 10). Sai em 720x1280, 30 quadros por segundo.
+# Os vídeos saem em H.264 + AAC, com o índice no começo do arquivo (o formato que o Instagram pede).
+import email.parser
+import email.policy
 import json
 import os
 import subprocess
@@ -21,7 +31,8 @@ import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 PORTA = int(os.environ.get('PORTA', '8080'))
-LIMITE_BYTES = 25 * 1024 * 1024
+LIMITE_BYTES = 40 * 1024 * 1024
+LIMITE_ARQUIVO = 15 * 1024 * 1024
 LIMITE_SEGUNDOS = 300
 MAX_LINHAS = 2
 MAX_CARACTERES = 40
@@ -133,6 +144,108 @@ def aplicar_faixa(dados, texto, cor='amarelo', centro_pct=70, letra_pct=4.5):
             return f.read()
 
 
+def ler_formulario(tipo, corpo):
+    """Lê um formulário multipart/form-data e devolve {nome do campo: conteúdo}."""
+    if 'multipart/form-data' not in (tipo or ''):
+        raise Recusa('mande as fotos e a música como formulário (multipart/form-data)')
+    cabecalho = b'Content-Type: ' + tipo.encode('latin-1') + b'\r\nMIME-Version: 1.0\r\n\r\n'
+    mensagem = email.parser.BytesParser(policy=email.policy.HTTP).parsebytes(cabecalho + corpo)
+    campos = {}
+    for parte in mensagem.iter_parts():
+        nome = parte.get_param('name', header='content-disposition')
+        dados = parte.get_payload(decode=True) or b''
+        if nome and dados:
+            if len(dados) > LIMITE_ARQUIVO:
+                raise Recusa(f'o arquivo {nome} passa de 15 MB')
+            campos[nome] = dados
+    return campos
+
+
+def e_imagem(caminho):
+    r = subprocess.run(['ffprobe', '-v', 'error', '-show_entries', 'stream=codec_type,width,height', '-of', 'json', caminho],
+                       capture_output=True, text=True, timeout=60)
+    fluxos = json.loads(r.stdout or '{}').get('streams', []) if r.returncode == 0 else []
+    return any(f.get('codec_type') == 'video' and f.get('width') for f in fluxos)
+
+
+def tem_audio(caminho):
+    r = subprocess.run(['ffprobe', '-v', 'error', '-show_entries', 'stream=codec_type', '-of', 'json', caminho],
+                       capture_output=True, text=True, timeout=60)
+    fluxos = json.loads(r.stdout or '{}').get('streams', []) if r.returncode == 0 else []
+    return any(f.get('codec_type') == 'audio' for f in fluxos)
+
+
+# Movimentos de câmera, um para cada foto: aproximar, afastar e deslizar de lado com um pouco de zoom.
+MOVIMENTOS = [
+    ("1+0.12*on/{n}", "iw/2-(iw/zoom/2)", "ih/2-(ih/zoom/2)"),
+    ("1.12-0.12*on/{n}", "iw/2-(iw/zoom/2)", "ih/2-(ih/zoom/2)"),
+    ("1.08", "(iw-iw/zoom)*on/{n}", "ih/2-(ih/zoom/2)"),
+]
+LARGURA, ALTURA, QUADROS = 720, 1280, 30
+TRANSICAO = 0.6
+
+
+def montar_vitrine(fotos, musica=None, duracao=10):
+    fotos = [f for f in fotos if f][:3]
+    if not fotos:
+        raise Recusa('mande pelo menos 1 foto')
+    duracao = max(6.0, min(20.0, float(duracao)))
+    n = len(fotos)
+    # Cada trecho dura um pouco mais que a sua parte, porque as transições se sobrepõem.
+    trecho = (duracao + (n - 1) * TRANSICAO) / n
+    quadros = int(round(trecho * QUADROS))
+    with tempfile.TemporaryDirectory() as pasta:
+        cmd = ['ffmpeg', '-hide_banner', '-loglevel', 'error', '-y']
+        for i, dados in enumerate(fotos):
+            caminho = os.path.join(pasta, f'foto{i}')
+            with open(caminho, 'wb') as f:
+                f.write(dados)
+            if not e_imagem(caminho):
+                raise Recusa(f'a foto {i + 1} não é uma imagem que eu consiga abrir')
+            cmd += ['-i', caminho]
+        com_musica = False
+        if musica:
+            caminho = os.path.join(pasta, 'musica')
+            with open(caminho, 'wb') as f:
+                f.write(musica)
+            if not tem_audio(caminho):
+                raise Recusa('a música não é um arquivo de áudio que eu consiga abrir')
+            cmd += ['-stream_loop', '-1', '-i', caminho]
+            com_musica = True
+        else:
+            cmd += ['-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=stereo']
+        partes = []
+        for i in range(n):
+            z, x, y = (m.format(n=quadros) for m in MOVIMENTOS[i % len(MOVIMENTOS)])
+            partes.append(
+                f'[{i}:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,'
+                f'boxblur=24:4,eq=brightness=-0.12,setsar=1[fundo{i}];'
+                f'[{i}:v]scale=1000:1700:force_original_aspect_ratio=decrease,setsar=1[frente{i}];'
+                f"[fundo{i}][frente{i}]overlay=(W-w)/2:(H-h)/2,zoompan=z='{z}':x='{x}':y='{y}'"
+                f':d={quadros}:s={LARGURA}x{ALTURA}:fps={QUADROS},format=yuv420p,settb=AVTB[v{i}]'
+            )
+        anterior = 'v0'
+        for i in range(1, n):
+            deslocamento = round(i * (trecho - TRANSICAO), 3)
+            partes.append(f'[{anterior}][v{i}]xfade=transition=fade:duration={TRANSICAO}:offset={deslocamento}[x{i}]')
+            anterior = f'x{i}'
+        fim_musica = max(0.5, duracao - 1.5)
+        partes.append(
+            f'[{n}:a]atrim=0:{duracao},asetpts=PTS-STARTPTS,afade=t=in:st=0:d=0.5,'
+            f'afade=t=out:st={fim_musica}:d=1.5,volume=0.9[audio]'
+        )
+        saida = os.path.join(pasta, 'vitrine.mp4')
+        cmd += ['-filter_complex', ';'.join(partes), '-map', f'[{anterior}]', '-map', '[audio]', '-t', str(duracao),
+                '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '21', '-profile:v', 'high', '-pix_fmt', 'yuv420p',
+                '-r', str(QUADROS), '-c:a', 'aac', '-b:a', '128k', '-ar', '48000', '-ac', '2',
+                '-movflags', '+faststart', saida]
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=LIMITE_SEGUNDOS)
+        if r.returncode != 0 or not os.path.exists(saida):
+            raise Recusa('o ffmpeg não conseguiu montar o vídeo: ' + (r.stderr or '').strip()[-300:])
+        with open(saida, 'rb') as f:
+            return f.read()
+
+
 class Atendente(BaseHTTPRequestHandler):
     server_version = 'kira-video'
 
@@ -158,15 +271,17 @@ class Atendente(BaseHTTPRequestHandler):
 
     def do_POST(self):
         partes = urllib.parse.urlsplit(self.path)
-        if partes.path != '/faixa':
+        if partes.path not in ('/faixa', '/vitrine'):
             return self.responder(404, {'erro': 'caminho não encontrado'})
         tamanho = int(self.headers.get('Content-Length') or 0)
         if tamanho <= 0:
-            return self.responder(400, {'erro': 'mande o vídeo no corpo do pedido'})
+            return self.responder(400, {'erro': 'mande o arquivo no corpo do pedido'})
         if tamanho > LIMITE_BYTES:
-            return self.responder(413, {'erro': 'vídeo maior que 25 MB'})
+            return self.responder(413, {'erro': 'pedido maior que 40 MB'})
         dados = self.rfile.read(tamanho)
         q = urllib.parse.parse_qs(partes.query)
+        if partes.path == '/vitrine':
+            return self.vitrine(dados, q)
         texto = (q.get('texto') or [''])[0]
         cor = (q.get('cor') or ['amarelo'])[0].strip().lower() or 'amarelo'
         try:
@@ -180,6 +295,22 @@ class Atendente(BaseHTTPRequestHandler):
         try:
             with FILA:
                 video = aplicar_faixa(dados, texto, cor, centro, letra)
+        except Recusa as e:
+            return self.responder(400, {'erro': str(e)})
+        except subprocess.TimeoutExpired:
+            return self.responder(504, {'erro': 'o vídeo demorou demais para ficar pronto'})
+        self.responder(200, video, 'video/mp4')
+
+    def vitrine(self, dados, q):
+        try:
+            duracao = float((q.get('duracao') or ['10'])[0].replace(',', '.'))
+        except ValueError:
+            duracao = 10
+        try:
+            campos = ler_formulario(self.headers.get('Content-Type'), dados)
+            fotos = [campos.get(f'foto{i}') for i in (1, 2, 3)]
+            with FILA:
+                video = montar_vitrine(fotos, campos.get('musica'), duracao)
         except Recusa as e:
             return self.responder(400, {'erro': str(e)})
         except subprocess.TimeoutExpired:

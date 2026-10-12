@@ -223,25 +223,28 @@ Para configurar:
 
 As memórias antigas, sem ambiente, são distribuídas pela categoria (`pessoal`, `negocios`, `trabalho`…); as que não se encaixam ficam como GERAL.
 
-## 15. Rascunhos automáticos de e-mails sobre pedidos
+## 15. E-mails sobre pedidos: aviso e rascunho sob pedido
 
-Workflow separado: **Kira — rascunhos automáticos (Outlook)** ([`kira-rascunhos-automaticos.json`](../n8n/workflows/kira-rascunhos-automaticos.json)). De segunda a sexta, das 7h às 19h30, a cada 30 minutos:
+Workflow separado: **Kira — rascunhos automáticos (Outlook)** ([`kira-rascunhos-automaticos.json`](../n8n/workflows/kira-rascunhos-automaticos.json)). De segunda a sexta, das 7h às 19h30, a cada 30 minutos, ele lê os e-mails novos da Caixa de Entrada e separa os que parecem perguntar de pedidos (pedido, TRF, cotação, compra, solicitação, produção, prazo, NF). Pula e-mails automáticos, os que você mesmo mandou e os que você já respondeu. Depois **só avisa** no Telegram, numa mensagem só, cada e-mail com um número (#N), quem mandou, o assunto e o começo do texto. **A IA não é chamada nessa hora**, então não há gasto com o Gemini.
 
-1. lê os e-mails novos da Caixa de Entrada e separa os que parecem perguntar de pedidos (pedido, TRF, cotação, compra, solicitação, produção, prazo, NF). Pula e-mails automáticos, os que você mesmo mandou e os que você já respondeu;
-2. a Kira lê cada um (até 5 por vez), consulta a base de pedidos (passo 13) e escreve a resposta no seu nome, marcando como **[confirmar]** o que a base não tem;
+Quando você quer a resposta de um deles, manda **`/rascunho N`** para a Kira. Aí:
+
+1. o workflow abre o e-mail N no Outlook;
+2. a Kira consulta a base de pedidos (passo 13) e escreve a resposta no seu nome, marcando como **[confirmar]** o que a base não tem;
 3. cria a resposta como **rascunho** na conversa do e-mail, no Outlook, com a sua assinatura (passo 17). **Nunca envia**;
-4. avisa no Telegram: de quem é, o assunto, o resumo da resposta e um link para o rascunho (e se a imagem da assinatura ficou de fora).
+4. avisa no Telegram: o resumo da resposta e um link para o rascunho (ou o motivo, se ela achar que o e-mail não pede resposta).
 
 Para remetentes de fora da empresa, ela fala só dos pedidos que a pessoa citou, sem dados de outros clientes, custos ou fornecedores. Se o pedido não estiver na base, a resposta diz que você está verificando, sem afirmar que o pedido não existe.
 
-1. Crie a tabela `kira_emails_auto` com as colunas `message_id`, `status` e `motivo` (texto). Cada e-mail é analisado uma vez só; os registros são apagados depois de 10 dias.
-2. Importe o workflow e selecione as credenciais: *Microsoft Outlook* (nos dois nós HTTP), *Gemini* (nos dois modelos) e *Telegram* (nos dois avisos).
+1. Crie a tabela `kira_emails_auto` com as colunas `message_id`, `status`, `motivo` e `graph_id` (texto). Cada e-mail é avisado uma vez só; os registros (e os números dos avisos) são apagados depois de 10 dias.
+2. Importe o workflow e selecione as credenciais: *Microsoft Outlook* (nos três nós HTTP), *Gemini* (nos dois modelos) e *Telegram* (nos dois avisos).
 3. No nó **Configuração**, preencha `nome_dono` (como a Kira chama você), `chat_id` (o seu ID do Telegram) e `ativo_desde` (data e hora a partir da qual os e-mails contam, por exemplo `2026-09-28T07:00:00-03:00`; vazio = últimas 72 horas).
 4. Na ferramenta **consultar_pedidos**, selecione o sub-workflow de pedidos e, no nó **Criar rascunho**, o sub-workflow do rascunho com assinatura (passo 17). Nos dois, em **Settings → This workflow can be called by**, libere também este workflow. Publique.
+5. Na Kira, no nó **Pedir rascunho do e-mail** (grupo **Comandos**), selecione este workflow e publique. Aqui, em **Settings → This workflow can be called by**, a Kira precisa estar liberada.
 
 Se o Outlook parar de responder (por exemplo, credencial expirada), a Kira avisa no Telegram no máximo uma vez por dia.
 
-> São cerca de 26 execuções por dia útil no n8n, quase todas rápidas e sem IA; o Gemini só é chamado para os e-mails que parecem ser sobre pedidos.
+> São cerca de 26 execuções por dia útil no n8n, rápidas e sem IA; o Gemini só é chamado quando você manda `/rascunho N`.
 
 ## 16. Internet (pesquisa no Google)
 
@@ -467,7 +470,8 @@ Durante os testes ficou uma linha de teste em `kira_logs` (usuário "Teste @test
 | A Kira diz que a chave do Instagram venceu ou foi desligada | O token da Página parou de valer (senha do Facebook trocada, app removido das integrações) | Gere um token novo (passo 23, itens 2 a 4) e troque na credencial do Instagram |
 | No login do Instagram aparece "Sua conta do Instagram não está qualificada para usar a API de Mensagens" | O caminho do "login do Instagram" não aceita algumas contas | Use o caminho do passo 23 (login do Facebook, com o Instagram ligado a uma Página) |
 | A Kira diz que o assunto é de outro ambiente | O ambiente ativo não é o do assunto | Mande "modo <nome>" (o `/status` mostra o ambiente ativo) |
-| Não apareceu rascunho para um e-mail sobre pedido | Fora do horário, e-mail sem palavras de pedido, já respondido, ou a Kira decidiu que não precisava de resposta | Veja as execuções de **Kira — rascunhos automáticos** e a tabela `kira_emails_auto` (coluna `motivo`) |
+| Não chegou aviso de um e-mail sobre pedido | Fora do horário, e-mail sem palavras de pedido ou já respondido | Veja as execuções de **Kira — rascunhos automáticos** e a tabela `kira_emails_auto` |
+| `/rascunho N` respondeu "aviso antigo" ou "não achei" | O aviso é de antes do `graph_id` ou passou de 10 dias | Peça a resposta no chat: "Kira, prepare a resposta para o e-mail de ..." |
 | A Kira diz que não conseguiu pesquisar na internet | Limite diário de pesquisas do plano gratuito ou instabilidade | Tente mais tarde; detalhes nas execuções de **Kira — pesquisar na internet** |
 | A Kira diz que não conseguiu gerar a imagem | Limite diário de imagens do plano gratuito ou pedido recusado pelo filtro do Google | Tente amanhã ou mude a descrição; detalhes nas execuções do sub-workflow **Kira — gerar imagem** |
 | A Kira diz que não tem permissão para consultar um modelo do Power BI | A conta conectada só pode ver o relatório, sem a permissão de criar conteúdo (Build) no modelo | Peça ao dono do modelo essa permissão (ou para entrar na área de trabalho como colaborador), ou reconecte a credencial com a conta dona dos modelos (passo 19) |

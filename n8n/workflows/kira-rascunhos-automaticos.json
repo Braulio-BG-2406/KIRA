@@ -70,6 +70,12 @@
               "name": "dias_guardar",
               "value": 10,
               "type": "number"
+            },
+            {
+              "id": "c-numero",
+              "name": "numero",
+              "value": "={{ Math.max(0, Math.floor(Number($json.numero) || 0)) }}",
+              "type": "number"
             }
           ]
         }
@@ -105,6 +111,200 @@
       },
       "credentials": {},
       "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "9b8c93c0-01f8-418a-aa0a-032743100089",
+      "name": "Pedido de rascunho?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        560,
+        160
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-pedido",
+              "leftValue": "={{ $('Configuração').first().json.numero > 0 }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "92ebb3cb-6817-4051-a96d-5ee0d135c2cc",
+      "name": "Buscar aviso",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        780,
+        -200
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "kira_emails_auto"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "keyValue": "={{ $('Configuração').first().json.numero }}"
+            }
+          ]
+        },
+        "limit": 1
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "58d6f881-5600-446d-aab3-6e45e16c42af",
+      "name": "Conferir aviso",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1000,
+        -200
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Confere o pedido do /rascunho N: o número precisa ser de um aviso de e-mail guardado (os avisos ficam 10 dias).\nconst numero = Number($('Configuração').first().json.numero) || 0;\nconst r = $input.first()?.json ?? {};\nif (!r.id) {\n  return [{ json: { ok: false, html: `⚠️ Não achei o e-mail #${numero}. Confira o número no aviso (os avisos ficam guardados por 10 dias).` } }];\n}\nif (!r.graph_id) {\n  return [{ json: { ok: false, html: `⚠️ O e-mail #${numero} é de um aviso antigo, que não guardava o e-mail. Peça no chat: \"Kira, prepare a resposta para o e-mail sobre ...\".` } }];\n}\nreturn [{ json: { ok: true, numero, graph_id: r.graph_id, chave: r.message_id } }];\n"
+      }
+    },
+    {
+      "id": "275e1890-fdfc-4bd8-a0d7-bffb629c7c47",
+      "name": "Aviso certo?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1220,
+        -200
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-aviso",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "33aeb833-70ea-4242-a9de-d4c9840931cf",
+      "name": "Buscar e-mail",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1440,
+        -200
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://graph.microsoft.com/v1.0/me/messages/' + encodeURIComponent($json.graph_id) }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "microsoftOutlookOAuth2Api",
+        "sendQuery": true,
+        "specifyQuery": "keypair",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "$select",
+              "value": "id,internetMessageId,subject,from,sender,toRecipients,ccRecipients,receivedDateTime,body"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "specifyHeaders": "keypair",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "outlook.body-content-type=\"text\""
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "credentials": {},
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "948b8d4a-09ee-4196-a12e-b304a63e6833",
+      "name": "Preparar e-mail",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        40
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Prepara o e-mail pedido com /rascunho N para a Kira escrever a resposta (os mesmos campos do \"Separar e-mails\").\nconst eu = $('Quem sou eu').first()?.json ?? {};\nconst meuEmail = String(eu.mail || eu.userPrincipalName || '').trim().toLowerCase();\nconst meuDominio = meuEmail.includes('@') ? meuEmail.split('@')[1] : '';\nconst aviso = $('Conferir aviso').first().json;\nconst e = $input.first().json;\n\n// Corta o histórico citado (respostas anteriores) e deixa só a mensagem nova.\nfunction mensagemNova(texto) {\n  const linhas = String(texto ?? '').replace(/\\r/g, '').split('\\n');\n  const corte = linhas.findIndex(\n    (l, i) =>\n      i > 0 &&\n      (/^\\s*(-{2,}\\s*(original message|mensagem original)|_{8,})/i.test(l) ||\n        /^\\s*(de|from):\\s.+/i.test(l) && linhas.slice(i + 1, i + 4).some((p) => /^\\s*(enviad[oa]|sent|para|to|data|date|assunto|subject):/i.test(p)) ||\n        /^\\s*(em|on)\\s.+(escreveu|wrote):\\s*$/i.test(l)),\n  );\n  const nova = (corte > 0 ? linhas.slice(0, corte) : linhas).join('\\n');\n  return nova.replace(/\\n{3,}/g, '\\n\\n').trim().slice(0, 4000);\n}\n\nconst endereco = (r) => String(r?.emailAddress?.address ?? '').trim().toLowerCase();\nconst nome = (r) => String(r?.emailAddress?.name ?? '').trim();\nconst remetente = endereco(e.from) || endereco(e.sender);\nconst para = (e.toRecipients ?? []).map(endereco);\nconst copia = (e.ccRecipients ?? []).map(endereco);\nconst dominio = remetente.split('@')[1] ?? '';\nconst texto = mensagemNova(e.body?.content ?? e.bodyPreview ?? '');\nreturn [\n  {\n    json: {\n      numero: aviso.numero,\n      chave: String(e.internetMessageId || aviso.chave || e.id || ''),\n      id: e.id,\n      assunto: String(e.subject ?? '').trim() || '(sem assunto)',\n      remetente_nome: nome(e.from) || remetente,\n      remetente_email: remetente,\n      externo: meuDominio ? dominio !== meuDominio : true, // sem saber o domínio do dono, trata como externo (mais cuidado)\n      so_em_copia: Boolean(meuEmail) && !para.includes(meuEmail) && copia.includes(meuEmail),\n      recebido_em: e.receivedDateTime\n        ? DateTime.fromISO(e.receivedDateTime).setZone('America/Sao_Paulo').toFormat(\"dd/MM/yyyy 'às' HH:mm\")\n        : '',\n      recebido_iso: e.receivedDateTime ?? '',\n      texto: texto || '(e-mail sem texto)',\n    },\n  },\n];\n"
+      }
+    },
+    {
+      "id": "617bf516-e358-441e-accd-c852c659bbed",
+      "name": "Avisar no Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2640,
+        200
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $('Configuração').first().json.chat_id }}",
+        "text": "={{ $json.html }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML",
+          "disable_web_page_preview": true
+        }
+      },
+      "credentials": {},
       "onError": "continueRegularOutput"
     },
     {
@@ -199,6 +399,136 @@
         "mode": "runOnceForAllItems",
         "language": "javaScript",
         "jsCode": "// Escolhe, entre os e-mails novos da Caixa de Entrada, os que parecem pedir informação de pedidos\n// (pedido, TRF, cotação, compra, solicitação, produção, prazo, NF). Pula os já vistos, os automáticos,\n// os que o dono mesmo mandou e os que ele já respondeu. Devolve no máximo N por execução, os mais antigos primeiro.\nconst cfg = $('Configuração').first().json;\nconst eu = $('Quem sou eu').first()?.json ?? {};\nconst meuEmail = String(eu.mail || eu.userPrincipalName || '').trim().toLowerCase();\nconst meuDominio = meuEmail.includes('@') ? meuEmail.split('@')[1] : '';\nconst lista = $('Buscar e-mails novos').first()?.json?.value;\nconst emails = Array.isArray(lista) ? lista : [];\nconst vistos = new Set(\n  $('Já processados')\n    .all()\n    .map((i) => String(i.json.message_id ?? ''))\n    .filter(Boolean),\n);\nconst maximo = Math.min(Math.max(Number(cfg.max_por_execucao) || 5, 1), 10);\n\nconst normalizar = (s) =>\n  String(s ?? '')\n    .toLowerCase()\n    .normalize('NFD')\n    .replace(/[\\u0300-\\u036f]/g, '')\n    .replace(/\\s+/g, ' ')\n    .trim();\n\nconst AUTOMATICO = /^(no-?reply|nao-?responda|naoresponda|do-?not-?reply|mailer-daemon|postmaster|bounce|notifica|notification|alerta?s?|newsletter|news|marketing|info@|mkt)/;\nconst ASSUNTO_AUTOMATICO = /^(resposta automatica|automatic reply|auto-?reply|out of office|fora do escritorio|ausencia|aceito:|recusado:|provisorio:|accepted:|declined:|tentative:|convite:|invitation:|updated invitation|convite atualizado|cancelado:|canceled:|entrega nao realizada|undeliverable|mail delivery)/;\nconst FORTES = /\\b(pedidos?|trf|transferencias?|cotac(ao|oes)|orcamentos?|solicitac(ao|oes) de compras?|requisic(ao|oes)|ordens? de compra|ordens? de producao|faturamento|nota fiscal|notas fiscais|previsao de entrega|prazo de entrega|status do pedido|posicao do pedido|situacao do pedido)\\b/;\nconst SIGLAS = /\\b(op|oc|sc|nf|nfe|nf-e)\\s*(n[o°º]?\\.?\\s*)?:?\\s*\\d{3,}/;\nconst FRACOS = /\\b(prazo|entrega|previsao|status|posicao|situacao|atraso|atrasad[oa]s?|embarque|expedicao|separacao|estoque|disponibilidade|material|materiais|producao|faturad[oa]s?)\\b/;\nconst NUMERO = /\\b\\d{4,}\\b/;\n\n// Corta o histórico citado (respostas anteriores) e deixa só a mensagem nova.\nfunction mensagemNova(texto) {\n  const linhas = String(texto ?? '').replace(/\\r/g, '').split('\\n');\n  const corte = linhas.findIndex(\n    (l, i) =>\n      i > 0 &&\n      (/^\\s*(-{2,}\\s*(original message|mensagem original)|_{8,})/i.test(l) ||\n        /^\\s*(de|from):\\s.+/i.test(l) && linhas.slice(i + 1, i + 4).some((p) => /^\\s*(enviad[oa]|sent|para|to|data|date|assunto|subject):/i.test(p)) ||\n        /^\\s*(em|on)\\s.+(escreveu|wrote):\\s*$/i.test(l)),\n  );\n  const nova = (corte > 0 ? linhas.slice(0, corte) : linhas).join('\\n');\n  return nova.replace(/\\n{3,}/g, '\\n\\n').trim().slice(0, 4000);\n}\n\nconst endereco = (r) => String(r?.emailAddress?.address ?? '').trim().toLowerCase();\nconst nome = (r) => String(r?.emailAddress?.name ?? '').trim();\n\nconst candidatos = [];\nfor (const e of emails) {\n  const chave = String(e.internetMessageId || e.id || '');\n  if (!chave || vistos.has(chave)) continue;\n  if (/eventMessage/i.test(String(e['@odata.type'] ?? ''))) continue;\n\n  const remetente = endereco(e.from) || endereco(e.sender);\n  if (!remetente || (meuEmail && remetente === meuEmail)) continue;\n  if (AUTOMATICO.test(remetente)) continue;\n\n  const assunto = String(e.subject ?? '').trim();\n  const assuntoNorm = normalizar(assunto).replace(/^((re|res|fw|fwd|enc|rv|tr)\\s*:\\s*)+/, '');\n  if (ASSUNTO_AUTOMATICO.test(assuntoNorm)) continue;\n\n  const verbo = (e.singleValueExtendedProperties ?? []).find((p) => /0x1081/i.test(String(p.id)));\n  if (verbo && ['102', '103', '104'].includes(String(verbo.value))) continue; // já respondido ou encaminhado\n\n  const texto = mensagemNova(e.body?.content ?? e.bodyPreview ?? '');\n  const tudo = normalizar(`${assunto}\\n${texto}`);\n  const relevante = FORTES.test(tudo) || SIGLAS.test(tudo) || (FRACOS.test(tudo) && NUMERO.test(tudo));\n  if (!relevante) continue;\n\n  const para = (e.toRecipients ?? []).map(endereco);\n  const copia = (e.ccRecipients ?? []).map(endereco);\n  const dominio = remetente.split('@')[1] ?? '';\n  candidatos.push({\n    chave,\n    id: e.id,\n    assunto: assunto || '(sem assunto)',\n    remetente_nome: nome(e.from) || remetente,\n    remetente_email: remetente,\n    externo: meuDominio ? dominio !== meuDominio : true, // sem saber o domínio do dono, trata como externo (mais cuidado)\n    so_em_copia: Boolean(meuEmail) && !para.includes(meuEmail) && copia.includes(meuEmail),\n    recebido_em: e.receivedDateTime\n      ? DateTime.fromISO(e.receivedDateTime).setZone('America/Sao_Paulo').toFormat(\"dd/MM/yyyy 'às' HH:mm\")\n      : '',\n    recebido_iso: e.receivedDateTime ?? '',\n    texto: texto || '(e-mail sem texto)',\n  });\n}\n\ncandidatos.sort((a, b) => String(a.recebido_iso).localeCompare(String(b.recebido_iso)));\nreturn candidatos.slice(0, maximo).map((json) => ({ json }));\n"
+      }
+    },
+    {
+      "id": "82d4a48f-c215-4a20-a451-7355869eb2ed",
+      "name": "Registrar aviso",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1220,
+        112
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "kira_emails_auto"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "message_id": "={{ $json.chave }}",
+            "status": "avisado",
+            "motivo": "",
+            "graph_id": "={{ $json.id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "message_id",
+              "displayName": "message_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "motivo",
+              "displayName": "motivo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "graph_id",
+              "displayName": "graph_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "c5c1ea5a-0b21-493e-a66c-0fc61bcd895a",
+      "name": "Montar avisos",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        112
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Avisa no Telegram, numa mensagem só, os e-mails novos que parecem falar de pedidos, cada um com um número.\n// A IA não é chamada aqui: a resposta só é escrita quando o dono manda /rascunho N.\nconst esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nconst emails = $('Separar e-mails').all().map((i) => i.json);\nconst blocos = [];\nfor (const { json: r } of $input.all()) {\n  const e = emails.find((x) => x.chave === r.message_id);\n  if (!e || !r.id) continue;\n  const quem = e.remetente_nome && e.remetente_nome !== e.remetente_email ? `${e.remetente_nome} (${e.remetente_email})` : e.remetente_email;\n  const trecho = String(e.texto ?? '').replace(/\\s+/g, ' ').trim().slice(0, 160);\n  const marcas = [e.externo ? '🔒 de fora da empresa' : '', e.so_em_copia ? 'você está em cópia' : ''].filter(Boolean).join(' · ');\n  blocos.push(\n    [`<b>#${r.id}</b> · ${esc(quem)}`, `<b>${esc(e.assunto)}</b>`, trecho ? `<i>${esc(trecho)}${trecho.length === 160 ? '…' : ''}</i>` : '', marcas]\n      .filter(Boolean)\n      .join('\\n'),\n  );\n}\nif (!blocos.length) return [];\nconst primeiro = blocos[0].match(/#(\\d+)/)[1];\nconst titulo = blocos.length === 1 ? '📧 <b>Chegou 1 e-mail sobre pedidos</b>' : `📧 <b>Chegaram ${blocos.length} e-mails sobre pedidos</b>`;\nconst rodape = `Quer que eu prepare a resposta? Mande <code>/rascunho ${primeiro}</code> (o número do e-mail). Ela fica como rascunho no Outlook, para você revisar e enviar.`;\nreturn [{ json: { html: [titulo, ...blocos, rodape].join('\\n\\n') } }];\n"
+      }
+    },
+    {
+      "id": "073e16c1-1d59-45ee-afc2-d440fcfbc7d9",
+      "name": "Pedido de rascunho",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        560
+      ],
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "numero",
+              "type": "number"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "71df2304-ca25-4e8e-a3f9-8257f48f1308",
+      "name": "E-mail não abriu",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1660,
+        -60
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ena-html",
+              "name": "html",
+              "type": "string",
+              "value": "={{ '⚠️ Não consegui abrir o e-mail #' + $('Conferir aviso').first().json.numero + ' no Outlook (ele pode ter sido apagado ou movido de pasta).' }}"
+            }
+          ]
+        },
+        "options": {}
       }
     },
     {
@@ -332,7 +662,7 @@
       "parameters": {
         "mode": "runOnceForEachItem",
         "language": "javaScript",
-        "jsCode": "// Lê o JSON que a Kira devolveu para um e-mail e junta com os dados do e-mail.\nconst email = $('Separar e-mails').item.json;\nconst bruto = String($json.output ?? $json.text ?? '').trim();\n\nfunction extrairJson(texto) {\n  const semCerca = texto.replace(/^```(?:json)?\\s*/i, '').replace(/```\\s*$/, '').trim();\n  try {\n    return JSON.parse(semCerca);\n  } catch (erro) {\n    const inicio = semCerca.indexOf('{');\n    const fim = semCerca.lastIndexOf('}');\n    if (inicio >= 0 && fim > inicio) {\n      try {\n        return JSON.parse(semCerca.slice(inicio, fim + 1));\n      } catch (erro2) {\n        return null;\n      }\n    }\n    return null;\n  }\n}\n\nconst r = extrairJson(bruto) ?? {};\nconst resposta = String(r.resposta ?? '').trim();\nconst responder = r.responder === true || r.responder === 'true';\nconst confirmar = (resposta.match(/\\[confirmar\\]/gi) ?? []).length;\n\nreturn {\n  json: {\n    ...email,\n    responder: responder && resposta.length > 0,\n    motivo: String(r.motivo ?? (bruto ? 'resposta fora do formato' : 'sem resposta da IA')).slice(0, 200),\n    resumo: String(r.resumo ?? '').trim().slice(0, 300),\n    resposta,\n    confirmar,\n    consultou: r.consultou === true || r.consultou === 'true',\n  },\n};\n"
+        "jsCode": "// Lê o JSON que a Kira devolveu para um e-mail e junta com os dados do e-mail.\nconst email = $('Preparar e-mail').item.json;\nconst bruto = String($json.output ?? $json.text ?? '').trim();\n\nfunction extrairJson(texto) {\n  const semCerca = texto.replace(/^```(?:json)?\\s*/i, '').replace(/```\\s*$/, '').trim();\n  try {\n    return JSON.parse(semCerca);\n  } catch (erro) {\n    const inicio = semCerca.indexOf('{');\n    const fim = semCerca.lastIndexOf('}');\n    if (inicio >= 0 && fim > inicio) {\n      try {\n        return JSON.parse(semCerca.slice(inicio, fim + 1));\n      } catch (erro2) {\n        return null;\n      }\n    }\n    return null;\n  }\n}\n\nconst r = extrairJson(bruto) ?? {};\nconst resposta = String(r.resposta ?? '').trim();\nconst responder = r.responder === true || r.responder === 'true';\nconst confirmar = (resposta.match(/\\[confirmar\\]/gi) ?? []).length;\n\nreturn {\n  json: {\n    ...email,\n    responder: responder && resposta.length > 0,\n    motivo: String(r.motivo ?? (bruto ? 'resposta fora do formato' : 'sem resposta da IA')).slice(0, 200),\n    resumo: String(r.resumo ?? '').trim().slice(0, 300),\n    resposta,\n    confirmar,\n    consultou: r.consultou === true || r.consultou === 'true',\n  },\n};\n"
       }
     },
     {
@@ -459,31 +789,8 @@
       "parameters": {
         "mode": "runOnceForEachItem",
         "language": "javaScript",
-        "jsCode": "// Monta o aviso do Telegram (HTML seguro) para cada e-mail com rascunho criado ou que falhou.\nconst esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nconst e = $json;\nconst quem = e.remetente_nome && e.remetente_nome !== e.remetente_email ? `${e.remetente_nome} (${e.remetente_email})` : e.remetente_email;\n\nlet html;\nif (e.status === 'rascunho') {\n  const linhas = [\n    '📝 <b>Deixei uma resposta pronta no Outlook</b>',\n    `<b>De:</b> ${esc(quem)}`,\n    `<b>Assunto:</b> ${esc(e.assunto)}`,\n  ];\n  if (e.resumo) linhas.push(`<b>Resposta:</b> ${esc(e.resumo)}`);\n  if (e.confirmar > 0) linhas.push(`⚠️ ${e.confirmar} ${e.confirmar === 1 ? 'ponto marcado' : 'pontos marcados'} como [confirmar].`);\n  if (e.externo) linhas.push('🔒 Remetente de fora da empresa: confira os dados antes de enviar.');\n  if (e.aviso_assinatura) linhas.push(`🖊️ Assinatura: ${esc(e.aviso_assinatura)}.`);\n  linhas.push('Está em Rascunhos, na conversa do e-mail. Revise e envie você mesmo; eu não envio nada.');\n  if (/^https:\\/\\//.test(e.link)) linhas.push(`<a href=\"${esc(e.link)}\">Abrir o rascunho</a>`);\n  html = linhas.join('\\n');\n} else {\n  html = [\n    '⚠️ <b>Não consegui deixar a resposta pronta</b>',\n    `<b>De:</b> ${esc(quem)}`,\n    `<b>Assunto:</b> ${esc(e.assunto)}`,\n    'Se quiser, peça para mim no chat: \"Kira, prepare a resposta para esse e-mail\".',\n  ].join('\\n');\n}\nreturn { json: { html } };\n"
+        "jsCode": "// Monta o aviso do Telegram (HTML seguro) com o resultado do /rascunho N: rascunho criado, e-mail que não\n// precisa de resposta ou falha.\nconst esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nconst e = $json;\nconst numero = $('Conferir aviso').first().json.numero;\nconst quem = e.remetente_nome && e.remetente_nome !== e.remetente_email ? `${e.remetente_nome} (${e.remetente_email})` : e.remetente_email;\n\nlet html;\nif (e.status === 'rascunho') {\n  const linhas = [\n    `📝 <b>Deixei a resposta do e-mail #${numero} pronta no Outlook</b>`,\n    `<b>De:</b> ${esc(quem)}`,\n    `<b>Assunto:</b> ${esc(e.assunto)}`,\n  ];\n  if (e.resumo) linhas.push(`<b>Resposta:</b> ${esc(e.resumo)}`);\n  if (e.confirmar > 0) linhas.push(`⚠️ ${e.confirmar} ${e.confirmar === 1 ? 'ponto marcado' : 'pontos marcados'} como [confirmar].`);\n  if (e.externo) linhas.push('🔒 Remetente de fora da empresa: confira os dados antes de enviar.');\n  if (e.aviso_assinatura) linhas.push(`🖊️ Assinatura: ${esc(e.aviso_assinatura)}.`);\n  linhas.push('Está em Rascunhos, na conversa do e-mail. Revise e envie você mesmo; eu não envio nada.');\n  if (/^https:\\/\\//.test(e.link)) linhas.push(`<a href=\"${esc(e.link)}\">Abrir o rascunho</a>`);\n  html = linhas.join('\\n');\n} else if (!e.status) {\n  html = [\n    `🤔 <b>Não preparei resposta para o e-mail #${numero}</b>`,\n    `<b>Assunto:</b> ${esc(e.assunto)}`,\n    `<b>Motivo:</b> ${esc(e.motivo)}`,\n    'Se quiser mesmo assim, peça no chat: \"Kira, prepare a resposta para esse e-mail\".',\n  ].join('\\n');\n} else {\n  html = [\n    `⚠️ <b>Não consegui deixar a resposta do e-mail #${numero} pronta</b>`,\n    `<b>Assunto:</b> ${esc(e.assunto)}`,\n    `Tente de novo daqui a pouco com /rascunho ${numero}.`,\n  ].join('\\n');\n}\nreturn { json: { html } };\n"
       }
-    },
-    {
-      "id": "617bf516-e358-441e-accd-c852c659bbed",
-      "name": "Avisar no Telegram",
-      "type": "n8n-nodes-base.telegram",
-      "typeVersion": 1.2,
-      "position": [
-        2640,
-        200
-      ],
-      "parameters": {
-        "resource": "message",
-        "operation": "sendMessage",
-        "chatId": "={{ $('Configuração').first().json.chat_id }}",
-        "text": "={{ $json.html }}",
-        "additionalFields": {
-          "appendAttribution": false,
-          "parse_mode": "HTML",
-          "disable_web_page_preview": true
-        }
-      },
-      "credentials": {},
-      "onError": "continueRegularOutput"
     },
     {
       "id": "c08abadb-7136-4f56-a7d1-8aaf0df36f9b",
@@ -588,7 +895,7 @@
       "parameters": {
         "mode": "runOnceForEachItem",
         "language": "javaScript",
-        "jsCode": "// A Kira (IA) falhou para este e-mail. Se foi limite de uso ou instabilidade, não registra:\n// o e-mail volta na próxima execução. Outros erros ficam registrados para não repetir sem fim.\n// Este nó roda \"uma vez por item\": devolve um objeto ou null (null descarta o item), nunca uma lista.\nconst email = $('Separar e-mails').item.json;\nconst erro = String($json.error?.message ?? $json.error ?? $json.message ?? '').slice(0, 300);\nconst temporario = /429|quota|resource.?exhausted|rate.?limit|limite|503|502|500|overloaded|unavailable|timeout|timed out|ECONNRESET|socket hang up/i.test(erro);\nif (temporario) return null;\nreturn {\n  json: {\n    chave: email.chave,\n    assunto: email.assunto,\n    remetente_nome: email.remetente_nome,\n    remetente_email: email.remetente_email,\n    status: 'erro',\n    motivo: `falha da IA: ${erro || 'sem detalhe'}`.slice(0, 200),\n  },\n};\n"
+        "jsCode": "// A Kira (IA) falhou ao escrever a resposta pedida com /rascunho N. Registra e avisa o dono, que pode tentar de novo.\n// Este nó roda \"uma vez por item\": devolve um objeto, nunca uma lista.\nconst email = $('Preparar e-mail').item.json;\nconst erro = String($json.error?.message ?? $json.error ?? $json.message ?? '').slice(0, 300);\nreturn {\n  json: {\n    chave: email.chave,\n    assunto: email.assunto,\n    remetente_nome: email.remetente_nome,\n    remetente_email: email.remetente_email,\n    status: 'erro',\n    motivo: `falha da IA: ${erro || 'sem detalhe'}`.slice(0, 200),\n  },\n};\n"
       }
     },
     {
@@ -749,7 +1056,7 @@
         -60
       ],
       "parameters": {
-        "content": "## Rascunhos automáticos (Outlook)\nA cada 30 min, de segunda a sexta (7h às 19h30), a Kira lê os e-mails novos da Caixa de Entrada, separa os que perguntam de pedidos (pedido, TRF, cotação, compra, solicitação, produção, prazo, NF), consulta a base oficial de pedidos e deixa a resposta como **rascunho** no Outlook, com a sua assinatura (imagem e e-mail). **Nunca envia.** Depois avisa no Telegram.\n\n- Pula e-mails automáticos, os que você mesmo mandou e os que você já respondeu.\n- Cada e-mail é analisado uma vez só (tabela `kira_emails_auto`, guardada por 10 dias).\n- O que a base não tem fica marcado como **[confirmar]**.\n- Configuração: `nome_dono` (como a Kira chama você), `chat_id` (seu ID do Telegram) e `ativo_desde` (só e-mails depois dessa data).",
+        "content": "## Rascunhos de e-mail sob pedido (Outlook)\nA cada 30 min, de segunda a sexta (7h às 19h30), lê os e-mails novos da Caixa de Entrada, separa os que perguntam de pedidos (pedido, TRF, cotação, compra, solicitação, produção, prazo, NF) e **só avisa** no Telegram, numa mensagem, cada um com um número. **A IA não é chamada.**\n\nQuando você manda **/rascunho N** na Kira, o gatilho **Pedido de rascunho** abre o e-mail N, a Kira consulta a base oficial de pedidos e deixa a resposta como **rascunho** no Outlook, com a sua assinatura. **Nunca envia.**\n\n- Pula e-mails automáticos, os que você mesmo mandou e os que você já respondeu.\n- Cada e-mail é avisado uma vez só (tabela `kira_emails_auto`, guardada por 10 dias).\n- O que a base não tem fica marcado como **[confirmar]**.\n- Configuração: `nome_dono` (como a Kira chama você), `chat_id` (seu ID do Telegram) e `ativo_desde` (só e-mails depois dessa data).",
         "color": 4,
         "width": 700,
         "height": 300
@@ -784,7 +1091,94 @@
       "main": [
         [
           {
+            "node": "Pedido de rascunho?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pedido de rascunho?": {
+      "main": [
+        [
+          {
+            "node": "Buscar aviso",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
             "node": "Buscar e-mails novos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar aviso": {
+      "main": [
+        [
+          {
+            "node": "Conferir aviso",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Conferir aviso": {
+      "main": [
+        [
+          {
+            "node": "Aviso certo?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aviso certo?": {
+      "main": [
+        [
+          {
+            "node": "Buscar e-mail",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Avisar no Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar e-mail": {
+      "main": [
+        [
+          {
+            "node": "Preparar e-mail",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "E-mail não abriu",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar e-mail": {
+      "main": [
+        [
+          {
+            "node": "Kira prepara a resposta",
             "type": "main",
             "index": 0
           }
@@ -829,7 +1223,51 @@
       "main": [
         [
           {
-            "node": "Kira prepara a resposta",
+            "node": "Registrar aviso",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registrar aviso": {
+      "main": [
+        [
+          {
+            "node": "Montar avisos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar avisos": {
+      "main": [
+        [
+          {
+            "node": "Avisar no Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pedido de rascunho": {
+      "main": [
+        [
+          {
+            "node": "Configuração",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "E-mail não abriu": {
+      "main": [
+        [
+          {
+            "node": "Avisar no Telegram",
             "type": "main",
             "index": 0
           }
@@ -910,6 +1348,11 @@
         [
           {
             "node": "Registrar e-mail",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Montar aviso",
             "type": "main",
             "index": 0
           }
@@ -1010,6 +1453,15 @@
     "timezone": "America/Sao_Paulo"
   },
   "nodeGroups": [
+    {
+      "id": "ac489c03-46ee-4246-a871-6fa63856269b",
+      "name": "Rascunho pedido (/rascunho N)",
+      "nodeIds": [
+        "92ebb3cb-6817-4051-a96d-5ee0d135c2cc",
+        "58d6f881-5600-446d-aab3-6e45e16c42af"
+      ],
+      "description": "Acha o aviso N (pedido com /rascunho N na Kira) e confere se ele guarda o e-mail."
+    },
     {
       "id": "dba63847-2427-47c4-a47a-2e27cefe9831",
       "name": "Falha ao ler o Outlook",

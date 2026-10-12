@@ -23,7 +23,7 @@ A Kira é um **agente central** que roda no n8n e conversa pelo Telegram, por te
    📱 Telegram ──► n8n ──► Gemini ──► Kira ──► 📱 Telegram
    🎙️ voz ou 💬 texto                    🔊 voz ou 💬 texto
 
-   Em paralelo: ☀️ resumo das 7h · 📝 rascunhos automáticos de e-mails sobre pedidos
+   Em paralelo: ☀️ resumo das 7h · 📝 avisos de e-mails sobre pedidos (rascunho com /rascunho N)
                 · 📦 sincronização da base oficial de pedidos (seg a sáb, 4x ao dia)
                 · 🌙 fim do dia (seg a sex, 18h) · 🩺 saúde (avisos de falha e resumo de segunda)
                 · 💾 backup das tabelas no Google Drive (domingo, 3h)
@@ -93,9 +93,12 @@ Os nomes em **negrito** são os nós do workflow [`n8n/workflows/kira-1.0.json`]
 
 **Montar base** junta as linhas de todas as voltas e guarda os textos repetidos (cliente, material, situação…) num dicionário por coluna: numa planilha com centenas de milhares de linhas, a base fica com dezenas de milhares de itens e poucos MB.
 
-### Rascunhos automáticos (workflow separado)
+### Avisos e rascunhos de e-mails sobre pedidos (workflow separado)
 
-**Kira — rascunhos automáticos (Outlook)**, de segunda a sexta, das 7h às 19h30, a cada 30 minutos: **Configuração** → **Quem sou eu** (seu endereço, para reconhecer e-mails seus e remetentes de fora) → **Buscar e-mails novos** (Caixa de Entrada, só depois de `ativo_desde`, com a marca de "já respondido") → **Já processados** (`kira_emails_auto`) → **Separar e-mails** (pula os já vistos, automáticos, seus, já respondidos e os que não falam de pedidos; até 5 por vez) → **Kira prepara a resposta** (agente com **consultar_pedidos**, devolve JSON) → **Interpretar resposta** → **Tem resposta?** → **Criar rascunho** (sub-workflow do rascunho com assinatura, um e-mail por vez; devolve a chave do e-mail como `referencia`) → **Resultado do rascunho** → **Registrar e-mail** e **Montar aviso** → **Avisar no Telegram**. Falha da IA por limite de uso não é registrada (o e-mail volta na próxima rodada); outras falhas são registradas e avisadas. Se o Outlook falhar, **Falha já avisada hoje?** garante no máximo um aviso por dia.
+**Kira — rascunhos automáticos (Outlook)** tem dois gatilhos, que passam por **Configuração** → **Quem sou eu** (seu endereço, para reconhecer e-mails seus e remetentes de fora) → **Pedido de rascunho?**:
+
+- **A cada 30 min (seg a sex, 7h às 19h30)**, sem IA: **Buscar e-mails novos** (Caixa de Entrada, só depois de `ativo_desde`, com a marca de "já respondido") → **Já processados** (`kira_emails_auto`) → **Separar e-mails** (pula os já vistos, automáticos, seus, já respondidos e os que não falam de pedidos; até 5 por vez) → **Registrar aviso** (`kira_emails_auto`, status `avisado`, com o `graph_id` do e-mail; o `id` da linha é o número do aviso) → **Montar avisos** (uma mensagem só, cada e-mail com o número, quem mandou, o assunto e o começo do texto) → **Avisar no Telegram**. Se o Outlook falhar, **Falha já avisada hoje?** garante no máximo um aviso por dia.
+- **Pedido de rascunho** (chamado pelo comando `/rascunho N` da Kira, com o número): **Buscar aviso** → **Conferir aviso** → **Aviso certo?** → **Buscar e-mail** (o e-mail N no Outlook; se não abrir, **E-mail não abriu** avisa) → **Preparar e-mail** → **Kira prepara a resposta** (agente com **consultar_pedidos**, devolve JSON) → **Interpretar resposta** → **Tem resposta?** → **Criar rascunho** (sub-workflow do rascunho com assinatura; devolve a chave do e-mail como `referencia`) → **Resultado do rascunho** → **Registrar e-mail** e **Montar aviso** → **Avisar no Telegram**. Se a IA achar que o e-mail não pede resposta, ou falhar, o aviso diz o motivo e você pode pedir de novo.
 
 ### Fim do dia (workflow separado)
 
@@ -121,7 +124,7 @@ Os nomes em **negrito** são os nós do workflow [`n8n/workflows/kira-1.0.json`]
 | `kira_config` | `user_id`, `contexto` | O ambiente ativo de cada usuário |
 | `kira_tarefas` | `user_id`, `contexto`, `titulo`, `detalhes`, `prazo`, `status` (`aberta` ou `concluida`) | Tarefas por ambiente |
 | `kira_contatos` | `user_id`, `contexto`, `nome`, `empresa`, `telefone`, `email`, `notas` | Contatos por ambiente |
-| `kira_emails_auto` | `message_id`, `status` (`rascunho`, `ignorado` ou `erro`), `motivo` | E-mails já analisados pelos rascunhos automáticos (guardados por 10 dias) |
+| `kira_emails_auto` | `message_id`, `status` (`avisado`, `rascunho`, `ignorado` ou `erro`), `motivo`, `graph_id` | E-mails sobre pedidos já avisados (o `id` é o número do aviso, usado no `/rascunho N`) e os rascunhos pedidos; guardados por 10 dias |
 | `kira_linkedin` | `texto`, `status` (`pendente` ou `publicado`), `post_urn`, `erro`, `imagem_id` | Rascunhos de posts; o `id` é o número usado no `/publicar N` |
 | `kira_instagram` | `user_id`, `chat_id`, `imagem_id`, `video_id`, `legenda`, `status` (`pendente`, `publicando`, `publicado`, `erro` ou `cancelado`), `token_imagem`, `media_id`, `permalink`, `erro` | Rascunhos de posts do Instagram da loja; o `id` é o número usado no `/instagram N`. `token_imagem` é a chave do link temporário da imagem e fica vazia fora da publicação |
 | `kira_imagens` | `user_id`, `chat_id`, `file_id`, `descricao`, `legenda`, `formato`, `modelo` | Imagens geradas e fotos que você mandou (`modelo` = "foto do Telegram"); o `id` é o número da imagem (#N) e o arquivo fica no Telegram (`file_id`) |
@@ -171,7 +174,7 @@ Todas as tabelas também têm `id`, `createdAt` e `updatedAt`, criados pelo n8n.
 
 **Histórico quebrado se conserta sozinho.** A memória da conversa guarda também as chamadas de ferramenta e manda para o Gemini só as últimas 10 interações. Quando uma resposta usa duas ferramentas ao mesmo tempo, o corte pode passar a cair no meio de uma chamada, e o Gemini recusa o pedido ("function call turn…"). Como a mensagem que falha não entra no histórico, todas as seguintes falhariam do mesmo jeito. Na primeira falha desse tipo, a Kira reinicia o histórico com um resumo das últimas trocas (da tabela `kira_logs`, do mesmo chat e ambiente) e repete a pergunta, então você recebe a resposta sem perceber.
 
-**Rascunhos automáticos, nunca envio.** Um workflow agendado, separado da Kira, prepara respostas para e-mails sobre pedidos. Um filtro por palavras evita chamar a IA para e-mails que não interessam; a IA decide se responde, consulta a base de pedidos e escreve; o Outlook só recebe um rascunho (`createReply`, com a assinatura). O e-mail é tratado como texto de terceiros (a Kira ignora instruções dentro dele), remetentes de fora recebem só dados dos pedidos que citaram e, quando o pedido não está na base, a resposta não afirma que ele não existe.
+**Rascunho só quando você pede, nunca envio.** Um workflow agendado, separado da Kira, avisa os e-mails sobre pedidos sem chamar a IA (o filtro é por palavras); escrever cada resposta custava de 2 a 4 chamadas do Gemini, então ela só é escrita com o comando `/rascunho N`, que é um ramo fixo da Kira (não passa pela conversa nem pelo ambiente ativo). A IA decide se responde, consulta a base de pedidos e escreve; o Outlook só recebe um rascunho (`createReply`, com a assinatura). O e-mail é tratado como texto de terceiros (a Kira ignora instruções dentro dele), remetentes de fora recebem só dados dos pedidos que citaram e, quando o pedido não está na base, a resposta não afirma que ele não existe.
 
 **Internet pela Busca Google do próprio Gemini.** Em vez de outro serviço de busca (que pediria outra conta e outra chave), a ferramenta usa o *grounding* com a Busca Google do Gemini, com a mesma chave gratuita: o modelo pesquisa, lê os resultados e responde com as fontes. Fica num sub-workflow para a Kira receber só a resposta e as fontes, já limpas, e para trocar de modelo sem mexer na Kira. As perguntas vão para o Google; por isso as instruções proíbem colocar nelas dados internos da empresa ou dados pessoais.
 
@@ -205,7 +208,7 @@ Todas as tabelas também têm `id`, `createdAt` e `updatedAt`, criados pelo n8n.
 - O Google Drive é só leitura, e PDFs, Word e imagens do Drive ainda não são lidos.
 - O Gemini funciona no plano pago com pré-pagamento e teto mensal: se o saldo ou o teto acabar, a Kira para de usar o Gemini até o dono recarregar ou o mês virar. Imagens são a parte mais cara; a conversa, a mais frequente.
 - O ambiente ativo vale para você em todos os chats e só muda por mensagem ("modo <nome>").
-- Os rascunhos automáticos rodam de segunda a sexta, das 7h às 19h30, até 5 e-mails por rodada, e só usam a base de pedidos.
+- Os avisos de e-mails sobre pedidos rodam de segunda a sexta, das 7h às 19h30, até 5 e-mails por rodada; o rascunho só é escrito com `/rascunho N` e só usa a base de pedidos.
 - A base de pedidos é atualizada de segunda a sábado, às 9h, 12h, 15h e 18h: entre uma leitura e outra, a Kira responde com a versão anterior (e cita a hora dela).
 - O resumo das 7h é enviado por outro workflow: a Kira da conversa não "lembra" dele.
 - Documentos (PDF, Word) e figurinhas ainda não são entendidos. Os vídeos ficam guardados para virar Reels (até 20 MB, o limite do robô do Telegram), mas a Kira não vê o conteúdo deles. As fotos passam pelo leitor de imagens: a Kira responde com base na descrição dele, não olhando a foto ela mesma.

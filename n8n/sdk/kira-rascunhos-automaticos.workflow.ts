@@ -1,6 +1,7 @@
-// Kira — rascunhos automáticos: a cada 30 minutos (segunda a sexta, das 7h às 19h30) a Kira olha os
-// e-mails novos do Outlook, separa os que pedem informação de pedidos, consulta a base de pedidos
-// do ERP e deixa a resposta pronta como RASCUNHO no Outlook (nunca envia). Depois avisa no Telegram.
+// Kira — rascunhos de e-mail sob pedido: a cada 30 minutos (segunda a sexta, das 7h às 19h30) olha os e-mails
+// novos do Outlook, separa os que pedem informação de pedidos e SÓ AVISA no Telegram, cada um com um número, sem
+// chamar a IA. Quando o dono manda /rascunho N na Kira, o gatilho "Pedido de rascunho" abre o e-mail N, a Kira
+// consulta a base de pedidos do ERP e deixa a resposta pronta como RASCUNHO no Outlook (nunca envia).
 import { workflow, node, trigger, sticky, ifElse, languageModel, tool, fromAi, expr, newCredential } from '@n8n/workflow-sdk';
 
 const credOutlook = newCredential('Microsoft Outlook');
@@ -19,6 +20,18 @@ const aCada30 = trigger({
   output: [{ timestamp: '2026-09-28T09:30:00.000-03:00' }],
 });
 
+// Pedido do comando /rascunho N da Kira (o número do aviso do e-mail).
+const pedidoRascunho = trigger({
+  type: 'n8n-nodes-base.executeWorkflowTrigger',
+  version: 1.1,
+  config: {
+    name: 'Pedido de rascunho',
+    parameters: { inputSource: 'workflowInputs', workflowInputs: { values: [{ name: 'numero', type: 'number' }] } },
+    position: [0, 560],
+  },
+  output: [{ numero: 12 }],
+});
+
 const configuracao = node({
   type: 'n8n-nodes-base.set',
   version: 3.5,
@@ -35,12 +48,13 @@ const configuracao = node({
           { id: 'c-janela', name: 'horas_janela', value: 72, type: 'number' },
           { id: 'c-max', name: 'max_por_execucao', value: 5, type: 'number' },
           { id: 'c-dias', name: 'dias_guardar', value: 10, type: 'number' },
+          { id: 'c-numero', name: 'numero', value: expr('{{ Math.max(0, Math.floor(Number($json.numero) || 0)) }}'), type: 'number' },
         ],
       },
     },
     position: [220, 300],
   },
-  output: [{ nome_dono: 'Carlos', chat_id: '111111111', ativo_desde: '2026-09-27T21:00:00-03:00', horas_janela: 72, max_por_execucao: 5, dias_guardar: 10 }],
+  output: [{ nome_dono: 'Carlos', chat_id: '111111111', ativo_desde: '2026-09-27T21:00:00-03:00', horas_janela: 72, max_por_execucao: 5, dias_guardar: 10, numero: 0 }],
 });
 
 const quemSouEu = node({
@@ -155,6 +169,168 @@ const separarEmails = node({
   output: [{ chave: '<abc@cliente.com>', id: 'AAMkAD', assunto: 'Previsão do pedido 123456', remetente_nome: 'Ana', remetente_email: 'ana@cliente.com', externo: true, so_em_copia: false, recebido_em: '28/09/2026 às 09:00', recebido_iso: '2026-09-28T12:00:00Z', texto: 'Qual a previsão de entrega do pedido 123456?' }],
 });
 
+// /rascunho N ou execução de rotina? O número só existe quando o pedido vem da Kira.
+const pedidoDeRascunho = ifElse({
+  version: 2.3,
+  config: {
+    name: 'Pedido de rascunho?',
+    parameters: {
+      conditions: {
+        options: { caseSensitive: true, leftValue: '', typeValidation: 'strict', version: 2 },
+        conditions: [{ id: 'cond-pedido', leftValue: expr("{{ $('Configuração').first().json.numero > 0 }}"), rightValue: '', operator: { type: 'boolean', operation: 'true', singleValue: true } }],
+        combinator: 'and',
+      },
+      options: {},
+    },
+    position: [560, 160],
+  },
+});
+
+const buscarAviso = node({
+  type: 'n8n-nodes-base.dataTable',
+  version: 1.1,
+  config: {
+    name: 'Buscar aviso',
+    parameters: {
+      resource: 'row',
+      operation: 'get',
+      dataTableId: { __rl: true, mode: 'name', value: 'kira_emails_auto' },
+      matchType: 'allConditions',
+      filters: { conditions: [{ keyName: 'id', keyValue: expr("{{ $('Configuração').first().json.numero }}") }] },
+      limit: 1,
+    },
+    alwaysOutputData: true,
+    executeOnce: true,
+    onError: 'continueRegularOutput',
+    position: [780, -200],
+  },
+  output: [{ id: 12, message_id: '<abc@cliente.com>', status: 'avisado', motivo: '', graph_id: 'AAMkAD' }],
+});
+
+const conferirAviso = node({
+  type: 'n8n-nodes-base.code',
+  version: 2,
+  config: {
+    name: 'Conferir aviso',
+    parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: "// Confere o pedido do /rascunho N: o número precisa ser de um aviso de e-mail guardado (os avisos ficam 10 dias).\nconst numero = Number($('Configuração').first().json.numero) || 0;\nconst r = $input.first()?.json ?? {};\nif (!r.id) {\n  return [{ json: { ok: false, html: `⚠️ Não achei o e-mail #${numero}. Confira o número no aviso (os avisos ficam guardados por 10 dias).` } }];\n}\nif (!r.graph_id) {\n  return [{ json: { ok: false, html: `⚠️ O e-mail #${numero} é de um aviso antigo, que não guardava o e-mail. Peça no chat: \"Kira, prepare a resposta para o e-mail sobre ...\".` } }];\n}\nreturn [{ json: { ok: true, numero, graph_id: r.graph_id, chave: r.message_id } }];\n" },
+    position: [1000, -200],
+  },
+  output: [{ ok: true, numero: 12, graph_id: 'AAMkAD', chave: '<abc@cliente.com>' }],
+});
+
+const avisoCerto = ifElse({
+  version: 2.3,
+  config: {
+    name: 'Aviso certo?',
+    parameters: {
+      conditions: {
+        options: { caseSensitive: true, leftValue: '', typeValidation: 'strict', version: 2 },
+        conditions: [{ id: 'cond-aviso', leftValue: expr('{{ $json.ok }}'), rightValue: '', operator: { type: 'boolean', operation: 'true', singleValue: true } }],
+        combinator: 'and',
+      },
+      options: {},
+    },
+    position: [1220, -200],
+  },
+});
+
+const buscarEmail = node({
+  type: 'n8n-nodes-base.httpRequest',
+  version: 4.5,
+  config: {
+    name: 'Buscar e-mail',
+    parameters: {
+      method: 'GET',
+      url: expr("{{ 'https://graph.microsoft.com/v1.0/me/messages/' + encodeURIComponent($json.graph_id) }}"),
+      authentication: 'predefinedCredentialType',
+      nodeCredentialType: 'microsoftOutlookOAuth2Api',
+      sendQuery: true,
+      specifyQuery: 'keypair',
+      queryParameters: { parameters: [{ name: '$select', value: 'id,internetMessageId,subject,from,sender,toRecipients,ccRecipients,receivedDateTime,body' }] },
+      sendHeaders: true,
+      specifyHeaders: 'keypair',
+      headerParameters: { parameters: [{ name: 'Prefer', value: 'outlook.body-content-type="text"' }] },
+      options: { timeout: 30000 },
+    },
+    credentials: { microsoftOutlookOAuth2Api: credOutlook },
+    onError: 'continueErrorOutput',
+    position: [1440, -200],
+  },
+  output: [{ id: 'AAMkAD', internetMessageId: '<abc@cliente.com>', subject: 'Previsão do pedido 123456', from: { emailAddress: { name: 'Ana', address: 'ana@cliente.com' } }, toRecipients: [{ emailAddress: { address: 'dono@empresa.com.br' } }], ccRecipients: [], receivedDateTime: '2026-09-28T12:00:00Z', body: { content: 'Bom dia! Qual a previsão do pedido 123456?' } }],
+});
+
+const emailNaoAbriu = node({
+  type: 'n8n-nodes-base.set',
+  version: 3.4,
+  config: {
+    name: 'E-mail não abriu',
+    parameters: {
+      mode: 'manual',
+      includeOtherFields: false,
+      assignments: {
+        assignments: [
+          { id: 'ena-html', name: 'html', type: 'string', value: expr("{{ '⚠️ Não consegui abrir o e-mail #' + $('Conferir aviso').first().json.numero + ' no Outlook (ele pode ter sido apagado ou movido de pasta).' }}") },
+        ],
+      },
+      options: {},
+    },
+    position: [1660, -60],
+  },
+  output: [{ html: '⚠️ Não consegui abrir o e-mail #12 no Outlook.' }],
+});
+
+const prepararEmail = node({
+  type: 'n8n-nodes-base.code',
+  version: 2,
+  config: {
+    name: 'Preparar e-mail',
+    parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: "// Prepara o e-mail pedido com /rascunho N para a Kira escrever a resposta (os mesmos campos do \"Separar e-mails\").\nconst eu = $('Quem sou eu').first()?.json ?? {};\nconst meuEmail = String(eu.mail || eu.userPrincipalName || '').trim().toLowerCase();\nconst meuDominio = meuEmail.includes('@') ? meuEmail.split('@')[1] : '';\nconst aviso = $('Conferir aviso').first().json;\nconst e = $input.first().json;\n\n// Corta o histórico citado (respostas anteriores) e deixa só a mensagem nova.\nfunction mensagemNova(texto) {\n  const linhas = String(texto ?? '').replace(/\\r/g, '').split('\\n');\n  const corte = linhas.findIndex(\n    (l, i) =>\n      i > 0 &&\n      (/^\\s*(-{2,}\\s*(original message|mensagem original)|_{8,})/i.test(l) ||\n        /^\\s*(de|from):\\s.+/i.test(l) && linhas.slice(i + 1, i + 4).some((p) => /^\\s*(enviad[oa]|sent|para|to|data|date|assunto|subject):/i.test(p)) ||\n        /^\\s*(em|on)\\s.+(escreveu|wrote):\\s*$/i.test(l)),\n  );\n  const nova = (corte > 0 ? linhas.slice(0, corte) : linhas).join('\\n');\n  return nova.replace(/\\n{3,}/g, '\\n\\n').trim().slice(0, 4000);\n}\n\nconst endereco = (r) => String(r?.emailAddress?.address ?? '').trim().toLowerCase();\nconst nome = (r) => String(r?.emailAddress?.name ?? '').trim();\nconst remetente = endereco(e.from) || endereco(e.sender);\nconst para = (e.toRecipients ?? []).map(endereco);\nconst copia = (e.ccRecipients ?? []).map(endereco);\nconst dominio = remetente.split('@')[1] ?? '';\nconst texto = mensagemNova(e.body?.content ?? e.bodyPreview ?? '');\nreturn [\n  {\n    json: {\n      numero: aviso.numero,\n      chave: String(e.internetMessageId || aviso.chave || e.id || ''),\n      id: e.id,\n      assunto: String(e.subject ?? '').trim() || '(sem assunto)',\n      remetente_nome: nome(e.from) || remetente,\n      remetente_email: remetente,\n      externo: meuDominio ? dominio !== meuDominio : true, // sem saber o domínio do dono, trata como externo (mais cuidado)\n      so_em_copia: Boolean(meuEmail) && !para.includes(meuEmail) && copia.includes(meuEmail),\n      recebido_em: e.receivedDateTime\n        ? DateTime.fromISO(e.receivedDateTime).setZone('America/Sao_Paulo').toFormat(\"dd/MM/yyyy 'às' HH:mm\")\n        : '',\n      recebido_iso: e.receivedDateTime ?? '',\n      texto: texto || '(e-mail sem texto)',\n    },\n  },\n];\n" },
+    position: [1100, 40],
+  },
+  output: [{ numero: 12, chave: '<abc@cliente.com>', id: 'AAMkAD', assunto: 'Previsão do pedido 123456', remetente_nome: 'Ana', remetente_email: 'ana@cliente.com', externo: true, so_em_copia: false, recebido_em: '28/09/2026 às 09:00', recebido_iso: '2026-09-28T12:00:00Z', texto: 'Bom dia! Qual a previsão do pedido 123456?' }],
+});
+
+// Rotina de 30 em 30 minutos: registra cada e-mail como "avisado" (com o id do Outlook, para o /rascunho N) e
+// manda um aviso só no Telegram.
+const registrarAviso = node({
+  type: 'n8n-nodes-base.dataTable',
+  version: 1.1,
+  config: {
+    name: 'Registrar aviso',
+    parameters: {
+      resource: 'row',
+      operation: 'insert',
+      dataTableId: { __rl: true, mode: 'name', value: 'kira_emails_auto' },
+      columns: {
+        mappingMode: 'defineBelow',
+        value: { message_id: expr('{{ $json.chave }}'), status: 'avisado', motivo: '', graph_id: expr('{{ $json.id }}') },
+        matchingColumns: [],
+        schema: [
+          { id: 'message_id', displayName: 'message_id', required: false, defaultMatch: false, display: true, type: 'string', canBeUsedToMatch: true },
+          { id: 'status', displayName: 'status', required: false, defaultMatch: false, display: true, type: 'string', canBeUsedToMatch: true },
+          { id: 'motivo', displayName: 'motivo', required: false, defaultMatch: false, display: true, type: 'string', canBeUsedToMatch: true },
+          { id: 'graph_id', displayName: 'graph_id', required: false, defaultMatch: false, display: true, type: 'string', canBeUsedToMatch: true },
+        ],
+      },
+      options: {},
+    },
+    onError: 'continueRegularOutput',
+    position: [1220, 112],
+  },
+  output: [{ id: 12, message_id: '<abc@cliente.com>', status: 'avisado', motivo: '', graph_id: 'AAMkAD' }],
+});
+
+const montarAvisos = node({
+  type: 'n8n-nodes-base.code',
+  version: 2,
+  config: {
+    name: 'Montar avisos',
+    parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: "// Avisa no Telegram, numa mensagem só, os e-mails novos que parecem falar de pedidos, cada um com um número.\n// A IA não é chamada aqui: a resposta só é escrita quando o dono manda /rascunho N.\nconst esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nconst emails = $('Separar e-mails').all().map((i) => i.json);\nconst blocos = [];\nfor (const { json: r } of $input.all()) {\n  const e = emails.find((x) => x.chave === r.message_id);\n  if (!e || !r.id) continue;\n  const quem = e.remetente_nome && e.remetente_nome !== e.remetente_email ? `${e.remetente_nome} (${e.remetente_email})` : e.remetente_email;\n  const trecho = String(e.texto ?? '').replace(/\\s+/g, ' ').trim().slice(0, 160);\n  const marcas = [e.externo ? '🔒 de fora da empresa' : '', e.so_em_copia ? 'você está em cópia' : ''].filter(Boolean).join(' · ');\n  blocos.push(\n    [`<b>#${r.id}</b> · ${esc(quem)}`, `<b>${esc(e.assunto)}</b>`, trecho ? `<i>${esc(trecho)}${trecho.length === 160 ? '…' : ''}</i>` : '', marcas]\n      .filter(Boolean)\n      .join('\\n'),\n  );\n}\nif (!blocos.length) return [];\nconst primeiro = blocos[0].match(/#(\\d+)/)[1];\nconst titulo = blocos.length === 1 ? '📧 <b>Chegou 1 e-mail sobre pedidos</b>' : `📧 <b>Chegaram ${blocos.length} e-mails sobre pedidos</b>`;\nconst rodape = `Quer que eu prepare a resposta? Mande <code>/rascunho ${primeiro}</code> (o número do e-mail). Ela fica como rascunho no Outlook, para você revisar e enviar.`;\nreturn [{ json: { html: [titulo, ...blocos, rodape].join('\\n\\n') } }];\n" },
+    position: [1440, 112],
+  },
+  output: [{ html: '📧 <b>Chegou 1 e-mail sobre pedidos</b>' }],
+});
+
 const geminiPrincipal = languageModel({
   type: '@n8n/n8n-nodes-langchain.lmChatGoogleGemini',
   version: 1.1,
@@ -263,7 +439,7 @@ const interpretarResposta = node({
   version: 2,
   config: {
     name: 'Interpretar resposta',
-    parameters: { mode: 'runOnceForEachItem', language: 'javaScript', jsCode: "// Lê o JSON que a Kira devolveu para um e-mail e junta com os dados do e-mail.\nconst email = $('Separar e-mails').item.json;\nconst bruto = String($json.output ?? $json.text ?? '').trim();\n\nfunction extrairJson(texto) {\n  const semCerca = texto.replace(/^```(?:json)?\\s*/i, '').replace(/```\\s*$/, '').trim();\n  try {\n    return JSON.parse(semCerca);\n  } catch (erro) {\n    const inicio = semCerca.indexOf('{');\n    const fim = semCerca.lastIndexOf('}');\n    if (inicio >= 0 && fim > inicio) {\n      try {\n        return JSON.parse(semCerca.slice(inicio, fim + 1));\n      } catch (erro2) {\n        return null;\n      }\n    }\n    return null;\n  }\n}\n\nconst r = extrairJson(bruto) ?? {};\nconst resposta = String(r.resposta ?? '').trim();\nconst responder = r.responder === true || r.responder === 'true';\nconst confirmar = (resposta.match(/\\[confirmar\\]/gi) ?? []).length;\n\nreturn {\n  json: {\n    ...email,\n    responder: responder && resposta.length > 0,\n    motivo: String(r.motivo ?? (bruto ? 'resposta fora do formato' : 'sem resposta da IA')).slice(0, 200),\n    resumo: String(r.resumo ?? '').trim().slice(0, 300),\n    resposta,\n    confirmar,\n    consultou: r.consultou === true || r.consultou === 'true',\n  },\n};\n" },
+    parameters: { mode: 'runOnceForEachItem', language: 'javaScript', jsCode: "// Lê o JSON que a Kira devolveu para um e-mail e junta com os dados do e-mail.\nconst email = $('Preparar e-mail').item.json;\nconst bruto = String($json.output ?? $json.text ?? '').trim();\n\nfunction extrairJson(texto) {\n  const semCerca = texto.replace(/^```(?:json)?\\s*/i, '').replace(/```\\s*$/, '').trim();\n  try {\n    return JSON.parse(semCerca);\n  } catch (erro) {\n    const inicio = semCerca.indexOf('{');\n    const fim = semCerca.lastIndexOf('}');\n    if (inicio >= 0 && fim > inicio) {\n      try {\n        return JSON.parse(semCerca.slice(inicio, fim + 1));\n      } catch (erro2) {\n        return null;\n      }\n    }\n    return null;\n  }\n}\n\nconst r = extrairJson(bruto) ?? {};\nconst resposta = String(r.resposta ?? '').trim();\nconst responder = r.responder === true || r.responder === 'true';\nconst confirmar = (resposta.match(/\\[confirmar\\]/gi) ?? []).length;\n\nreturn {\n  json: {\n    ...email,\n    responder: responder && resposta.length > 0,\n    motivo: String(r.motivo ?? (bruto ? 'resposta fora do formato' : 'sem resposta da IA')).slice(0, 200),\n    resumo: String(r.resumo ?? '').trim().slice(0, 300),\n    resposta,\n    confirmar,\n    consultou: r.consultou === true || r.consultou === 'true',\n  },\n};\n" },
     position: [1540, 300],
   },
   output: [{ chave: '<abc@cliente.com>', id: 'AAMkAD', assunto: 'Previsão do pedido 123456', remetente_nome: 'Ana', remetente_email: 'ana@cliente.com', externo: true, responder: true, motivo: 'pergunta de prazo', resumo: 'Pedido 123456 com previsão para 10/10', resposta: 'Olá, Ana!', confirmar: 0, consultou: true }],
@@ -336,7 +512,7 @@ const tratarFalha = node({
   version: 2,
   config: {
     name: 'Tratar falha da IA',
-    parameters: { mode: 'runOnceForEachItem', language: 'javaScript', jsCode: "// A Kira (IA) falhou para este e-mail. Se foi limite de uso ou instabilidade, não registra:\n// o e-mail volta na próxima execução. Outros erros ficam registrados para não repetir sem fim.\n// Este nó roda \"uma vez por item\": devolve um objeto ou null (null descarta o item), nunca uma lista.\nconst email = $('Separar e-mails').item.json;\nconst erro = String($json.error?.message ?? $json.error ?? $json.message ?? '').slice(0, 300);\nconst temporario = /429|quota|resource.?exhausted|rate.?limit|limite|503|502|500|overloaded|unavailable|timeout|timed out|ECONNRESET|socket hang up/i.test(erro);\nif (temporario) return null;\nreturn {\n  json: {\n    chave: email.chave,\n    assunto: email.assunto,\n    remetente_nome: email.remetente_nome,\n    remetente_email: email.remetente_email,\n    status: 'erro',\n    motivo: `falha da IA: ${erro || 'sem detalhe'}`.slice(0, 200),\n  },\n};\n" },
+    parameters: { mode: 'runOnceForEachItem', language: 'javaScript', jsCode: "// A Kira (IA) falhou ao escrever a resposta pedida com /rascunho N. Registra e avisa o dono, que pode tentar de novo.\n// Este nó roda \"uma vez por item\": devolve um objeto, nunca uma lista.\nconst email = $('Preparar e-mail').item.json;\nconst erro = String($json.error?.message ?? $json.error ?? $json.message ?? '').slice(0, 300);\nreturn {\n  json: {\n    chave: email.chave,\n    assunto: email.assunto,\n    remetente_nome: email.remetente_nome,\n    remetente_email: email.remetente_email,\n    status: 'erro',\n    motivo: `falha da IA: ${erro || 'sem detalhe'}`.slice(0, 200),\n  },\n};\n" },
     position: [1540, 520],
   },
   output: [{ chave: '<abc@cliente.com>', assunto: 'Previsão do pedido 123456', remetente_nome: 'Ana', remetente_email: 'ana@cliente.com', status: 'erro', motivo: 'falha da IA: bloqueado' }],
@@ -378,10 +554,10 @@ const montarAviso = node({
   version: 2,
   config: {
     name: 'Montar aviso',
-    parameters: { mode: 'runOnceForEachItem', language: 'javaScript', jsCode: "// Monta o aviso do Telegram (HTML seguro) para cada e-mail com rascunho criado ou que falhou.\nconst esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nconst e = $json;\nconst quem = e.remetente_nome && e.remetente_nome !== e.remetente_email ? `${e.remetente_nome} (${e.remetente_email})` : e.remetente_email;\n\nlet html;\nif (e.status === 'rascunho') {\n  const linhas = [\n    '📝 <b>Deixei uma resposta pronta no Outlook</b>',\n    `<b>De:</b> ${esc(quem)}`,\n    `<b>Assunto:</b> ${esc(e.assunto)}`,\n  ];\n  if (e.resumo) linhas.push(`<b>Resposta:</b> ${esc(e.resumo)}`);\n  if (e.confirmar > 0) linhas.push(`⚠️ ${e.confirmar} ${e.confirmar === 1 ? 'ponto marcado' : 'pontos marcados'} como [confirmar].`);\n  if (e.externo) linhas.push('🔒 Remetente de fora da empresa: confira os dados antes de enviar.');\n  if (e.aviso_assinatura) linhas.push(`🖊️ Assinatura: ${esc(e.aviso_assinatura)}.`);\n  linhas.push('Está em Rascunhos, na conversa do e-mail. Revise e envie você mesmo; eu não envio nada.');\n  if (/^https:\\/\\//.test(e.link)) linhas.push(`<a href=\"${esc(e.link)}\">Abrir o rascunho</a>`);\n  html = linhas.join('\\n');\n} else {\n  html = [\n    '⚠️ <b>Não consegui deixar a resposta pronta</b>',\n    `<b>De:</b> ${esc(quem)}`,\n    `<b>Assunto:</b> ${esc(e.assunto)}`,\n    'Se quiser, peça para mim no chat: \"Kira, prepare a resposta para esse e-mail\".',\n  ].join('\\n');\n}\nreturn { json: { html } };\n" },
+    parameters: { mode: 'runOnceForEachItem', language: 'javaScript', jsCode: "// Monta o aviso do Telegram (HTML seguro) com o resultado do /rascunho N: rascunho criado, e-mail que não\n// precisa de resposta ou falha.\nconst esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nconst e = $json;\nconst numero = $('Conferir aviso').first().json.numero;\nconst quem = e.remetente_nome && e.remetente_nome !== e.remetente_email ? `${e.remetente_nome} (${e.remetente_email})` : e.remetente_email;\n\nlet html;\nif (e.status === 'rascunho') {\n  const linhas = [\n    `📝 <b>Deixei a resposta do e-mail #${numero} pronta no Outlook</b>`,\n    `<b>De:</b> ${esc(quem)}`,\n    `<b>Assunto:</b> ${esc(e.assunto)}`,\n  ];\n  if (e.resumo) linhas.push(`<b>Resposta:</b> ${esc(e.resumo)}`);\n  if (e.confirmar > 0) linhas.push(`⚠️ ${e.confirmar} ${e.confirmar === 1 ? 'ponto marcado' : 'pontos marcados'} como [confirmar].`);\n  if (e.externo) linhas.push('🔒 Remetente de fora da empresa: confira os dados antes de enviar.');\n  if (e.aviso_assinatura) linhas.push(`🖊️ Assinatura: ${esc(e.aviso_assinatura)}.`);\n  linhas.push('Está em Rascunhos, na conversa do e-mail. Revise e envie você mesmo; eu não envio nada.');\n  if (/^https:\\/\\//.test(e.link)) linhas.push(`<a href=\"${esc(e.link)}\">Abrir o rascunho</a>`);\n  html = linhas.join('\\n');\n} else if (!e.status) {\n  html = [\n    `🤔 <b>Não preparei resposta para o e-mail #${numero}</b>`,\n    `<b>Assunto:</b> ${esc(e.assunto)}`,\n    `<b>Motivo:</b> ${esc(e.motivo)}`,\n    'Se quiser mesmo assim, peça no chat: \"Kira, prepare a resposta para esse e-mail\".',\n  ].join('\\n');\n} else {\n  html = [\n    `⚠️ <b>Não consegui deixar a resposta do e-mail #${numero} pronta</b>`,\n    `<b>Assunto:</b> ${esc(e.assunto)}`,\n    `Tente de novo daqui a pouco com /rascunho ${numero}.`,\n  ].join('\\n');\n}\nreturn { json: { html } };\n" },
     position: [2420, 200],
   },
-  output: [{ html: '📝 <b>Deixei uma resposta pronta no Outlook</b>' }],
+  output: [{ html: '📝 <b>Deixei a resposta do e-mail #12 pronta no Outlook</b>' }],
 });
 
 const avisarTelegram = node({
@@ -491,10 +667,11 @@ const avisarFalhaTelegram = node({
 });
 
 const nota = sticky(
-  '## Rascunhos automáticos (Outlook)\n' +
-    'A cada 30 min, de segunda a sexta (7h às 19h30), a Kira lê os e-mails novos da Caixa de Entrada, separa os que perguntam de pedidos (pedido, TRF, cotação, compra, solicitação, produção, prazo, NF), consulta a base oficial de pedidos e deixa a resposta como **rascunho** no Outlook, com a sua assinatura (imagem e e-mail). **Nunca envia.** Depois avisa no Telegram.\n\n' +
+  '## Rascunhos de e-mail sob pedido (Outlook)\n' +
+    'A cada 30 min, de segunda a sexta (7h às 19h30), lê os e-mails novos da Caixa de Entrada, separa os que perguntam de pedidos (pedido, TRF, cotação, compra, solicitação, produção, prazo, NF) e **só avisa** no Telegram, numa mensagem, cada um com um número. **A IA não é chamada.**\n\n' +
+    'Quando você manda **/rascunho N** na Kira, o gatilho **Pedido de rascunho** abre o e-mail N, a Kira consulta a base oficial de pedidos e deixa a resposta como **rascunho** no Outlook, com a sua assinatura. **Nunca envia.**\n\n' +
     '- Pula e-mails automáticos, os que você mesmo mandou e os que você já respondeu.\n' +
-    '- Cada e-mail é analisado uma vez só (tabela `kira_emails_auto`, guardada por 10 dias).\n' +
+    '- Cada e-mail é avisado uma vez só (tabela `kira_emails_auto`, guardada por 10 dias).\n' +
     '- O que a base não tem fica marcado como **[confirmar]**.\n' +
     '- Configuração: `nome_dono` (como a Kira chama você), `chat_id` (seu ID do Telegram) e `ativo_desde` (só e-mails depois dessa data).',
   { color: 4, position: [-40, -60], width: 700, height: 300, name: 'Sobre este workflow' },
@@ -504,9 +681,15 @@ export default workflow('kira-rascunhos-automaticos', 'Kira — rascunhos autom�
   .add(aCada30)
   .to(configuracao)
   .to(quemSouEu)
-  .to(buscarEmails)
-  .to(jaProcessados)
-  .to(separarEmails)
+  .to(
+    pedidoDeRascunho
+      .onTrue(buscarAviso.to(conferirAviso.to(avisoCerto.onTrue(buscarEmail.to(prepararEmail)).onFalse(avisarTelegram))))
+      .onFalse(buscarEmails.to(jaProcessados.to(separarEmails.to(registrarAviso.to(montarAvisos.to(avisarTelegram)))))),
+  )
+  .add(pedidoRascunho)
+  .to(configuracao)
+  .add(buscarEmail.onError(emailNaoAbriu.to(avisarTelegram)))
+  .add(prepararEmail)
   .to(kiraResponde)
   .to(interpretarResposta)
   .to(
@@ -514,6 +697,7 @@ export default workflow('kira-rascunhos-automaticos', 'Kira — rascunhos autom�
       .onTrue(criarRascunho.to(resultadoRascunho.to(montarAviso.to(avisarTelegram))))
       .onFalse(registrarEmail),
   )
+  .add(temResposta.onFalse(montarAviso))
   .add(resultadoRascunho)
   .to(registrarEmail)
   .add(jaProcessados)
@@ -527,6 +711,9 @@ export default workflow('kira-rascunhos-automaticos', 'Kira — rascunhos autom�
   .add(falhaJaAvisada)
   .to(avisarFalha.onTrue(registrarFalha.to(avisarFalhaTelegram)))
   .add(nota)
+  .group('Rascunho pedido (/rascunho N)', [buscarAviso, conferirAviso], {
+    description: 'Acha o aviso N (pedido com /rascunho N na Kira) e confere se ele guarda o e-mail.',
+  })
   .group('Falha ao ler o Outlook', [falhaJaAvisada, avisarFalha, registrarFalha, avisarFalhaTelegram], {
     description: 'Se o Outlook falhar, avisa no Telegram no máximo uma vez por dia.',
   });

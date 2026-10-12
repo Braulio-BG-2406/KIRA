@@ -300,13 +300,50 @@ teste('/instagram: mostra o resultado do sub-workflow do Instagram (publicado, f
   assert.match(instagram('/instagram 5', { error: { message: 'timeout' } }), /Não consegui falar com o Instagram agora\. Erro: timeout/);
   assert.match(instagram('/instagram'), /Me diga qual rascunho publicar, por exemplo: \/instagram 3/);
 });
+// ---------- /rascunho N: resposta de e-mail só quando o dono pede ----------
+function rascunhoCmd(texto, pediu) {
+  const fixos = {
+    'Normalizar entrada': { ...entradaNormalizada, tipo_entrada: 'comando', comando: '/rascunho', texto },
+    'Configuração da Kira': config,
+    'Ambientes da Kira': ambientesDaKira,
+    'Ambiente atual': ambienteAtivo,
+  };
+  const $ = (nome) => {
+    if (nome in fixos) return { isExecuted: true, first: () => ({ json: fixos[nome] }), all: () => [{ json: fixos[nome] }] };
+    if (nome === 'Pedir rascunho do e-mail') return { isExecuted: pediu, first: () => ({ json: {} }), all: () => [] };
+    throw new Error(`nó não executado: ${nome}`);
+  };
+  const $input = { first: () => ({ json: {} }), all: () => [] };
+  return new Function('$', '$input', 'DateTime', codigoDo('Resposta do comando'))($, $input, DateTime)[0].json.texto_resposta;
+}
+teste('/rascunho N: é comando, pede o rascunho sem esperar e sem passar pela IA da conversa', () => {
+  const normal = Object.fromEntries(nos['Normalizar entrada'].parameters.assignments.assignments.map((a) => [a.name, a.value]));
+  const tipo = (text) => new Function('$json', `return (${normal.tipo_entrada.slice(3, -2)})`)({ message: { text } });
+  assert.equal(tipo('/rascunho 12'), 'comando');
+  assert.match(rascunhoCmd('/rascunho 12', true), /^⏳ Preparando a resposta do e-mail #12\./);
+  assert.match(rascunhoCmd('/rascunho', false), /por exemplo: \/rascunho 12/);
+  const pedir = nos['Pedir rascunho do e-mail'];
+  assert.equal(pedir.type, 'n8n-nodes-base.executeWorkflow');
+  assert.equal(pedir.parameters.options.waitForSubWorkflow, false);
+  assert.equal(pedir.parameters.workflowId.value, '');
+  const numero = (texto) => new Function('$', `return (${pedir.parameters.workflowInputs.value.numero.slice(3, -2)})`)(() => ({ first: () => ({ json: { texto } }) }));
+  assert.equal(numero('/rascunho 12'), 12);
+  assert.equal(numero('/rascunho #7 por favor'), 7);
+  const condicao = nos['É /rascunho?'].parameters.conditions.conditions[0].leftValue;
+  const ehRascunho = (comando, texto) => new Function('$', `return (${condicao.slice(3, -2)})`)(() => ({ first: () => ({ json: { comando, texto } }) }));
+  assert.equal(ehRascunho('/rascunho', '/rascunho 3'), true);
+  assert.equal(ehRascunho('/rascunho', '/rascunho'), false, 'sem número, só explica o uso');
+  assert.equal(ehRascunho('/instagram', '/instagram 3'), false);
+  assert.match(JSON.stringify(nos['Resposta do comando'].parameters), /\/rascunho N/);
+});
 teste('/instagram: é comando, chama o sub-workflow como "comando" e o ambiente vem do workflow', () => {
   const normal = Object.fromEntries(nos['Normalizar entrada'].parameters.assignments.assignments.map((a) => [a.name, a.value]));
   const tipo = (text) => new Function('$json', `return (${normal.tipo_entrada.slice(3, -2)})`)({ message: { text } });
   assert.equal(tipo('/instagram 4'), 'comando');
   const ligacoes = (nome) => (workflow.connections[nome]?.main ?? []).map((saida) => (saida ?? []).map((l) => l.node));
   assert.deepEqual(ligacoes('É /publicar?')[1], ['É /instagram?']);
-  assert.deepEqual(ligacoes('É /instagram?'), [['Publicar no Instagram'], ['É /limpar?']]);
+  assert.deepEqual(ligacoes('É /instagram?'), [['Publicar no Instagram'], ['É /rascunho?']]);
+  assert.deepEqual(ligacoes('É /rascunho?'), [['Pedir rascunho do e-mail'], ['É /limpar?']]);
   assert.deepEqual(ligacoes('Publicar no Instagram'), [['Buscar memórias (comandos)']]);
   const valores = nos['Publicar no Instagram'].parameters.workflowInputs.value;
   assert.equal(valores.acao, 'publicar');
@@ -1327,14 +1364,15 @@ const noRA = (nome) => {
 };
 // Executa um nó Code com $json e $('Nó').item (modo "uma vez por item") ou first/all.
 // No modo "uma vez por item", o n8n aceita um objeto ou null (descarta o item), nunca uma lista.
-function executarRA(nome, { nosAnteriores = {}, json = {} } = {}) {
+function executarRA(nome, { nosAnteriores = {}, json = {}, entrada = [] } = {}) {
   const $ = (no) => {
     const valor = nosAnteriores[no];
     const lista = [].concat(valor ?? []).map((j) => ({ json: j }));
     return { first: () => lista[0], all: () => lista, item: lista[0] };
   };
   const no = noRA(nome);
-  const resultado = new Function('$', '$json', '$input', 'DateTime', no.parameters.jsCode)($, json, { all: () => [] }, luxon.DateTime);
+  const $input = { first: () => (entrada.length ? { json: entrada[0] } : undefined), all: () => entrada.map((j) => ({ json: j })) };
+  const resultado = new Function('$', '$json', '$input', 'DateTime', no.parameters.jsCode)($, json, $input, luxon.DateTime);
   if (no.parameters.mode === 'runOnceForEachItem' && Array.isArray(resultado)) {
     throw new Error(`${nome}: no modo "uma vez por item" o n8n recusa lista ("A 'json' property isn't an object")`);
   }
@@ -1389,7 +1427,7 @@ teste('rascunhos: corta o histórico citado, marca "só em cópia" e sem saber o
 });
 teste('rascunhos: a resposta da Kira vira rascunho só quando vem no formato combinado', () => {
   const email = { chave: '<a1@teste>', id: 'a1', assunto: 'Pedido 1' };
-  const interpretar = (output) => executarRA('Interpretar resposta', { nosAnteriores: { 'Separar e-mails': email }, json: { output } }).json;
+  const interpretar = (output) => executarRA('Interpretar resposta', { nosAnteriores: { 'Preparar e-mail': email }, json: { output } }).json;
   let r = interpretar('```json\n{"responder": true, "resumo": "Previsão [confirmar]", "resposta": "Olá!\\nVerificando [confirmar].\\nCarlos", "consultou": true}\n```');
   assert.equal(r.responder, true);
   assert.equal(r.confirmar, 1);
@@ -1399,7 +1437,7 @@ teste('rascunhos: a resposta da Kira vira rascunho só quando vem no formato com
   assert.equal(interpretar('{"responder": true, "resposta": ""}').responder, false);
 });
 teste('rascunhos: aviso no Telegram em HTML seguro, com alerta para remetente externo', () => {
-  const aviso = (json) => executarRA('Montar aviso', { json }).json.html;
+  const aviso = (json) => executarRA('Montar aviso', { nosAnteriores: { 'Conferir aviso': { numero: 12 } }, json }).json.html;
   const html = aviso({ status: 'rascunho', remetente_nome: 'Ana <Cliente>', remetente_email: 'a@c.com', assunto: 'Pedido 1 & 2', resumo: 'Prazo', confirmar: 2, externo: true, link: 'https://outlook.office365.com/owa/?ItemID=X&a=1' });
   assert.equal(htmlValidoParaTelegram(html), true);
   assert.match(html, /2 pontos marcados como \[confirmar\]/);
@@ -1407,6 +1445,12 @@ teste('rascunhos: aviso no Telegram em HTML seguro, com alerta para remetente ex
   assert.match(html, /eu não envio nada/);
   assert.doesNotMatch(aviso({ status: 'rascunho', remetente_email: 'a@c.com', assunto: 'x', confirmar: 0, link: 'javascript:alert(1)' }), /href/);
   assert.equal(htmlValidoParaTelegram(aviso({ status: 'erro', remetente_nome: 'Ana', remetente_email: 'a@c.com', assunto: 'x' })), true);
+  assert.match(aviso({ status: 'erro', remetente_email: 'a@c.com', assunto: 'x' }), /Tente de novo daqui a pouco com \/rascunho 12/);
+  // a IA achou que o e-mail não pede resposta: explica o motivo
+  const ignorado = aviso({ remetente_email: 'a@c.com', assunto: 'Newsletter', motivo: 'só informativo <sem pergunta>' });
+  assert.equal(htmlValidoParaTelegram(ignorado), true);
+  assert.match(ignorado, /Não preparei resposta para o e-mail #12/);
+  assert.match(html, /resposta do e-mail #12 pronta/);
   const comAviso = aviso({ status: 'rascunho', remetente_email: 'a@c.com', assunto: 'x', confirmar: 0, link: '', aviso_assinatura: 'não achei a imagem <da> assinatura' });
   assert.equal(htmlValidoParaTelegram(comAviso), true);
   assert.match(comAviso, /🖊️ Assinatura: não achei a imagem &lt;da&gt; assinatura\./);
@@ -1426,13 +1470,59 @@ teste('rascunhos: o resultado acha o e-mail pela referência devolvida pelo sub-
   r = resultado({ error: { message: 'Workflow is not active' } });
   assert.deepEqual([r.chave, r.status], ['<a@t>', 'erro'], 'sem referência, usa o item pareado');
 });
-teste('rascunhos: limite de uso da IA não registra (tenta de novo); outros erros registram', () => {
-  const falha = (json) => executarRA('Tratar falha da IA', { nosAnteriores: { 'Separar e-mails': { chave: '<a@t>', assunto: 'x' } }, json });
-  assert.equal(falha({ error: { message: '[429] RESOURCE_EXHAUSTED' } }), null);
-  assert.equal(falha({ error: 'Service unavailable - try again later' }), null);
-  assert.equal(falha({ error: { message: 'bloqueado pelo filtro' } }).json.status, 'erro');
+teste('rascunhos: falha da IA no /rascunho N vira aviso (o dono pede de novo), nunca lista', () => {
+  const falha = (json) => executarRA('Tratar falha da IA', { nosAnteriores: { 'Preparar e-mail': { chave: '<a@t>', assunto: 'x' } }, json });
+  assert.equal(falha({ error: { message: '[429] RESOURCE_EXHAUSTED' } }).json.status, 'erro');
+  assert.match(falha({ error: { message: 'bloqueado pelo filtro' } }).json.motivo, /falha da IA: bloqueado/);
+  const ligacoes = (nome) => (rascunhosAuto.connections[nome]?.main ?? []).map((s) => (s ?? []).map((l) => l.node));
+  assert.deepEqual(ligacoes('Tratar falha da IA'), [['Registrar e-mail', 'Montar aviso']]);
+});
+teste('rascunhos: a rotina só avisa (sem IA), numa mensagem, cada e-mail com número para o /rascunho N', () => {
+  const ligacoes = (nome) => (rascunhosAuto.connections[nome]?.main ?? []).map((s) => (s ?? []).map((l) => l.node));
+  assert.deepEqual(ligacoes('Separar e-mails'), [['Registrar aviso']]);
+  assert.deepEqual(ligacoes('Registrar aviso'), [['Montar avisos']]);
+  assert.deepEqual(ligacoes('Montar avisos'), [['Avisar no Telegram']]);
+  assert.deepEqual(ligacoes('Quem sou eu'), [['Pedido de rascunho?']]);
+  assert.deepEqual(ligacoes('Pedido de rascunho?'), [['Buscar aviso'], ['Buscar e-mails novos']]);
+  assert.deepEqual(ligacoes('Pedido de rascunho'), [['Configuração']]);
+  // a IA só recebe o e-mail pedido com /rascunho N
+  const quemChamaAIA = Object.entries(rascunhosAuto.connections).filter(([, c]) => (c.main ?? []).flat().some((l) => l?.node === 'Kira prepara a resposta')).map(([n]) => n);
+  assert.deepEqual(quemChamaAIA, ['Preparar e-mail']);
+  const registrar = noRA('Registrar aviso').parameters.columns.value;
+  assert.equal(registrar.status, 'avisado');
+  assert.match(registrar.graph_id, /\$json\.id/);
+  const emails = [
+    { chave: '<a@t>', assunto: 'Pedido 123 & prazo', remetente_nome: 'Ana <Cliente>', remetente_email: 'a@c.com', externo: true, so_em_copia: false, texto: 'Qual a previsão do pedido 123?' },
+    { chave: '<b@t>', assunto: 'NF 4567', remetente_nome: 'b@e.com', remetente_email: 'b@e.com', externo: false, so_em_copia: true, texto: '' },
+  ];
+  const [r] = executarRA('Montar avisos', { nosAnteriores: { 'Separar e-mails': emails }, entrada: [{ id: 12, message_id: '<a@t>' }, { id: 13, message_id: '<b@t>' }, { message_id: '<c@t>' }] });
+  assert.equal(htmlValidoParaTelegram(r.json.html), true);
+  assert.match(r.json.html, /Chegaram 2 e-mails sobre pedidos/);
+  assert.match(r.json.html, /<b>#12<\/b> · Ana &lt;Cliente&gt; \(a@c\.com\)/);
+  assert.match(r.json.html, /você está em cópia/);
+  assert.match(r.json.html, /\/rascunho 12/);
+  assert.deepEqual(executarRA('Montar avisos', { nosAnteriores: { 'Separar e-mails': emails }, entrada: [{ error: 'falhou' }] }), [], 'sem registro, sem aviso (volta na próxima rodada)');
+});
+teste('rascunhos: /rascunho N acha o aviso, abre o e-mail e prepara os mesmos campos da rotina', () => {
+  const conferir = (numero, linha) => executarRA('Conferir aviso', { nosAnteriores: { 'Configuração': { numero } }, entrada: [linha] })[0].json;
+  assert.deepEqual(conferir(12, { id: 12, message_id: '<a@t>', graph_id: 'AAMk' }), { ok: true, numero: 12, graph_id: 'AAMk', chave: '<a@t>' });
+  assert.match(conferir(99, {}).html, /Não achei o e-mail #99/);
+  assert.match(conferir(5, { id: 5, message_id: '<v@t>' }).html, /aviso antigo/);
+  const [p] = executarRA('Preparar e-mail', {
+    nosAnteriores: { 'Quem sou eu': { mail: 'dono@empresa.com.br' }, 'Conferir aviso': { numero: 12, chave: '<a@t>' } },
+    entrada: [emailRA({ id: 'a1', de: 'Ana@Cliente.com', assunto: 'Pedido 123', cc: ['dono@empresa.com.br'], para: ['outro@empresa.com.br'], texto: 'E o pedido 123?\n\nEm seg, 28 de set, Fulano escreveu:\n> antigo' })],
+  });
+  assert.deepEqual([p.json.numero, p.json.remetente_email, p.json.externo, p.json.so_em_copia, p.json.texto], [12, 'ana@cliente.com', true, true, 'E o pedido 123?']);
+  const buscar = noRA('Buscar e-mail');
+  assert.match(buscar.parameters.url, /\/me\/messages\/' \+ encodeURIComponent\(\$json\.graph_id\)/);
+  assert.equal(buscar.onError, 'continueErrorOutput');
+  const ligacoes = (nome) => (rascunhosAuto.connections[nome]?.main ?? []).map((s) => (s ?? []).map((l) => l.node));
+  assert.deepEqual(ligacoes('Aviso certo?'), [['Buscar e-mail'], ['Avisar no Telegram']]);
+  assert.deepEqual(ligacoes('Buscar e-mail'), [['Preparar e-mail'], ['E-mail não abriu']]);
+  assert.deepEqual(ligacoes('Tem resposta?')[1].sort(), ['Montar aviso', 'Registrar e-mail']);
 });
 teste('rascunhos: seg a sex a cada 30 min, só cria rascunho (sub-workflow com assinatura) e nunca envia', () => {
+  assert.deepEqual(noRA('Pedido de rascunho').parameters.workflowInputs.values, [{ name: 'numero', type: 'number' }]);
   assert.equal(noRA('A cada 30 min (seg a sex, 7h às 19h30)').parameters.rule.interval[0].expression, '*/30 7-19 * * 1-5');
   const criar = noRA('Criar rascunho');
   assert.equal(criar.type, 'n8n-nodes-base.executeWorkflow');

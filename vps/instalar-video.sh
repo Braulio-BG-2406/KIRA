@@ -3,6 +3,7 @@
 # Rode como root, passando o endereço da pasta vps/video deste repositório (versão "raw" do GitHub):
 #   bash instalar-video.sh https://raw.githubusercontent.com/<dono>/<repositório>/<ramo>/vps/video
 # O serviço não abre nenhuma porta na internet: só o n8n fala com ele (http://kira-video:8080).
+# Cabe numa VPS pequena (2 GB de memória): usa no máximo 1 processador e 512 MB, um vídeo por vez.
 # Pode rodar de novo para atualizar.
 set -euo pipefail
 
@@ -35,7 +36,7 @@ services:
     build: ./video
     restart: unless-stopped
     cpus: 1.0
-    mem_limit: 768m
+    mem_limit: 512m
     read_only: true
     tmpfs:
       - /tmp:size=300m

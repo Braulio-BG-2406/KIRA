@@ -1,128 +1,179 @@
 ---
 name: apr-seguranca
-description: Cria APR (Análise Preliminar de Riscos / Análise Preliminar de Risco) de segurança do trabalho em planilha Excel (.xlsx, e PDF opcional) a partir só da descrição da atividade — Claude levanta as etapas, os perigos, os possíveis danos, as medidas de controle, EPIs, EPCs e permissões (PT, PT a quente, PTA, PET), com as datas preenchidas automaticamente (elaboração hoje, execução amanhã, validade até 30/12). Use sempre que o usuário pedir uma APR, análise de risco de um serviço, "faz a APR de...", "preciso da análise de riscos para...", ou simplesmente mandar o nome de um serviço de manutenção/montagem industrial (solda, troca de tubulação, instalação de válvula, montagem de guarda-corpo, serviço em telhado, amônia, CO2, vapor, ETA/ETEI) esperando a APR pronta, mesmo que não use a sigla.
+description: Cria APR (Análise Preliminar de Riscos) de segurança do trabalho da TJ MONTAGENS no modelo "ANEXO 9 - ANÁLISE PRELIMINAR DE RISCOS / DECLARAÇÃO DE MÉTODOS" (padrão Ambev), em planilha Excel (.xlsx) e PDF, a partir só da descrição da atividade. Claude escreve os passos da atividade, escolhe os riscos e as medidas de controle, e a planilha sai com cabeçalho, etapas padrão (planejamento, transporte e isolamento, rota de fuga NH3, bloqueio de energia, 5S), fotos ilustrativas e assinaturas, com as datas automáticas (elaboração hoje, início amanhã, término 30/12). Use sempre que o usuário pedir uma APR, "faz a APR de...", análise de riscos de um serviço, ou simplesmente mandar o nome de um serviço de manutenção/montagem na cervejaria (solda, troca de tubulação, instalação de válvula, medidor, plataforma, guarda-corpo, telhado, amônia, CO2, vapor, ETA/ETEI, packing), mesmo sem usar a sigla.
 ---
 
-# APR – Análise Preliminar de Riscos
+# APR – Anexo 9 (TJ MONTAGENS)
 
-O usuário (segurança do trabalho da TJ MONTAGENS, empresa de montagem e
-manutenção industrial que presta serviço numa cervejaria) informa a atividade
-a ser realizada. Você entrega a APR pronta em planilha, com etapas, riscos e
-medidas de controle já escritos, para a equipe só revisar, imprimir e assinar.
+O usuário é da segurança do trabalho da TJ MONTAGENS, que presta serviço de
+montagem e manutenção numa cervejaria Ambev. Ele manda o nome da atividade
+(igual ao nome do arquivo que eles usam, ex.: "Troca de trecho de tubulação de
+retorno de condensado na área externa próxima a maltose") e espera a APR pronta
+no modelo Anexo 9, para imprimir e colher as assinaturas.
 
-O objetivo é uma APR que um técnico de segurança assinaria sem reescrever:
-específica do serviço, com medidas práticas e verificáveis em campo, e sem
-riscos que não existem na atividade.
+O modelo tem um padrão fixo, que o script já monta sozinho:
+
+| Nº | Etapa | Quando entra |
+|---|---|---|
+| 1 | Planejamento da atividade e conscientização dos colaboradores | sempre |
+| 2 | Transporte de materiais e ferramentas e isolamento de área | sempre (lista as ferramentas da atividade) |
+| 3 | Procedimento Rota de Fuga em caso de vazamento de Amônia | `"utilidades": true` |
+| 4 | Bloqueio de Energia | `"bloqueio_energia": true` |
+| 5 | **Atividade principal** – passos, riscos e medidas | o que você escreve |
+| 6 | 5S, limpeza e organização da área | sempre |
+
+Seu trabalho é a atividade principal: descrever os passos de execução e
+escolher os riscos certos. Os textos das etapas padrão e das medidas de cada
+risco já estão em `assets/biblioteca.json`, no padrão de redação da empresa, e
+vêm numerados (riscos 1, 2, 3... e medidas 1., 1.1., 1.2...) pelo script.
 
 ## Fluxo
 
-1. **Entender a atividade.** Leia o pedido e identifique: local/área da planta
-   (CM01, CM02, usina de CO2, packing linhas 501/502/511/512, brassagem, secador
-   de fermento, ETA, ETEI, caldeira, subestação, refeitório...), fluido ou
-   energia envolvida (amônia, CO2, vapor, condensado, água quente, ar
-   comprimido, produto químico, biogás, eletricidade), se haverá solda/corte,
-   altura, espaço confinado, içamento, intervenção em máquina.
-   Só pergunte ao usuário se a atividade estiver vaga a ponto de mudar os
-   riscos principais (ex.: "serviço na CM01" sem dizer qual). Caso contrário,
-   assuma o cenário mais provável e diga no final quais suposições fez.
+1. **Entender a atividade.** Identifique o local (CM01, CM02, usina de CO2,
+   packing linhas 501/502/511/512, brassagem, secador de fermento, ETA, ETEI,
+   caldeira...), o que será feito e com quais equipamentos. Só pergunte se a
+   atividade for vaga a ponto de mudar os riscos principais; caso contrário,
+   assuma o cenário mais provável e diga no final o que assumiu.
 
-2. **Montar as etapas.** Divida o serviço em 6 a 10 etapas na ordem real de
-   execução. Use o esqueleto da seção 1 de `references/biblioteca-riscos.md`
-   (liberação/DDS → transporte de materiais → isolamento → bloqueio de energias
-   → etapas técnicas → testes/retorno → desmobilização) e detalhe as etapas
-   técnicas do serviço específico (ex.: "Corte do trecho danificado com
-   esmerilhadeira", "Ponteamento e soldagem do novo trecho", "Teste de
-   estanqueidade").
+2. **Escrever os `passos`** do jeito que a empresa escreve: em primeira pessoa
+   do plural, um passo por item, dizendo o que será feito e com qual
+   ferramenta/equipamento. O script coloca "1 Passo:", "2 Passo:"...
+   Exemplo real: "Após a conferência de residual, iremos realizar a preparação
+   para corte da mesma, utilizando a lixadeira e disco de corte;"
+   Termine com o retoque de pintura (se houver solda) e o 5S da área.
 
-3. **Levantar riscos e medidas por etapa.** Leia
-   `references/biblioteca-riscos.md` e use as seções que se aplicam. Para cada
-   etapa, liste de 1 a 4 riscos com:
-   - `perigo`: a fonte do risco, específica ("Vazamento de amônia residual ao
-     abrir o flange", não só "Químico")
-   - `dano`: as consequências possíveis
-   - `medidas`: lista de medidas de controle, na ordem da hierarquia —
-     eliminar/isolar a energia, controles de engenharia, procedimentos e
-     permissões, por último EPI. Prefira medidas verificáveis ("extintor PQS
-     junto ao ponto de solda", "vigia de incêndio por 30 min após o término")
-     a frases vagas ("ter cuidado").
-   Adapte o texto da biblioteca ao serviço: cite o equipamento, a área e o
-   fluido reais.
+3. **Listar as `ferramentas`** (uma por item): máquina de solda TIG/elétrica,
+   lixadeira, furadeira de impacto, plataforma elevatória HB1430, caminhão
+   munck, escada de abrir/extensiva, extensão e robô com DR...
 
-4. **Completar o restante:** permissões/documentos, ferramentas e equipamentos,
-   EPIs, EPCs/sinalização, procedimentos de emergência e recomendações gerais
-   (seções 23 a 25 da biblioteca).
+4. **Escolher os `riscos`** do catálogo (tabela abaixo). Pense em cada passo e
+   em cada ferramenta: solda → fumos, queimaduras, incêndio, choque;
+   lixadeira → ruído, projeção, cortes; altura → a variante de queda certa;
+   munck → carga suspensa, atropelamento, tombamento. A ordem não importa: o
+   script agrupa por categoria (físicos, químicos, biológicos, ergonômicos,
+   acidentes) e numera.
 
-5. **Gerar a planilha.** Escreva o JSON (formato abaixo) e rode:
+5. **Riscos fora do catálogo** vão em `riscos_extras`, com categoria, título e
+   medidas no mesmo estilo (frases curtas, imperativas, verificáveis). Para
+   ideias de medidas, consulte `references/biblioteca-riscos.md`. Para
+   acrescentar uma medida específica a um risco do catálogo, use
+   `medidas_extras`.
+
+6. **Gerar a planilha:**
 
    ```bash
    python <caminho-da-skill>/scripts/gerar_apr.py dados.json --saida <pasta-de-saída> --pdf
    ```
 
-   O script calcula as datas sozinho — não coloque datas no JSON:
-   - **Data de elaboração:** hoje (fuso de Brasília)
-   - **Data de execução:** o dia seguinte
-   - **Validade:** 30/12 do ano da execução
-   O arquivo sai com o nome da atividade (ex.: `Troca de trecho de tubulação
-   de incêndio na ETEI.xlsx`), igual ao padrão que o usuário já usa.
-   Use como pasta de saída a pasta que o ambiente usa para entregar arquivos ao
-   usuário (ex.: `/mnt/user-data/outputs` no claude.ai); se não houver, o
-   diretório atual. `--pdf` precisa do LibreOffice; se não houver, entregue só
-   o .xlsx.
+   Datas automáticas (não coloque no JSON): elaboração = hoje, início =
+   amanhã, término = 30/12. O arquivo sai com o nome da atividade, como os da
+   empresa. Use como saída a pasta de entrega de arquivos do ambiente (ex.:
+   `/mnt/user-data/outputs` no claude.ai); se não houver, o diretório atual.
+   `--pdf` precisa do LibreOffice; se faltar, entregue só o .xlsx.
 
-6. **Entregar.** Envie o arquivo e responda em poucas linhas: datas
-   (elaboração/execução/validade), principais riscos considerados, permissões
-   exigidas e as suposições que você fez. Não repita a APR inteira no chat.
+7. **Entregar** o .xlsx (e o PDF) com um resumo curto: datas, etapas incluídas,
+   riscos principais e as suposições feitas. Não repita a APR no chat.
 
-Se o usuário pedir alteração (incluir risco, mudar local, trocar responsável),
-edite o JSON e rode o script de novo — não edite a planilha à mão.
+Para corrigir algo depois (trocar risco, incluir passo, mudar local), edite o
+JSON e rode o script de novo — não edite a planilha à mão.
 
 ## Formato do JSON
 
 ```json
 {
-  "atividade": "Troca de trecho de tubulação de retorno de condensado na área externa próxima à maltose",
+  "atividade": "Troca de trecho de tubulação de retorno de condensado na área externa próxima a maltose",
   "local": "Área externa – próximo à maltose",
-  "descricao": "Remoção de trecho corroído de 3\" da linha de retorno de condensado e montagem de novo trecho em aço carbono com solda.",
-  "empresa": "TJ MONTAGENS",
-  "contratante": "",
-  "responsavel": "",
-  "numero": "",
-  "permissoes": ["Permissão de Trabalho (PT)", "Permissão de Trabalho a Quente (PTQ)", "Permissão de Trabalho em Altura (PTA)", "Bloqueio e etiquetagem (LOTO) das válvulas de condensado"],
-  "ferramentas": ["Máquina de solda inversora", "Esmerilhadeira 7\" com coifa", "Andaime tubular", "Chaves de boca e combinadas", "Extintor PQS 6 kg"],
-  "etapas": [
-    {
-      "etapa": "Liberação do serviço, DDS e emissão das permissões",
-      "riscos": [
-        {
-          "perigo": "Início do serviço sem liberação ou com desconhecimento dos riscos",
-          "dano": "Acidentes diversos",
-          "medidas": ["Emitir PT, PTQ e PTA antes do início", "DDS com todos os executantes sobre esta APR", "Conferir ASO e treinamentos NR-35"]
-        }
-      ]
-    }
+  "utilidades": false,
+  "bloqueio_energia": true,
+  "passos": [
+    "Iremos realizar o bloqueio e a drenagem da linha junto com a operação Ambev e conferir a ausência de pressão;",
+    "Após a liberação, iremos realizar o corte do trecho danificado utilizando a lixadeira e disco de corte;",
+    "Iremos realizar a montagem do novo trecho e a soldagem com processo de soldagem elétrica;",
+    "Realizar o retoque de pintura;",
+    "Realizar o 5S da área."
   ],
-  "epis": ["Capacete com jugular", "Óculos de segurança", "..."],
-  "epcs": ["Fita zebrada e cones", "Manta anti-chama", "..."],
-  "emergencia": ["..."],
-  "recomendacoes": ["..."]
+  "ferramentas": ["Máquina de solda elétrica", "Lixadeira", "Ferramentas manuais", "Escada de abrir", "Extensão e robô com DR"],
+  "riscos": ["ruido", "poeiras_fumos", "quimicos_tintas", "posturas", "movimentos_repetitivos",
+             "cortes_prensamento", "projecao", "queimaduras", "vapor", "choque", "incendio",
+             "batida_contra", "queda_mesmo_nivel", "queda_altura_escada"],
+  "riscos_extras": [
+    {"categoria": "acidente", "titulo": "Golpe de aríete no retorno da linha",
+     "medidas": ["Retorno gradual da linha acompanhado pela operação Ambev.", "Manter a área isolada durante o retorno."]}
+  ],
+  "medidas_extras": {"vapor": ["Utilizar luva de proteção térmica até 200 °C."]}
 }
 ```
 
-- `empresa` padrão é TJ MONTAGENS. `contratante`, `responsavel` e `numero`
-  ficam vazios se o usuário não informou — são preenchidos à mão na
-  impressão. Não invente nomes de pessoas.
-- `medidas` é uma lista; cada item vira uma linha com marcador na célula.
-- `linhas_equipe` (opcional, padrão 8) define quantas linhas em branco ficam
-  para assinatura da equipe.
+Campos opcionais:
+- `sequencia`: texto da coluna "Sequência de atividades" da atividade principal
+  (padrão: o próprio nome da atividade).
+- `descricao`: texto do campo "Descrição dos trabalhos" (padrão: a atividade).
+- `sif` (padrão `true` = Precursor/Potencial/Real "Sim"), `full_time` e `pt`
+  (padrão "SIM"). Use `"sif": false` só em atividade de baixo risco, sem
+  altura, trabalho a quente, içamento ou energia perigosa.
+- `fotos`: caminhos de fotos do local ou do equipamento que o usuário enviar;
+  entram na coluna "Fotos ilustrativa" da atividade principal.
+- `atividades`: lista de atividades principais (cada uma com `sequencia`,
+  `passos`, `ferramentas`, `riscos`...) quando o serviço tiver mais de uma
+  frente distinta. Sem esse campo, vale a atividade única do nível de cima.
+- `etapas_extras`: etapas livres (`sequencia`, `tecnicas`, `riscos`, `medidas`
+  como texto) que entram antes do 5S.
+- `responsavel`, `telefone_responsavel`, `responsavel_seguranca`,
+  `telefone_seguranca`: só se o usuário pedir outro nome; o padrão está em
+  `assets/config.json`.
 
-## Cuidados de conteúdo
+### Quando marcar `utilidades` e `bloqueio_energia`
 
-- Coerência entre seções: se uma etapa tem solda, a PT a quente, a máscara de
-  solda e o extintor precisam aparecer em permissões, EPIs e EPCs. Se há
-  altura, o cinto e a PTA também.
-- Serviços em linhas de amônia, CO2, vapor ou produto químico começam sempre
-  por drenagem/despressurização/bloqueio feito ou acompanhado pela operação —
-  é o ponto onde mais acontecem acidentes graves nesse tipo de planta.
-- Cite NRs quando ajudam (NR-10, NR-12, NR-13, NR-33, NR-35), sem encher o
-  texto de referências.
-- Escreva em português do Brasil, frases curtas, no padrão de campo.
+- `utilidades: true` quando o serviço é na área de Utilidades / casas de
+  máquinas de amônia (CM01, CM02, condensadores, torres da CM, compressores de
+  NH3). Na dúvida, inclua: a etapa só acrescenta a rota de fuga.
+- `bloqueio_energia: true` quando houver intervenção em equipamento ou linha
+  com energia (elétrica, pressão, fluido, movimento): válvulas, tubulações,
+  bombas, linhas do packing, painéis. Use `false` em serviço puramente
+  estrutural sem abrir nada (plataforma, guarda-corpo, forro, escada, cobertura).
+
+## Catálogo de riscos (`riscos`)
+
+| Chave | Título na APR | Use quando |
+|---|---|---|
+| `ruido` | Exposição a ruído | quase sempre (área industrial, lixadeira, furadeira) |
+| `poeiras_fumos` | Poeiras e fumos metálicos | solda, corte, lixamento |
+| `quimicos_tintas` | Produtos químicos (tintas e solventes) | retoque de pintura, solventes |
+| `nh3` | NH3 (amônia) | linhas/equipamentos de amônia |
+| `co2` | CO2 (asfixia / baixa temperatura) | linhas, tanques e usina de CO2 |
+| `quimicos_processo` | Produtos químicos de processo | assepsia, CIP, dosagem, ETA |
+| `biologico` | Agentes biológicos | ETEI, efluente, lodo, água de torre |
+| `posturas` | Posturas inadequadas | quase sempre |
+| `movimentos_repetitivos` | Movimentos repetitivos | quase sempre |
+| `cortes_prensamento` | Cortes / Prensamento de membros | ferramentas, montagem, chapas, tubos |
+| `projecao` | Projeção de material e de partículas | lixadeira, corte, furação |
+| `queimaduras` | Queimaduras | solda, corte, superfícies quentes |
+| `vapor` | Contato com vapor, condensado ou água quente | vapor, condensado, caldeira, água quente |
+| `pressao` | Energia residual de pressão | ar comprimido, linhas pressurizadas, testes |
+| `choque` | Choque elétrico | qualquer ferramenta elétrica |
+| `incendio` | Incêndio e explosão | trabalho a quente |
+| `batida_contra` | Batida contra | quase sempre |
+| `queda_mesmo_nivel` | Queda de pessoas de mesmo nível | quase sempre |
+| `queda_altura` | Queda de nível diferente (acima de 2 m) | altura com cinto em estrutura/andaime |
+| `queda_altura_pemt` | Queda de nível diferente (acima de 2 m) – PEMT | plataforma elevatória (HB1430 etc.) |
+| `queda_altura_escada` | Queda de nível diferente (abaixo de 2 m) – escada | escada de abrir abaixo de 2 m |
+| `queda_materiais` | Queda de materiais e ferramentas | serviço em altura sem içamento mecânico |
+| `carga_suspensa` | Queda de material / carga suspensa (içamento) | munck, talha, guindaste |
+| `atropelamento` | Atropelamento | munck, PEMT, veículos, empilhadeiras na área |
+| `tombamento_equipamento` | Tombamento do equipamento (munck / PEMT) | munck, PEMT |
+| `tombamento_escada` | Tombamento de escada | escada extensiva ou de abrir |
+| `espaco_confinado` | Espaço confinado (atmosfera perigosa) | tanques, silos, filtros fechados, poços |
+
+Coerência importa: se os passos têm solda, não pode faltar `poeiras_fumos`,
+`queimaduras` e `incendio`; se há pintura, `quimicos_tintas`; se há munck,
+`carga_suspensa`, `atropelamento` e `tombamento_equipamento`.
+
+## Personalização
+
+- `assets/config.json`: empresa, responsável, telefones e telefone da
+  brigada (usado nos textos de emergência).
+- `assets/fotos/`: pictogramas usados nas etapas padrão. Se o usuário mandar a
+  foto da equipe, salve como `assets/fotos/equipe.jpg` para ela aparecer na
+  etapa 1, como no modelo original.
+- `assets/modelo-anexo9.xlsx`: molde da página (cabeçalho, títulos da tabela e
+  assinaturas), tirado da planilha da empresa.

@@ -1,0 +1,401 @@
+{
+  "categorias": [
+    ["fisico", "RISCOS FÍSICOS:"],
+    ["quimico", "RISCOS QUÍMICOS:"],
+    ["biologico", "RISCOS BIOLÓGICOS:"],
+    ["ergonomico", "RISCOS ERGONÔMICOS:"],
+    ["acidente", "RISCOS DE ACIDENTES:"]
+  ],
+
+  "etapas_padrao": {
+    "planejamento": {
+      "sequencia": "Planejamento da atividade e conscientização dos colaboradores.",
+      "tecnicas": "TÉCNICA UTILIZADA:\nDDS (Diálogo Diário de Segurança).\nAvaliação de materiais, equipamentos e EPI.\nTreinar todos os envolvidos na atividade na APR.",
+      "riscos": "RISCO ERGONÔMICO\n1. Falha na comunicação\n\nRISCO DE ACIDENTES\n2. Ferramentas defeituosas.\n3. Queda de mesmo nível / materiais",
+      "sif": false,
+      "medidas": "Acompanhamento Full time responsável Ambev\n1. Participar do DDS e treinar os funcionários na APR;\n1.1. Garantir o cumprimento do 5S no local de trabalho;\n1.2. Os funcionários devem portar o crachá de aptidão e executar as atividades de acordo com os treinamentos válidos;\n1.3. Respeitar as vias de acesso de veículos e usar as faixas de pedestre;\n1.4. Conhecer e respeitar as REGRAS DE OURO: Trabalho em altura, Veículos, Permissão de trabalho, Eletricidade, Substâncias perigosas e SAM e LOTOTO;\n1.5. Aplicar o PARE 1 MINUTO;\n1.6. Qualquer mudança ou irregularidade na atividade, parar e comunicar o especialista responsável e a segurança do trabalho para nova avaliação;\n1.7. Executar a atividade conforme APR e iniciar qualquer atividade após liberação da PTI;\n1.8. Comunicar o supervisor da área antes de iniciar as atividades;\n1.9. Atenção ao transitar na via de acesso com o trânsito de veículos, máquinas e equipamentos móveis;\n1.10. Ao subir rampas e degraus, utilizar o corrimão para evitar quedas;\n1.11. Atenção com o manuseio de ferramentas manuais para não atingir acidentalmente as mãos;\n1.12. Utilizar luvas apropriadas para cada atividade que realizar para evitar cortes ou perfuração de mãos e dedos;\n1.13. Manter boa comunicação entre todos os envolvidos na atividade e a equipe Ambev;\n1.14. Isolar e sinalizar todo o perímetro da atividade;\n1.15. Manter água gelada ou fresca no local de trabalho para hidratação dos funcionários.\n2. Cumprir o planejado da atividade; qualquer anomalia encontrada durante o checklist em ferramentas e equipamentos, retirar para manutenção de imediato;\n2.1. Não improvisar ferramentas.\n3. Atenção com piso molhado, buracos e obstáculos na via de acesso que possam causar escorregões, tropeços ou quedas de pessoas e materiais;\n3.1. Atenção ao transportar materiais, máquinas e ferramentas, com o trânsito de pessoas na via de acesso.\n\nItem 1: Utilizar EPIs obrigatórios: botina de segurança, óculos contra impacto incolor, protetor auricular tipo plug ou concha, capacete com jugular, uniforme manga longa com faixa refletiva (colete refletivo).\nObs.: Para todas as etapas das atividades utilizar os EPIs obrigatórios mencionados no (item 1).",
+      "full_time": "SIM",
+      "pt": "NÃO",
+      "fotos": ["equipe.jpg", "pedestre.png"],
+      "altura_min": 409
+    },
+
+    "transporte_isolamento": {
+      "sequencia": "Transporte de materiais e ferramentas para áreas de atuação e isolamento de área.",
+      "tecnicas": "Técnicas que serão utilizadas:\nRealizar o isolamento da área com cones e cerquites antes de iniciar a atividade e alinhar com o supervisor de área sobre os locais que poderão ser isolados pelos colaboradores.\nO transporte de máquinas e equipamentos será feito com o veículo da empresa e manualmente utilizando carrinho de mão / carrinho quatro rodas até o local da atividade.\n\nFerramentas e Equipamentos:\nCarrinho de mão, carrinho quatro rodas, veículo da empresa, cones, cerquites, tapumes, fita zebrada, {ferramentas}.",
+      "riscos": "RISCOS DE ACIDENTE:\n1. Atropelamento\n2. Batida contra\n3. Queda de mesmo nível\n4. Queda de material ou equipamentos\n5. Corte / prensamentos\n\nRISCOS ERGONÔMICOS:\n6. Esforço físico / postura inadequada",
+      "sif": false,
+      "medidas": "1. Manter distância mínima de 5 metros de máquinas e veículos em funcionamento;\n1.1. Caminhe pelos acessos seguros, atravesse nas faixas de pedestre, observe o trânsito em todos os sentidos;\n1.2. Para o condutor de veículo: usar o cinto de segurança, obedecer a velocidade permitida para trânsito dentro da área fabril (10 km/h), transitar com o pisca-alerta ligado e não utilizar celular em movimentação;\n1.3. Respeitar isolamento e placas de sinalização Ambev.\n2. Manter a área organizada, realizando constantemente o 5S;\n2.1. Não utilizar o telefone durante o trajeto, pare em local seguro sempre;\n2.2. e 3. Procurar observar a existência de aberturas e objetos não sinalizados.\n4. Ao transitar com ferramentas e equipamentos, segurá-los de forma firme utilizando-se de suas alças, cabos, rodas apoiadas no piso entre outros;\n4.1. Não exceder a carga permitida do equipamento.\n5. Não utilizar adornos, como: anéis, correntes, brincos e relógios etc.;\n5.1. Não colocar as mãos em partes com risco de corte ou prensamento;\n5.2. Manusear qualquer tipo de material utilizando luva específica para a atividade.\n6. Solicitar auxílio ao movimentar materiais, peças, máquinas ou ferramentas acima de 23 kg;\n6.1. Realizar revezamento de tarefas para evitar fadiga e sobrecarga;\n6.2. Realizar pausas regularmente.",
+      "full_time": "NÃO",
+      "pt": "NÃO",
+      "fotos": ["regras-de-ouro.jpeg"],
+      "altura_min": 280
+    },
+
+    "rota_fuga_nh3": {
+      "sequencia": "Procedimento Rota Fuga em caso de vazamento de Amônia",
+      "tecnicas": "Técnica Utilizada:\n- Todos os envolvidos em atividade dentro da área Utilidades pelo projeto deverão ter o treinamento de autorização de entrada na área. O treinamento é aplicado pelos responsáveis da área AMBEV.\n- Todos deverão conhecer e saber como proceder em caso de emergência e as rotas de fuga destinadas na área.\n- Manter o medidor de gás NH3 em campo e cada um deverá portar a máscara autônoma.\n- A partir de 20 PPM < 49 PPM: portar.\n> 49 PPM: colocar a máscara; se o vazamento persistir a equipe do projeto deverá sair da área.\n150 PPM: evacuar a área.\n10.000 PPM: não acessar a área.\n\nFerramentas: Medidor NH3, sinal sonoro, Máscara Autônoma",
+      "riscos": "RISCOS FÍSICOS:\n1. Ruído\n\nRISCOS DE ACIDENTE:\n2. Falha na operação\n3. Falha na comunicação\n4. Não cumprimento do procedimento\n5. Vazamento de Amônia\n6. Mal-estar",
+      "sif": true,
+      "medidas": "Somente pessoas treinadas e autorizadas poderão acessar a Utilidades, com treinamento da área, recebendo o selo de autorizado e preenchendo o forms confirmando a presença no treinamento;\n\nRiscos Físicos:\n1. Utilizar protetor auricular tipo concha;\n\nRiscos de Acidentes:\n2. Atentar aos sinais sonoros de alerta da área; em caso de dúvida procurar a operação;\n3. Sempre comunicar no supervisório a entrada da equipe na área; a PT deverá ser assinada pelo responsável da área em todas as atividades; em caso de reconhecer alguma anomalia na área acionar a operação imediatamente;\n4. Todos deverão conhecer o plano de rota de fuga; manter a máscara autônoma na área próxima à atividade; todos deverão ter o treinamento da cartilha de conhecimento em caso de vazamento; não acessar a área pelas portas laterais da casa de máquinas 01, somente pela porta principal destinada no plano; manter a portinha da escada lateral ao lado do processo sempre aberta (sem cadeado), comunicar com a área a necessidade; TST acompanhando full time em campo com o medidor de NH3;\n5. Se houver vazamento seguir o procedimento da cartilha; atentar às tampas das valas da área com desnível; não correr; ir para o ponto de encontro principal (portaria);\n6. Sempre comunicar se não se sentir bem devido ao cheiro da amônia, pois há pessoas que se sentirão desconfortáveis mesmo abaixo de 20 ppm; sinalizar ao responsável da empresa, TST e supervisor e ir para fora da área;\n- Identificar os chuveiros de emergência da área.\n\nEm caso de emergência acionar a Brigada {brigada}.",
+      "full_time": "NÃO",
+      "pt": "NÃO",
+      "fotos": ["rota-fuga-utilidades.png", "medidor-nh3.png", "nh3-concentracoes.png", "porta-principal.png"],
+      "altura_min": 280
+    },
+
+    "bloqueio_energia": {
+      "sequencia": "Bloqueio de Energia.",
+      "tecnicas": "TÉCNICAS:\n# Fazer os 9 passos de bloqueio de energia:\n1. Identificar as fontes de energia;\n2. Informar os envolvidos;\n3. Parar o equipamento;\n4. Desligar o equipamento;\n5. Bloquear o equipamento;\n6. Liberar energia armazenada;\n7. Certificar-se do bloqueio;\n8. Realizar manutenção;\n9. Desbloquear energia.\nFERRAMENTAS:\n# Kit de bloqueio de energia: garra, cartão com identificação e cadeado",
+      "riscos": "RISCOS FÍSICOS:\n# Ruído\n\nRISCOS DE ACIDENTE:\n# Descarga de energia\n# Bloqueio inadequado\n# Falta de mapeamento\n# Falta de dispositivo de bloqueio\n# Ferramentas improvisadas",
+      "sif": true,
+      "medidas": "# Todos os bloqueios e desbloqueios serão feitos por funcionário da Ambev, e os fornecedores deverão participar do bloqueio múltiplo;\n# Descrever na PT os bloqueios necessários e a forma como fazer;\n# Bloquear, fazer o travamento e identificar;\n# Não realizar nenhuma atividade sem que seja feito o bloqueio de energia, sendo assim considerado ato inseguro gravíssimo;\n# Para atividades onde não houver bloqueio de energia em formulário padronizado, deverá ser preenchido obrigatoriamente o anexo 1 do VPO – Segurança – Bloqueio de Energia, seguindo rigorosamente o que está descrito no anexo 1;\n# A participação no bloqueio múltiplo será para todos os envolvidos na atividade, utilizando seus cadeados identificados com foto, nome e telefone;\n# Cada um deve ficar com a chave do seu cadeado, sendo proibido compartilhar ou passar a guarda para outro colaborador;\n# Remover o cadeado do bloqueio múltiplo apenas quando a atividade estiver concluída.\n\nOBS: EPIs básicos de uso obrigatório: capacete com jugular, óculos contra impacto, bota de segurança com biqueira em composite e solado antiperfurante, luvas multitato e protetor auricular tipo plug ou concha.",
+      "full_time": "SIM",
+      "pt": "SIM",
+      "fotos": ["loto-caixa.png", "loto-cadeado.png", "loto-garra.png"],
+      "altura_min": 330
+    },
+
+    "cinco_s": {
+      "sequencia": "5S, limpeza e organização da área.",
+      "tecnicas": "Técnicas utilizadas:\n\nFinalizadas as atividades a equipe desmobilizará o isolamento, realizará o 5S na área e se deslocará para o canteiro. A equipe irá utilizar carro de mão plataforma (quatro rodas) para transportar materiais e ferramentas (postes de isolamento, correntes de isolamento), devidamente amarrados, utilizando caminhos seguros e faixas de pedestres. O lixo será segregado para descarte e as ferramentas serão armazenadas no contêiner almoxarifado.\n\nFerramentas e Equipamentos utilizados:\nCarro de mão plataforma, postes de isolamento, correntes de isolamento.",
+      "riscos": "RISCOS DE ACIDENTE:\n1. Tropeço, quedas e escorregões\n2. Queda de mesmo nível\n3. Queda de ferramentas e materiais\n4. Batida contra pessoas e equipamentos\n5. Corte / perfuração\n\nRISCOS ERGONÔMICOS:\n6. Postura inadequada",
+      "sif": false,
+      "medidas": "1. Retirar o isolamento da área (se a atividade não foi finalizada no dia, manter o isolamento);\n1.1. Fazer a limpeza e organização do local, não deixando materiais ou ferramentas desorganizados e fora de locais apropriados;\n1.2. Atentar aos desníveis do piso ao andar nas áreas demarcadas para pedestres.\n2. Retornar ao canteiro respeitando o plano de tráfego da área (faixas de circulação);\n2.1. Inspecionar a área por onde passar, cuidando da presença de obstáculos e piso irregular;\n2.2. Não utilizar telefone ao caminhar.\n3. Manter a carga bem amarrada no carrinho de mão;\n3.1. Não exceder a capacidade permitida de materiais.\n4. Durante a movimentação dos materiais atentar para a circulação de pessoas;\n4.1. Realizar a guarda de equipamentos e materiais conforme demarcação;\n4.2. Ver e ser visto por veículos industriais;\n4.3. Atenção aos avisos sonoros dos equipamentos;\n4.4. Usar a faixa de pedestres;\n4.5. Não utilizar telefone ao caminhar.\n5. Ao transportar os equipamentos para isolamento, utilizar luvas de vaqueta.\n6. Manter postura correta, elevar peso com ajuda de outra pessoa e fazer a movimentação correta.\n\nEPIs específicos: para manuseio de materiais leves com baixo risco deve-se utilizar luvas multitato. Para manuseio de partes com arestas cortantes, utilizar luvas anticorte ou vaqueta.",
+      "full_time": "NÃO",
+      "pt": "NÃO",
+      "fotos": ["5s-placa.jpeg", "5s-limpeza.jpeg"],
+      "altura_min": 330
+    }
+  },
+
+  "riscos": {
+    "ruido": {
+      "categoria": "fisico",
+      "titulo": "Exposição a ruído",
+      "fotos": ["ruido.png"],
+      "medidas": [
+        "Utilizar protetor auricular (tipo plug ou concha) sempre que atuar em ambientes ou operar equipamentos que apresentem níveis elevados de ruído, garantindo a proteção da audição."
+      ]
+    },
+    "poeiras_fumos": {
+      "categoria": "quimico",
+      "titulo": "Poeiras e fumos metálicos",
+      "medidas": [
+        "Utilizar respirador/máscara com filtro adequado (PFF2) para fumos metálicos e poeiras.",
+        "Garantir ventilação natural ou mecânica adequada no local de trabalho.",
+        "Proibido realizar solda ou lixamento em ambientes confinados sem ventilação."
+      ]
+    },
+    "quimicos_tintas": {
+      "categoria": "quimico",
+      "titulo": "Produtos químicos (tintas e solventes)",
+      "medidas": [
+        "A FDS dos produtos deve estar no local da atividade.",
+        "Colaboradores deverão ser treinados na FDS (Ficha com Dados de Segurança) dos produtos a serem utilizados.",
+        "Fica proibido fumar próximo da atividade e/ou fora do local destinado (fumódromo).",
+        "Em caso de contato com produto químico, seguir as medidas de primeiros socorros descritas na FDS.",
+        "No local do serviço, deve ser disposta somente a quantidade de produtos necessária à utilização imediata.",
+        "Manipular esses produtos em áreas ventiladas e abertas.",
+        "Nunca reutilizar essas embalagens para qualquer outra finalidade.",
+        "Fazer o descarte conforme orientação do fabricante.",
+        "Não comer ou beber. Após a aplicação/utilização lavar as mãos, mesmo se estiver usando luvas.",
+        "Ao finalizar a aplicação, trocar as roupas e EPIs sujos de produto. Retirar todas as estopas, panos e espumas que contenham o produto do local de trabalho e fazer o correto descarte ou armazenamento. Alguns produtos, quando combinados, podem entrar em combustão.",
+        "Ao entrar na área, identificar os pontos de chuveiros de emergência e lava-olhos para usá-los em caso de contato com produtos químicos, e os extintores para extinção de princípio de incêndio.",
+        "EPIs: capacete com jugular, óculos de proteção, luva nitrílica, protetor auricular (quando necessário), máscara semifacial, avental de PVC, calçado de segurança."
+      ]
+    },
+    "nh3": {
+      "categoria": "quimico",
+      "titulo": "NH3 (amônia)",
+      "fotos": ["medidor-nh3.png"],
+      "medidas": [
+        "Garantir termo de abertura de linha aprovado e assinado em campo.",
+        "Todo o time autorizado a acessar a área (adesivo visível).",
+        "Receber treinamento da cartilha de NH3.",
+        "Portar medidor de NH3 portátil durante toda a atividade.",
+        "Todos devem possuir máscara facial completa com filtro para NH3 disponível em caso de vazamento, para fuga."
+      ]
+    },
+    "co2": {
+      "categoria": "quimico",
+      "titulo": "CO2 (asfixia / baixa temperatura)",
+      "medidas": [
+        "Garantir termo de abertura de linha aprovado e assinado em campo, com a linha de CO2 despressurizada e bloqueada pela operação Ambev.",
+        "Confirmar pressão zero no manômetro antes de soltar flanges ou conexões; abrir de forma gradual, com o corpo fora da linha de saída.",
+        "Portar medidor de CO2/O2 portátil durante toda a atividade, principalmente em áreas baixas, fossos e ambientes fechados.",
+        "Manter a área ventilada; não permanecer em pontos baixos durante a abertura da linha.",
+        "Em caso de tontura, dor de cabeça ou falta de ar, abandonar a área imediatamente e comunicar o responsável Ambev.",
+        "Utilizar luvas de proteção térmica ao manusear linhas ou componentes com CO2 em baixa temperatura (risco de queimadura por frio)."
+      ]
+    },
+    "quimicos_processo": {
+      "categoria": "quimico",
+      "titulo": "Produtos químicos de processo (soda, ácidos, sanitizantes, cloro)",
+      "medidas": [
+        "Garantir a drenagem e o enxágue da linha/equipamento pela operação Ambev antes da intervenção.",
+        "A FDS dos produtos deve estar no local da atividade e os colaboradores treinados nela.",
+        "Bloquear as bombas dosadoras e válvulas de produtos químicos que alimentam o equipamento.",
+        "Utilizar óculos de ampla visão, protetor facial, luvas de PVC cano longo, avental e bota de PVC.",
+        "Identificar os chuveiros de emergência e lava-olhos antes do início; em caso de contato, lavar com água corrente por no mínimo 15 minutos e comunicar o responsável Ambev."
+      ]
+    },
+    "biologico": {
+      "categoria": "biologico",
+      "titulo": "Agentes biológicos (efluente, lodo, água de torre)",
+      "medidas": [
+        "Utilizar luvas nitrílicas ou de PVC e bota de PVC.",
+        "Higienizar as mãos antes de comer, beber ou fumar; não levar as mãos ao rosto.",
+        "Manter a vacinação em dia (tétano e hepatite)."
+      ]
+    },
+    "posturas": {
+      "categoria": "ergonomico",
+      "titulo": "Posturas inadequadas",
+      "fotos": ["ergonomia.png"],
+      "medidas": [
+        "Manter a coluna ereta, evitando curvar excessivamente as costas durante as atividades.",
+        "Flexionar os joelhos ao abaixar ou levantar cargas, utilizando a força das pernas e não da lombar.",
+        "Evitar torções do tronco; sempre movimentar o corpo inteiro ao mudar de direção.",
+        "Ajustar a altura de bancadas, mesas e equipamentos para evitar inclinações prolongadas do corpo.",
+        "Alternar posturas e realizar pausas periódicas para alongamento e descanso muscular.",
+        "Utilizar ferramentas e equipamentos ergonômicos, adequados à atividade executada.",
+        "Evitar permanecer longos períodos na mesma posição, seja em pé, sentado ou agachado.",
+        "Comunicar imediatamente ao responsável qualquer desconforto, dor ou dificuldade durante a execução da atividade."
+      ]
+    },
+    "movimentos_repetitivos": {
+      "categoria": "ergonomico",
+      "titulo": "Movimentos repetitivos",
+      "medidas": [
+        "Realizar rodízio de atividades para reduzir a sobrecarga contínua dos mesmos grupos musculares.",
+        "Estabelecer pausas programadas durante a jornada para recuperação física.",
+        "Executar exercícios de alongamento e relaxamento muscular ao longo do turno.",
+        "Utilizar ferramentas mecanizadas ou auxiliares sempre que possível para diminuir a repetitividade manual.",
+        "Planejar o ritmo de trabalho, evitando execução acelerada e contínua das tarefas.",
+        "Evitar movimentos bruscos ou de impacto repetitivo.",
+        "Respeitar os limites físicos individuais, interrompendo a atividade em caso de fadiga excessiva."
+      ]
+    },
+    "cortes_prensamento": {
+      "categoria": "acidente",
+      "titulo": "Cortes / Prensamento de membros",
+      "medidas": [
+        "Utilizar corretamente os Equipamentos de Proteção Individual (EPIs) adequados, como luvas de proteção compatíveis com a atividade (Hyflex / Vaqueta).",
+        "Manter as mãos e demais membros afastados de partes móveis, áreas de corte e pontos de prensamento.",
+        "Nunca remover, improvisar ou inutilizar proteções, carenagens e dispositivos de segurança das máquinas e ferramentas.",
+        "Garantir que máquinas e equipamentos estejam desligados e desenergizados antes de ajustes, limpezas ou manutenções (ex.: lixadeira).",
+        "Utilizar ferramentas apropriadas para cada tarefa, evitando o uso das mãos como apoio ou guia.",
+        "Manter atenção total durante a execução da atividade, evitando distrações.",
+        "Não utilizar roupas largas, acessórios ou adornos que possam ser puxados por partes móveis.",
+        "Realizar treinamento NR-12 para operação segura de máquinas e ferramentas.",
+        "Comunicar imediatamente qualquer condição insegura, falha de equipamento ou ocorrência de quase acidente."
+      ]
+    },
+    "projecao": {
+      "categoria": "acidente",
+      "titulo": "Projeção de material e de partículas",
+      "medidas": [
+        "Fazer uso dos óculos de segurança contra impacto; em caso de lixadeira, fazer o uso do protetor facial."
+      ]
+    },
+    "queimaduras": {
+      "categoria": "acidente",
+      "titulo": "Queimaduras",
+      "fotos": ["queimadura.png"],
+      "medidas": [
+        "Utilizar EPI adequado: luvas de raspa, avental de raspa, mangotes e perneiras.",
+        "Utilizar máscara de solda ou protetor facial para proteção contra fagulhas.",
+        "Manter distância segura de superfícies e materiais aquecidos.",
+        "Evitar contato direto com peças recém-soldadas ou aquecidas.",
+        "Manter organização do local de trabalho para evitar contato acidental com materiais quentes.",
+        "Isolar e sinalizar a área onde estiver ocorrendo solda ou corte.",
+        "Manter extintor de incêndio ABC disponível e acessível no local da atividade."
+      ]
+    },
+    "vapor": {
+      "categoria": "acidente",
+      "titulo": "Contato com vapor, condensado ou água quente",
+      "medidas": [
+        "Garantir termo de abertura de linha aprovado e assinado em campo, com a linha bloqueada, despressurizada e drenada pela operação Ambev.",
+        "Aguardar o resfriamento da tubulação antes de iniciar a intervenção.",
+        "Confirmar ausência de pressão abrindo o dreno antes de soltar flanges ou conexões; nunca se posicionar de frente para o flange.",
+        "Utilizar luvas de proteção térmica e protetor facial durante a abertura da linha.",
+        "Sinalizar superfícies quentes próximas à área de trabalho."
+      ]
+    },
+    "pressao": {
+      "categoria": "acidente",
+      "titulo": "Energia residual de pressão (ar comprimido, água, gases)",
+      "medidas": [
+        "Bloquear, despressurizar e drenar a linha antes da intervenção, com acompanhamento da operação Ambev.",
+        "Conferir pressão zero no manômetro e abrir as conexões de forma gradual.",
+        "Utilizar mangueiras com engates de segurança e cabo anti-chicote.",
+        "Na pressurização para teste, manter a área isolada e pressurizar de forma gradual."
+      ]
+    },
+    "choque": {
+      "categoria": "acidente",
+      "titulo": "Choque elétrico",
+      "medidas": [
+        "Todos os equipamentos / ferramentas / máquinas elétricas deverão passar por aprovação de um eletricista Ambev antes da utilização.",
+        "Realizar inspeção visual e checklist antes do uso de qualquer equipamento.",
+        "Reportar imediatamente qualquer cabo danificado, cheiro de queimado, ruído ou aquecimento anormal.",
+        "Manter cabos, conexões e ferramentas elétricas em perfeito estado, sem emendas improvisadas.",
+        "Em caso de intervenção em maquinário, realizar o bloqueio das fontes de energia.",
+        "Todas as ferramentas deverão estar lacradas com lacre amarelo.",
+        "As extensões só poderão ser utilizadas se possuírem DR."
+      ]
+    },
+    "incendio": {
+      "categoria": "acidente",
+      "titulo": "Incêndio e explosão",
+      "fotos": ["incendio.png"],
+      "medidas": [
+        "Garantir que as máquinas / equipamentos estejam com o sistema elétrico íntegro, sem fios expostos ou curtos-circuitos.",
+        "Evitar estacionar ou operar os equipamentos próximos a painéis elétricos, máquinas aquecidas ou processos térmicos.",
+        "Caso seja detectado odor forte de combustível ou solventes, interromper as operações.",
+        "Realizar manutenção preventiva conforme especificações do fabricante.",
+        "Obrigatório extintor ABC na área da atividade – checar validade e pressurização antes do uso.",
+        "Garantir a área sem material combustível ou, no mínimo, com distância de 11 m de raio da atividade a quente."
+      ]
+    },
+    "batida_contra": {
+      "categoria": "acidente",
+      "titulo": "Batida contra",
+      "medidas": [
+        "Garantir que a área com superfície irregular esteja bem iluminada para facilitar a visualização de obstáculos.",
+        "Procurar observar a existência de aberturas e objetos não sinalizados."
+      ]
+    },
+    "queda_mesmo_nivel": {
+      "categoria": "acidente",
+      "titulo": "Queda de pessoas de mesmo nível",
+      "medidas": [
+        "Os colaboradores deverão estar atentos quanto às possíveis interferências existentes no piso.",
+        "Não correr.",
+        "Não utilizar o telefone ao caminhar.",
+        "Usar medidas de proteção coletiva, como isolamento e sinalização."
+      ]
+    },
+    "queda_altura": {
+      "categoria": "acidente",
+      "titulo": "Queda de nível diferente (acima de 2 metros)",
+      "medidas": [
+        "Possuir treinamento de NR-35 válido.",
+        "Ter realizado exames médicos conforme a NR-35, com Aptidão para Trabalho em Altura devidamente registrada em ASO válido.",
+        "Possuir selo com liberação ambulatorial para trabalho em altura.",
+        "Todo trabalho em altura (acima de 2 metros) é obrigatório o uso de cinto de segurança.",
+        "Fazer checklist do cinto de segurança.",
+        "Todo trabalho em altura deve contemplar o check saúde.",
+        "Cinto de segurança com talabarte duplo preso à estrutura em tempo integral durante o uso.",
+        "Isolar a área abaixo da atividade no raio de 2 metros, evitando circulação de pessoas onde há risco de projeção ou queda de trabalhadores e materiais. Com cota zero para comunicação (ajudante e TST)."
+      ]
+    },
+    "queda_altura_pemt": {
+      "categoria": "acidente",
+      "titulo": "Queda de nível diferente (acima de 2 metros) – PEMT",
+      "medidas": [
+        "Possuir treinamento de NR-35 válido.",
+        "Ter realizado exames médicos conforme a NR-35, com Aptidão para Trabalho em Altura devidamente registrada em ASO válido.",
+        "Possuir selo com liberação ambulatorial para trabalho em altura.",
+        "Todo trabalho em altura (acima de 2 metros) é obrigatório o uso de cinto de segurança.",
+        "Fazer checklist do cinto de segurança.",
+        "Todo trabalho em altura deve contemplar o check saúde.",
+        "Não projetar o corpo para fora da gaiola da PEMT.",
+        "Cinto de segurança com talabarte duplo preso à estrutura da PEMT em tempo integral durante o uso.",
+        "Para realizar o carregamento da PEMT, o caminhão prancha deverá estar estacionado em local plano e isolado, com acompanhamento do responsável da área.",
+        "Somente operador com NR-11, NR-18 e NR-35, ASO apto e autorizado a operar o modelo da PEMT específico conforme treinamento recebido.",
+        "Isolar a área abaixo da atividade no raio de 2 metros, evitando circulação de pessoas onde há risco de projeção ou queda de trabalhadores e materiais. Com cota zero para comunicação (ajudante e TST)."
+      ]
+    },
+    "queda_altura_escada": {
+      "categoria": "acidente",
+      "titulo": "Queda de nível diferente (abaixo de 2 metros) – escada",
+      "medidas": [
+        "Somente escadas inspecionadas e com lacre de liberação poderão ser utilizadas.",
+        "Realizar checklist antes de iniciar a atividade.",
+        "Ficar sempre de frente para a escada quando estiver subindo e realizando a atividade.",
+        "Verificar o piso onde serão realizadas as atividades com escadas.",
+        "Assentar a base da escada numa superfície segura e plana.",
+        "Manter 3 pontos de contato na escada.",
+        "Não subir escadas com as mãos ocupadas com qualquer material.",
+        "Obter o tamanho correto de escada para o trabalho que será realizado."
+      ]
+    },
+    "queda_materiais": {
+      "categoria": "acidente",
+      "titulo": "Queda de materiais e ferramentas",
+      "medidas": [
+        "Isolar e sinalizar a área abaixo da atividade.",
+        "Utilizar ferramentas amarradas (porta-ferramentas / cordas de retenção) em trabalhos em altura.",
+        "Içar materiais por corda ou balde; nunca arremessar materiais.",
+        "Não acumular materiais nas bordas de plataformas e estruturas."
+      ]
+    },
+    "carga_suspensa": {
+      "categoria": "acidente",
+      "titulo": "Queda de material / carga suspensa (içamento)",
+      "medidas": [
+        "Conferir o peso da carga e a capacidade dos sistemas de ligação do equipamento.",
+        "Verificar cintas, ganchos e manilhas antes do uso. Sistema danificado deverá ser imediatamente retirado da área.",
+        "Garantir a amarração correta da carga.",
+        "É proibida a passagem ou permanência abaixo da carga suspensa ou da lança hidráulica do equipamento, mesmo das pessoas envolvidas na movimentação de carga.",
+        "Durante a movimentação de carga o operador não deve passar a carga suspensa por sobre pessoas; caso haja alguém dentro do raio de segurança, a atividade deve ser interrompida imediatamente pelo operador.",
+        "Manter distância segura da carga e do equipamento e comunicação constante com o operador.",
+        "Nunca colocar as mãos ou parte do corpo entre a carga e a estrutura.",
+        "Isolar e sinalizar a área de movimentação de cargas."
+      ]
+    },
+    "atropelamento": {
+      "categoria": "acidente",
+      "titulo": "Atropelamento",
+      "medidas": [
+        "Manter distância mínima de 5 metros do equipamento ou veículo em funcionamento.",
+        "Caminhar pelos acessos seguros, atravessar nas faixas de pedestre, observar o trânsito em todos os sentidos.",
+        "Obrigatório o uso do colete refletivo.",
+        "Isolar e sinalizar a área de operação.",
+        "Manter somente pessoas autorizadas na área.",
+        "Manter comunicação entre o operador, o sinaleiro e a equipe.",
+        "Sempre que necessário, caso o operador não tenha visão plena da área de operação, deve existir um \"sinaleiro\" para dar orientação ao operador."
+      ]
+    },
+    "tombamento_equipamento": {
+      "categoria": "acidente",
+      "titulo": "Tombamento do equipamento (munck / PEMT)",
+      "medidas": [
+        "Realizar avaliação prévia do terreno antes de iniciar.",
+        "Proibido patolar em solo úmido (barro ou grama molhada).",
+        "Patolar o equipamento corretamente em terreno firme, nivelado e resistente.",
+        "Movimentar o equipamento no campo com velocidade adequada (10 km/h) e não realizar movimentos bruscos.",
+        "Identificar a capacidade de carga e não exceder a carga permitida do equipamento.",
+        "Em caso de vento forte ou carga desbalanceada, paralisar a atividade."
+      ]
+    },
+    "tombamento_escada": {
+      "categoria": "acidente",
+      "titulo": "Tombamento de escada",
+      "medidas": [
+        "Verificar o piso onde serão realizadas as atividades com escadas.",
+        "Somente escadas inspecionadas e com lacre de liberação poderão ser utilizadas.",
+        "A escada deverá estar fixada / amarrada.",
+        "Ficar sempre de frente para a escada quando estiver subindo e realizando a atividade.",
+        "Não subir escadas com as mãos ocupadas com qualquer material.",
+        "Obter o tamanho correto de escada para o trabalho que será realizado."
+      ]
+    },
+    "espaco_confinado": {
+      "categoria": "acidente",
+      "titulo": "Espaço confinado (atmosfera perigosa)",
+      "medidas": [
+        "Emitir PET (Permissão de Entrada e Trabalho) conforme NR-33; trabalhadores autorizados, vigia e supervisor de entrada capacitados.",
+        "Realizar medição de atmosfera (O2, explosividade, H2S, CO) antes da entrada e de forma contínua durante a atividade.",
+        "Manter ventilação / exaustão forçada durante toda a atividade.",
+        "Bloquear e raquetear todas as linhas que chegam ao espaço confinado.",
+        "Vigia permanente na entrada e equipamento de resgate (tripé / guincho) disponível no local."
+      ]
+    }
+  },
+
+  "rodape_atividade": "**Qualquer ocorrência, incidente ou CI deverá ser reportado ao responsável Ambev.\nEM CASO DE EMERGÊNCIA ACIONAR A BRIGADA DE EMERGÊNCIA: {brigada}"
+}

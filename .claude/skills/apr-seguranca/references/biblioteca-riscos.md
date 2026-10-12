@@ -1,9 +1,9 @@
 # Biblioteca de riscos e medidas de controle
 
-Base de consulta para montar a APR. Pegue só o que se aplica à atividade e
-adapte o texto ao serviço real (nome do equipamento, área, fluido, altura).
-Uma APR genérica, com risco que não existe no serviço, perde credibilidade com
-quem vai assinar.
+Consulta para riscos que não estão no catálogo de `assets/biblioteca.json`
+(campo `riscos_extras`) e para medidas específicas (`medidas_extras`). Pegue
+só o que se aplica à atividade e escreva no estilo da empresa: frases curtas,
+imperativas e verificáveis em campo, citando o equipamento e a área reais.
 
 ## Sumário
 

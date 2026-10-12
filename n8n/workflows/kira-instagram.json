@@ -1886,7 +1886,7 @@
           "parameters": [
             {
               "name": "fields",
-              "value": "={{ 'instagram_business_account{username,followers_count,media_count,media.limit(' + $json.quantidade + '){caption,media_type,media_product_type,timestamp,like_count,comments_count,permalink}' + '}' }}"
+              "value": "={{ 'instagram_business_account{username,followers_count,media_count,media.limit(' + $json.quantidade + '){id,caption,media_type,media_product_type,timestamp,like_count,comments_count,permalink}' + '}' }}"
             }
           ]
         },
@@ -1898,8 +1898,8 @@
       "onError": "continueErrorOutput"
     },
     {
-      "id": "c76dee95-bb7d-4449-a64e-179541a59d5f",
-      "name": "Resumir posts",
+      "id": "faf2268a-f160-4945-afc2-5f46d0ac546a",
+      "name": "Separar posts",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -1909,7 +1909,52 @@
       "parameters": {
         "mode": "runOnceForAllItems",
         "language": "javaScript",
-        "jsCode": "// Resume a conta e os últimos posts. Devolve só números e textos curtos: nunca os links de paginação\n// do Facebook, que carregam a chave de acesso.\nconst FUSO = 'America/Sao_Paulo';\nconst TIPOS = { IMAGE: 'foto', CAROUSEL_ALBUM: 'carrossel', VIDEO: 'vídeo' };\nconst conta = $input.first().json.instagram_business_account;\nif (!conta || !conta.username) throw new Error('A Página do Facebook não tem uma conta do Instagram ligada.');\nconst quando = (iso) => {\n  const d = new Date(String(iso ?? '').replace(/([+-]\\d\\d)(\\d\\d)$/, '$1:$2'));\n  return isNaN(d) ? '' : DateTime.fromJSDate(d).setZone(FUSO).toFormat('dd/MM/yyyy HH:mm');\n};\nconst curta = (s, n) => {\n  const t = String(s ?? '').replace(/\\s+/g, ' ').trim();\n  return t.length > n ? t.slice(0, n - 1) + '…' : t;\n};\nconst posts = (conta.media?.data ?? []).map((p, i) => ({\n  posicao: i + 1,\n  data: quando(p.timestamp),\n  tipo: p.media_product_type === 'REELS' ? 'reels' : TIPOS[p.media_type] ?? String(p.media_type ?? '').toLowerCase(),\n  legenda: curta(p.caption, 150),\n  curtidas: p.like_count ?? null,\n  comentarios: p.comments_count ?? null,\n  link: p.permalink ?? '',\n}));\nreturn [\n  {\n    json: {\n      ok: true,\n      conta: '@' + conta.username,\n      seguidores: conta.followers_count ?? null,\n      total_de_posts: conta.media_count ?? null,\n      posts,\n      observacao: 'Curtidas e comentários contam até agora. Alcance e visualizações ainda não estão liberados.',\n    },\n  },\n];\n"
+        "jsCode": "// Um item por post, para buscar os números de cada um (o Instagram dá alcance e visualizações post a post).\nconst posts = $input.first().json.instagram_business_account?.media?.data ?? [];\nreturn posts.length ? posts.map((p) => ({ json: { id: String(p.id ?? '') } })) : [{ json: { id: '' } }];\n"
+      }
+    },
+    {
+      "id": "921a2647-0aac-45c5-afa4-4a2d9b76bb61",
+      "name": "Buscar alcance",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1140,
+        960
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://graph.facebook.com/' + $json.id + '/insights' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "metric",
+              "value": "reach,views,saved,shares"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "credentials": {},
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "c76dee95-bb7d-4449-a64e-179541a59d5f",
+      "name": "Resumir posts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1360,
+        960
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Resume a conta e os últimos posts, com o alcance e as visualizações de cada um. Devolve só números e textos\n// curtos: nunca os links de paginação do Facebook nem o texto bruto dos erros, que podem carregar a chave de acesso.\nconst FUSO = 'America/Sao_Paulo';\nconst TIPOS = { IMAGE: 'foto', CAROUSEL_ALBUM: 'carrossel', VIDEO: 'vídeo' };\nconst conta = $('Buscar posts').first().json.instagram_business_account;\nif (!conta || !conta.username) throw new Error('A Página do Facebook não tem uma conta do Instagram ligada.');\nconst quando = (iso) => {\n  const d = new Date(String(iso ?? '').replace(/([+-]\\d\\d)(\\d\\d)$/, '$1:$2'));\n  return isNaN(d) ? '' : DateTime.fromJSDate(d).setZone(FUSO).toFormat('dd/MM/yyyy HH:mm');\n};\nconst curta = (s, n) => {\n  const t = String(s ?? '').replace(/\\s+/g, ' ').trim();\n  return t.length > n ? t.slice(0, n - 1) + '…' : t;\n};\n// Números de cada post, na mesma ordem dos posts (o nó anterior devolve um item por post, com erro ou não).\nconst numeros = $input.all().map((i) => i.json);\nconst metricas = (r) => {\n  const m = {};\n  for (const x of Array.isArray(r?.data) ? r.data : []) {\n    const v = x?.values?.[0]?.value ?? x?.total_value?.value;\n    if (x?.name && typeof v === 'number') m[x.name] = v;\n  }\n  return m;\n};\nlet falhou = '';\nconst posts = (conta.media?.data ?? []).map((p, i) => {\n  const r = numeros[i] ?? {};\n  if (r.error && !falhou) falhou = /\\(#10\\)|\\(#200\\)|permiss/i.test(JSON.stringify(r.error)) ? 'sem permissão' : 'indisponível';\n  const m = metricas(r);\n  return {\n    posicao: i + 1,\n    data: quando(p.timestamp),\n    tipo: p.media_product_type === 'REELS' ? 'reels' : TIPOS[p.media_type] ?? String(p.media_type ?? '').toLowerCase(),\n    legenda: curta(p.caption, 150),\n    curtidas: p.like_count ?? null,\n    comentarios: p.comments_count ?? null,\n    alcance: m.reach ?? null,\n    visualizacoes: m.views ?? null,\n    salvamentos: m.saved ?? null,\n    compartilhamentos: m.shares ?? null,\n    link: p.permalink ?? '',\n  };\n});\nconst comNumeros = posts.filter((p) => p.alcance !== null || p.visualizacoes !== null).length;\nlet observacao = 'Os números contam até agora; o Instagram atualiza alcance e visualizações com algumas horas de atraso. Alcance = contas diferentes que viram o post; visualizações = vezes que ele foi visto.';\nif (!comNumeros && posts.length) {\n  observacao = falhou === 'sem permissão'\n    ? 'Alcance e visualizações não vieram: o Instagram recusou por falta de permissão (a chave do Instagram no n8n precisa da permissão instagram_manage_insights).'\n    : 'Alcance e visualizações não vieram agora (o Instagram não respondeu esses números). Curtidas e comentários estão certos.';\n} else if (comNumeros < posts.length) {\n  observacao += ' Alguns posts vieram sem esses números (o Instagram não tem números para posts antigos ou de antes da conta virar profissional).';\n}\nreturn [\n  {\n    json: {\n      ok: true,\n      conta: '@' + conta.username,\n      seguidores: conta.followers_count ?? null,\n      total_de_posts: conta.media_count ?? null,\n      posts,\n      observacao,\n    },\n  },\n];\n"
       },
       "onError": "continueErrorOutput"
     },
@@ -3157,7 +3202,7 @@
       "main": [
         [
           {
-            "node": "Resumir posts",
+            "node": "Separar posts",
             "type": "main",
             "index": 0
           }
@@ -3165,6 +3210,28 @@
         [
           {
             "node": "Falha nos posts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Separar posts": {
+      "main": [
+        [
+          {
+            "node": "Buscar alcance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar alcance": {
+      "main": [
+        [
+          {
+            "node": "Resumir posts",
             "type": "main",
             "index": 0
           }

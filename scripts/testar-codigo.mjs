@@ -2423,12 +2423,33 @@ teste('instagram: espera o Instagram processar antes de publicar e explica a fal
 });
 teste('instagram: últimos posts e rascunhos só com números e textos curtos (sem links com a chave)', () => {
   const conta = { username: 'loja', followers_count: 49, media_count: 84, media: { data: [{ timestamp: '2026-10-10T16:46:53+0000', media_type: 'IMAGE', caption: 'Olá', like_count: 1, comments_count: 0, permalink: 'https://www.instagram.com/p/x/' }], paging: { next: 'https://graph.facebook.com/x?access_token=EAA123' } } };
-  const r = rodarInsta('Resumir posts', { entrada: [{ instagram_business_account: conta }] })[0].json;
+  const numeros = { data: [{ name: 'reach', period: 'lifetime', values: [{ value: 8 }] }, { name: 'views', values: [{ value: 18 }] }, { name: 'saved', values: [{ value: 0 }] }] };
+  const r = rodarInsta('Resumir posts', { nos: { 'Buscar posts': { instagram_business_account: conta } }, entrada: [numeros] })[0].json;
   assert.equal(r.conta, '@loja');
   assert.deepEqual([r.seguidores, r.total_de_posts, r.posts[0].tipo, r.posts[0].curtidas], [49, 84, 'foto', 1]);
+  assert.deepEqual([r.posts[0].alcance, r.posts[0].visualizacoes, r.posts[0].salvamentos, r.posts[0].compartilhamentos], [8, 18, 0, null]);
   assert.equal(r.posts[0].data, '2026-10-10T16:46');
   assert.doesNotMatch(JSON.stringify(r), /access_token/);
-  assert.throws(() => rodarInsta('Resumir posts', { entrada: [{ id: '1' }] }), /não tem uma conta do Instagram/);
+  assert.throws(() => rodarInsta('Resumir posts', { nos: { 'Buscar posts': { id: '1' } }, entrada: [{}] }), /não tem uma conta do Instagram/);
+  // sem a permissão de insights, os posts vêm assim mesmo e a observação explica (sem o texto bruto do erro)
+  const semPermissao = rodarInsta('Resumir posts', {
+    nos: { 'Buscar posts': { instagram_business_account: conta } },
+    entrada: [{ error: { message: '(#10) Application does not have permission https://x?access_token=EAA123' } }],
+  })[0].json;
+  assert.equal(semPermissao.posts[0].alcance, null);
+  assert.match(semPermissao.observacao, /instagram_manage_insights/);
+  assert.doesNotMatch(JSON.stringify(semPermissao), /access_token|EAA123/);
+  // um item por post para buscar os números; post sem números não derruba os outros
+  assert.deepEqual(rodarInsta('Separar posts', { entrada: [{ instagram_business_account: { media: { data: [{ id: 7 }, { id: '8' }] } } }] }).map((i) => i.json.id), ['7', '8']);
+  assert.deepEqual(rodarInsta('Separar posts', { entrada: [{ instagram_business_account: {} }] }).map((i) => i.json.id), ['']);
+  const alcance = noDe(insta, 'Buscar alcance');
+  assert.equal(alcance.onError, 'continueRegularOutput');
+  assert.equal(alcance.parameters.queryParameters.parameters[0].value, 'reach,views,saved,shares');
+  assert.match(noDe(insta, 'Buscar posts').parameters.queryParameters.parameters[0].value, /\{id,caption,/);
+  const ligacoesPosts = (nome) => (insta.connections[nome]?.main ?? []).map((saida) => (saida ?? []).map((l) => l.node));
+  assert.deepEqual(ligacoesPosts('Buscar posts'), [['Separar posts'], ['Falha nos posts']]);
+  assert.deepEqual(ligacoesPosts('Separar posts'), [['Buscar alcance']]);
+  assert.deepEqual(ligacoesPosts('Buscar alcance'), [['Resumir posts']]);
   const lista = rodarInsta('Listar rascunhos', { entrada: [{ id: 1, status: 'publicado' }, { id: 2, status: 'pendente', legenda: 'a' }, { id: 3, status: 'erro', erro: 'x', legenda: 'b' }] })[0].json;
   assert.deepEqual(lista.rascunhos.map((x) => x.rascunho), [3, 2]);
   assert.equal(rodarInsta('Listar rascunhos', { entrada: [{}] })[0].json.total, 0);

@@ -51,7 +51,7 @@ Meu bot particular: a **Kira** é uma assistente pessoal de IA que roda no **n8n
 | 📬 Outlook | Lê e-mails e agenda quando você pergunta e prepara **rascunhos** de resposta, já com a sua assinatura (imagem e e-mail) e, se você quiser, com imagem anexa. Nunca envia, apaga ou altera nada: você revisa e envia. |
 | 📁 Google Drive | Procura e lê Documentos, Planilhas e Apresentações do Google e arquivos de texto. Só leitura. |
 | 💼 LinkedIn | Escreve o post e guarda como rascunho numerado, com ou sem imagem. Só vai para o LinkedIn quando você manda `/publicar N`. |
-| 📸 Instagram da loja | No modo Negócios, escreve a legenda, guarda o rascunho numerado (com uma imagem ou um vídeo seu, para Reels) e manda a prévia no Telegram. Só publica quando você manda `/instagram N`. Também mostra os últimos posts com curtidas e comentários. |
+| 📸 Instagram da loja | No modo Negócios, escreve a legenda, guarda o rascunho numerado (com uma imagem ou um vídeo seu, para Reels) e manda a prévia no Telegram. Só publica quando você manda `/instagram N`. Também mostra os últimos posts com curtidas, comentários, alcance e visualizações. |
 | 🎬 Vídeo vitrine | Junta de 1 a 3 fotos num vídeo vertical para Reels, com movimento suave, transições e a música que você mandou (áudio com a legenda "música"). Grátis, sem IA: quem monta é o serviço de vídeo da VPS. |
 | 🖼️ Imagens | Gera imagens com o Gemini ("Nano Banana") quando você pede, manda no Telegram e numera (#1, #2…) para usar no LinkedIn ou em e-mails. |
 | 💬 Teams | Lista e lê suas conversas do Microsoft Teams e escreve ou responde em seu nome **quando você pede** ("responde o João que o pedido sai amanhã"). |

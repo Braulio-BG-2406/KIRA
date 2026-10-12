@@ -3608,7 +3608,7 @@
             {
               "id": "re-texto",
               "name": "texto_resposta",
-              "value": "={{ /429|quota|RESOURCE_EXHAUSTED|rate limit/i.test(JSON.stringify($json.error ?? $json)) ? 'Atingi o limite de uso do Gemini por agora. 😕 Tente de novo em alguns minutos.' : ((!$('Pergunta').isExecuted && $('Normalizar entrada').first().json.tipo_entrada === 'voz') ? 'Não consegui processar o seu áudio. 😕 Pode tentar de novo ou me mandar por texto?' : ((!$('Pergunta').isExecuted && $('Normalizar entrada').first().json.tipo_entrada === 'imagem') ? 'Não consegui abrir a sua foto. 😕 Pode mandar de novo?' : 'Desculpe, tive um problema técnico e não consegui responder agora. 😕 Tente de novo em instantes.')) }}",
+              "value": "={{ /spend|spending|cap\\b|billing|prepa(id|y)|credit|saldo|faturamento/i.test(JSON.stringify($json.error ?? $json)) ? 'O Gemini parou porque o teto de gasto do mês ou o saldo pré-pago acabou. 😕 Para eu voltar agora, suba o teto ou coloque crédito no AI Studio (Gasto, no projeto da chave da Kira); se não, eu volto sozinha no dia 1º.' : /429|quota|RESOURCE_EXHAUSTED|rate limit/i.test(JSON.stringify($json.error ?? $json)) ? 'Atingi o limite de uso do Gemini por agora. 😕 Tente de novo em alguns minutos.' : ((!$('Pergunta').isExecuted && $('Normalizar entrada').first().json.tipo_entrada === 'voz') ? 'Não consegui processar o seu áudio. 😕 Pode tentar de novo ou me mandar por texto?' : ((!$('Pergunta').isExecuted && $('Normalizar entrada').first().json.tipo_entrada === 'imagem') ? 'Não consegui abrir a sua foto. 😕 Pode mandar de novo?' : 'Desculpe, tive um problema técnico e não consegui responder agora. 😕 Tente de novo em instantes.')) }}",
               "type": "string"
             },
             {

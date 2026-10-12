@@ -429,6 +429,17 @@ teste('vídeos: o vídeo do Telegram fica guardado (Vídeo #N) para virar Reels;
   }
 });
 
+teste('erro: teto de gasto ou saldo do Gemini acabou vira um aviso claro; outros limites pedem para tentar de novo', () => {
+  const valor = nos['Resposta de erro'].parameters.assignments.assignments.find((a) => a.name === 'texto_resposta').value;
+  const responder = (error, tipo_entrada = 'texto') =>
+    new Function('$json', '$', `return (${valor.slice(3, -2)})`)({ error }, () => ({ isExecuted: true, first: () => ({ json: { tipo_entrada } }) }));
+  assert.match(responder({ message: '429 Your project has exceeded its monthly spending cap' }), /teto de gasto do mês ou o saldo pré-pago acabou/);
+  assert.match(responder({ message: 'Billing account prepayment balance is depleted' }), /volto sozinha no dia 1º/);
+  assert.match(responder({ message: '[429] RESOURCE_EXHAUSTED: check quota' }), /Atingi o limite de uso do Gemini por agora/);
+  assert.match(responder('timeout'), /problema técnico/);
+  assert.doesNotMatch(responder({ message: 'model capacity exceeded' }), /teto de gasto/);
+});
+
 teste('workflow: todas as conexões apontam para nós que existem', () => {
   for (const [origem, tipos] of Object.entries(workflow.connections)) {
     assert.ok(nos[origem], `origem inexistente: ${origem}`);

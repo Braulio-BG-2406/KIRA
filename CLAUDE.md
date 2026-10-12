@@ -1,12 +1,14 @@
 # Kira: regras do projeto para o Claude
 
-A Kira é a assistente pessoal do dono: Telegram + n8n + Google Gemini (chave gratuita). Este repositório guarda a
+A Kira é a assistente pessoal do dono: Telegram + n8n + Google Gemini. Este repositório guarda a
 versão **genérica** dos workflows, os testes e a documentação; a versão real roda no n8n do dono.
 
 ## Conversa com o dono
 - Responda sempre em **português do Brasil**, com linguagem simples: o dono não é técnico. Passos numerados, um
   de cada vez, dizendo onde clicar e o que deve aparecer na tela.
-- Tudo precisa ser **gratuito** (Gemini com chave gratuita, n8n instalado na VPS, apps OAuth próprios).
+- Custo: o Gemini usa uma chave **paga, no pré-pagamento, com teto mensal** definido pelo dono (o plano pago também
+  evita que o Google use os dados da empresa). O resto é **gratuito** (n8n na VPS, apps OAuth próprios). Nada de
+  novo custo sem o dono aprovar, e prefira o caminho que gasta menos chamadas.
 - **Nunca peça nem aceite** senhas, tokens, chaves de API ou segredos no chat: eles vão direto nas credenciais do
   n8n ou no gerenciador de senhas do dono. Se ele colar um segredo, não repita o valor e oriente a trocar.
 - Não repita o IP da VPS no chat (o nome da VPS basta).

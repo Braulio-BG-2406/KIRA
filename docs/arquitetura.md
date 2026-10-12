@@ -50,7 +50,7 @@ Os nomes em **negrito** são os nós do workflow [`n8n/workflows/kira-1.0.json`]
 7. **Pergunta** → **Detectar troca de ambiente** → **Trocar ambiente?**: mensagens curtas como "modo pessoal", "quero o modo negócios" ou "/negocios" trocam o ambiente (**Salvar ambiente** → **Resposta: ambiente ativado**); nos áudios, também vale "moto pessoal", um erro comum da transcrição. Nas outras, **Buscar memórias** → **Memórias do ambiente** (só as do ambiente ativo e as gerais) → **Contexto da conversa** montam o que a Kira precisa: a pergunta, a data e hora, o perfil, o ambiente e as memórias.
 8. **Kira** (AI Agent) responde usando:
    - **Gemini (principal)** e **Gemini (reserva)**: se o principal falhar, a reserva assume;
-   - **Memória da conversa**: as últimas 20 trocas, separadas por ambiente;
+   - **Memória da conversa**: as últimas 10 trocas, separadas por ambiente;
    - ferramentas **salvar_memoria** e **apagar_memoria** (tabela `kira_memoria`, com o ambiente de cada memória);
    - **buscar_conversas**, **criar_tarefa**, **listar_tarefas**, **concluir_tarefa**, **salvar_contato** e **buscar_contatos**: sempre do seu usuário e do ambiente ativo (tabelas `kira_logs`, `kira_tarefas` e `kira_contatos`);
    - ferramentas do Outlook: **emails_recentes**, **buscar_emails**, **ler_email** e **agenda** (leitura), pelo Microsoft Graph, e **criar_rascunho_resposta** (só rascunho, com a assinatura do dono; sub-workflow abaixo);
@@ -135,6 +135,8 @@ Todas as tabelas também têm `id`, `createdAt` e `updatedAt`, criados pelo n8n.
 
 **Reels por envio direto, não pelo link.** Com `video_url`, o Instagram baixava o vídeo do link público e recusava (status `ERROR`, código 2207077, fora da lista oficial da Meta). No envio `resumable`, o workflow cria o Reels sem o vídeo, baixa o arquivo do Telegram e manda os bytes para `rupload.facebook.com` com a mesma chave (por isso a credencial libera esse domínio). As fotos continuam pelo link, que ajusta o formato.
 
+**Instruções fixas no começo, para o cache do Gemini.** As instruções da Kira (cerca de 17 mil caracteres) e as ferramentas vão em todas as chamadas. O Gemini dá desconto automático quando o começo do pedido se repete, então tudo o que muda a cada mensagem (data e hora, ambiente ativo, memórias, canal) fica numa seção no fim, "Esta conversa agora". A conversa manda só as 10 últimas trocas: o que importa a longo prazo vai para a memória de longo prazo.
+
 **Editar a própria foto, não criar outra.** Para um post com o produto, uma imagem criada do zero mostra uma peça que não existe. Por isso a foto recebida fica guardada com um número e a ferramenta `gerar_imagem` aceita `imagem_base`: a foto original vai junto para o modelo de imagem do Gemini, com a instrução de mudar só o que foi pedido e manter a peça idêntica. Sem formato pedido, a imagem editada mantém o formato da foto. Também serve para ajustar uma imagem já gerada ("deixa a #3 com o fundo mais claro").
 
 **Transcrição com o Gemini.** O mesmo Gemini que conversa também entende áudio. O nó usa a operação *Analyze audio* com uma instrução em português ("transcreva literalmente…; se não houver fala, responda [inaudível]"), o que dá uma transcrição limpa, sem rótulos.
@@ -159,7 +161,7 @@ Todas as tabelas também têm `id`, `createdAt` e `updatedAt`, criados pelo n8n.
 
 **Ambientes separados (Kira 2.0).** O ambiente ativo fica em `kira_config` e só muda por uma mensagem curta de troca ("modo pessoal"), reconhecida por código, sem IA: assim a troca é previsível e barata. A IA é instruída a nunca dizer que trocou de ambiente; se você pedir a troca no meio de outra frase, ela pede o comando curto. A separação vale em várias camadas: a memória da conversa usa uma chave por ambiente, as memórias de longo prazo são filtradas antes de chegar à IA, e as ferramentas de tarefas, contatos e conversas filtram por usuário e ambiente com valores que vêm do workflow, nunca da IA. As instruções completam o resto: a Kira não usa dados de outro ambiente sem autorização na mesma mensagem. A lista de ambientes fica num nó próprio (**Ambientes da Kira**), separado da configuração geral.
 
-**Histórico quebrado se conserta sozinho.** A memória da conversa guarda também as chamadas de ferramenta e manda para o Gemini só as últimas 20 interações. Quando uma resposta usa duas ferramentas ao mesmo tempo, o corte pode passar a cair no meio de uma chamada, e o Gemini recusa o pedido ("function call turn…"). Como a mensagem que falha não entra no histórico, todas as seguintes falhariam do mesmo jeito. Na primeira falha desse tipo, a Kira reinicia o histórico com um resumo das últimas trocas (da tabela `kira_logs`, do mesmo chat e ambiente) e repete a pergunta, então você recebe a resposta sem perceber.
+**Histórico quebrado se conserta sozinho.** A memória da conversa guarda também as chamadas de ferramenta e manda para o Gemini só as últimas 10 interações. Quando uma resposta usa duas ferramentas ao mesmo tempo, o corte pode passar a cair no meio de uma chamada, e o Gemini recusa o pedido ("function call turn…"). Como a mensagem que falha não entra no histórico, todas as seguintes falhariam do mesmo jeito. Na primeira falha desse tipo, a Kira reinicia o histórico com um resumo das últimas trocas (da tabela `kira_logs`, do mesmo chat e ambiente) e repete a pergunta, então você recebe a resposta sem perceber.
 
 **Rascunhos automáticos, nunca envio.** Um workflow agendado, separado da Kira, prepara respostas para e-mails sobre pedidos. Um filtro por palavras evita chamar a IA para e-mails que não interessam; a IA decide se responde, consulta a base de pedidos e escreve; o Outlook só recebe um rascunho (`createReply`, com a assinatura). O e-mail é tratado como texto de terceiros (a Kira ignora instruções dentro dele), remetentes de fora recebem só dados dos pedidos que citaram e, quando o pedido não está na base, a resposta não afirma que ele não existe.
 
@@ -170,11 +172,11 @@ Todas as tabelas também têm `id`, `createdAt` e `updatedAt`, criados pelo n8n.
 **Áudio como "arquivo de áudio", não como "mensagem de voz".** O nó do Telegram no n8n não tem a operação de mensagem de voz (*sendVoice*). Chamar a API do Telegram direto exigiria colocar o token do bot dentro do workflow, o que é inseguro. Por isso a resposta sai como áudio tocável (título "Kira") com o texto na legenda.
 
 **Duas memórias.**
-- *Curto prazo* (**Memória da conversa**): as últimas 20 trocas, guardadas na memória do n8n. É rápida, mas se perde quando o n8n reinicia.
+- *Curto prazo* (**Memória da conversa**): as últimas 10 trocas, guardadas na memória do n8n. É rápida, mas se perde quando o n8n reinicia.
 - *Longo prazo* (`kira_memoria`): fatos que você pede para guardar. A própria Kira grava e apaga pelas ferramentas; o `user_id` vem do Telegram, nunca da IA, então ela não consegue gravar ou apagar memórias de outra pessoa.
 - O `/limpar` usa um segundo nó de memória com a **mesma Session Key** (`kira-<chat_id>`). No n8n, nós de memória simples com a mesma chave compartilham o mesmo histórico, e é isso que permite apagá-lo pelo nó *Limpar histórico da conversa*.
 
-**Modelo de reserva.** A conversa usa um modelo principal e um de reserva. Se o principal ficar indisponível ou atingir o limite do plano gratuito, o agente usa a reserva sem você perceber.
+**Modelo de reserva.** A conversa usa um modelo principal e um de reserva. Se o principal ficar indisponível ou atingir o limite do plano, o agente usa a reserva sem você perceber.
 
 **Formatação segura.** O Gemini escreve em Markdown; o Telegram aceita um HTML restrito. O nó *Dividir mensagem* converte (negrito, itálico, listas, código, links), escapa `<`, `>` e `&` e divide textos longos. Se ainda assim o Telegram recusar, a mensagem vai sem formatação.
 
@@ -193,7 +195,7 @@ Todas as tabelas também têm `id`, `createdAt` e `updatedAt`, criados pelo n8n.
 - E-mail e agenda só do Outlook: a Kira lê e prepara rascunhos, mas não envia. No Teams, ela só escreve em conversas que já existem. Dos dados da empresa, só a base oficial de pedidos (itens dos últimos 120 dias, os em aberto e os totais mensais); os demais arquivos do OneDrive ainda não. A Kira foi instruída a dizer isso em vez de inventar.
 - A planilha do negócio mostra os números da última vez que foi atualizada e salva no Drive; as vendas são o total do período do relatório (não por mês).
 - O Google Drive é só leitura, e PDFs, Word e imagens do Drive ainda não são lidos.
-- As imagens e as pesquisas na internet dependem das cotas gratuitas diárias do Gemini.
+- O Gemini funciona no plano pago com pré-pagamento e teto mensal: se o saldo ou o teto acabar, a Kira para de usar o Gemini até o dono recarregar ou o mês virar. Imagens são a parte mais cara; a conversa, a mais frequente.
 - O ambiente ativo vale para você em todos os chats e só muda por mensagem ("modo <nome>").
 - Os rascunhos automáticos rodam de segunda a sexta, das 7h às 19h30, até 5 e-mails por rodada, e só usam a base de pedidos.
 - A base de pedidos é atualizada de segunda a sábado, às 9h, 12h, 15h e 18h: entre uma leitura e outra, a Kira responde com a versão anterior (e cita a hora dela).
@@ -208,4 +210,4 @@ Todas as tabelas também têm `id`, `createdAt` e `updatedAt`, criados pelo n8n.
 2. **Memória persistente da conversa** (por exemplo, *Postgres Chat Memory*), para não perder o contexto em reinícios.
 3. **Kira proativa**: o fim do dia já traz a agenda do próximo dia útil e as tarefas do trabalho; falta juntar ao resumo das 7h a agenda do dia e as tarefas abertas de cada ambiente.
 4. **Documentos (PDF e Word) e o conteúdo dos vídeos**, como já acontece com as fotos.
-5. **Privacidade**: e-mails, Teams, pedidos e a planilha do negócio já passam pelo Gemini no plano gratuito, por escolha do dono; o plano pago evita que o Google use esse conteúdo. Este repositório deve ficar privado se passar a guardar qualquer coisa sensível.
+5. **Custo e privacidade**: a Kira usa o Gemini no plano pago (pré-pagamento com teto mensal), que também evita que o Google use o conteúdo de e-mails, Teams, pedidos e planilhas. Vale acompanhar o gasto no AI Studio e cortar o que não compensa. Este repositório deve ficar privado se passar a guardar qualquer coisa sensível.

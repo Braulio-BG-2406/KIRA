@@ -2415,6 +2415,19 @@ teste('nós Code "uma vez por item" não devolvem lista (o n8n recusa e a execu�
   }
 });
 
+teste('vps: o serviço de vídeo (faixa nos Reels) não abre porta na internet e roda sem root', () => {
+  const script = ler('vps/instalar-video.sh');
+  const override = script.slice(script.indexOf("<<'YAML'"), script.indexOf('\nYAML\n'));
+  assert.match(override, /kira-video:/);
+  assert.doesNotMatch(override, /ports:/);
+  assert.match(override, /read_only: true/);
+  assert.match(ler('vps/video/Dockerfile'), /USER nobody/);
+  const servidor = ler('vps/video/servidor.py');
+  assert.match(servidor, /LIMITE_BYTES = 25 \* 1024 \* 1024/);
+  assert.match(servidor, /expansion=none/);
+  assert.match(servidor, /\+faststart/);
+  assert.doesNotMatch(script + servidor, /github\.com\/|raw\.githubusercontent\.com\/[A-Za-z]/);
+});
 teste('segurança: nenhum token do Telegram, chave do Google ou caminho de webhook nos arquivos', () => {
   const arquivos = [
     'n8n/workflows/kira-1.0.json',

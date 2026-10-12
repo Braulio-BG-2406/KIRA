@@ -20,7 +20,8 @@ dnf -y install epel-release >/dev/null 2>&1 ||
 dnf -y install fail2ban fail2ban-systemd >/dev/null 2>&1 || dnf -y install fail2ban python3-systemd >/dev/null
 
 echo "==> 2/3 Configurando"
-MEU_IP="${SSH_CLIENT%% *}"
+MEU_IP="${SSH_CLIENT:-}"
+MEU_IP="${MEU_IP%% *}"
 if systemctl is-active --quiet firewalld; then
   BLOQUEIO=firewallcmd-rich-rules
 else

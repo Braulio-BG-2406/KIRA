@@ -24,6 +24,7 @@ import email.parser
 import email.policy
 import json
 import os
+import re
 import subprocess
 import tempfile
 import threading
@@ -145,9 +146,16 @@ def aplicar_faixa(dados, texto, cor='amarelo', centro_pct=70, letra_pct=4.5):
 
 
 def ler_formulario(tipo, corpo):
-    """Lê um formulário multipart/form-data e devolve {nome do campo: conteúdo}."""
+    """Lê um formulário multipart/form-data e devolve {nome do campo: conteúdo}.
+
+    O n8n manda o formulário já montado como arquivo comum (application/octet-stream): se ele marcar o envio como
+    multipart/form-data, tenta remontar o corpo byte a byte e trava. Nesse caso, a fronteira vem da primeira linha."""
     if 'multipart/form-data' not in (tipo or ''):
-        raise Recusa('mande as fotos e a música como formulário (multipart/form-data)')
+        primeira = corpo[:80].split(b'\r\n', 1)[0]
+        fronteira = primeira[2:].decode('ascii', 'replace')
+        if not (primeira.startswith(b'--') and re.fullmatch(r"[0-9A-Za-z'()+_,./:=?-]{1,70}", fronteira)):
+            raise Recusa('mande as fotos e a música como formulário (multipart/form-data)')
+        tipo = f'multipart/form-data; boundary={fronteira}'
     cabecalho = b'Content-Type: ' + tipo.encode('latin-1') + b'\r\nMIME-Version: 1.0\r\n\r\n'
     mensagem = email.parser.BytesParser(policy=email.policy.HTTP).parsebytes(cabecalho + corpo)
     campos = {}

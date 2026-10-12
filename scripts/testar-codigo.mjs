@@ -2561,8 +2561,10 @@ teste('vídeo vitrine: monta o formulário com fotos e música e para (avisando)
     );
   const [r] = await montar([arquivo('F1', 'image/jpeg'), arquivo('F2', 'image/png'), arquivo('MP3', 'audio/mpeg')]);
   assert.deepEqual(r.json, { ok: true, fotos: [1, 2], musica_id: 3, musica_titulo: 'b', duracao: 12 });
-  const [, fronteira] = r.binary.data.mimeType.match(/^multipart\/form-data; boundary=(\S+)$/);
+  // vai como arquivo comum: com o tipo multipart/form-data, o nó HTTP do n8n remonta o corpo byte a byte e trava
+  assert.equal(r.binary.data.mimeType, 'application/octet-stream');
   const corpo = Buffer.from(r.binary.data.data, 'base64').toString();
+  const [, fronteira] = corpo.match(/^--(kira[0-9a-z]+)\r\n/);
   assert.equal(corpo.split(`--${fronteira}`).length, 5);
   assert.match(corpo, /name="foto2"; filename="foto2"\r\nContent-Type: image\/png\r\n\r\nF2\r\n/);
   assert.match(corpo, /name="musica"; filename="musica"\r\nContent-Type: audio\/mpeg\r\n\r\nMP3\r\n/);
@@ -2594,6 +2596,8 @@ teste('vps: o serviço de vídeo (faixa nos Reels) não abre porta na internet e
   assert.match(servidor, /LIMITE_ARQUIVO = 15 \* 1024 \* 1024/);
   // vídeo vitrine: fotos com zoom suave, transições e música (ou áudio mudo), sem custo de IA
   assert.match(servidor, /'\/vitrine'/);
+  // o formulário chega do n8n como arquivo comum; a fronteira sai da primeira linha do corpo
+  assert.match(servidor, /primeira = corpo\[:80\]\.split\(b'\\r\\n', 1\)\[0\]/);
   assert.match(servidor, /xfade=transition=fade/);
   assert.match(servidor, /anullsrc/);
   assert.match(servidor, /expansion=none/);

@@ -1,5 +1,6 @@
 // Kira — Instagram: sub-workflow da ferramenta instagram da Kira e do comando /instagram <número>.
-// A Kira guarda rascunhos de post (imagem ou vídeo + legenda) e manda a prévia no Telegram; só o dono publica,
+// A Kira guarda rascunhos de post (imagem ou vídeo + legenda; faixa no vídeo só se o dono pedir) e manda a prévia
+// no Telegram; só o dono publica,
 // mandando /instagram <número>. Também mostra os últimos posts com curtidas e comentários.
 // Tudo isso só no modo Negócios (o ambiente vem do workflow da Kira, nunca da IA).
 // Publicação pela API do Instagram com login do Facebook (graph.facebook.com): a credencial Query Auth
@@ -29,6 +30,7 @@ const pedidoDaKira = trigger({
           { name: "imagem_id", type: "number" },
           { name: "video_id", type: "number" },
           { name: "legenda", type: "string" },
+          { name: "faixa", type: "string" },
           { name: "rascunho_id", type: "number" },
           { name: "quantidade", type: "number" },
         ],
@@ -37,7 +39,7 @@ const pedidoDaKira = trigger({
     position: [0, 600],
   },
   output: [
-    { acao: "rascunho", ambiente: "NEGOCIOS", origem: "kira", user_id: "111", chat_id: "111", imagem_id: 3, video_id: 0, legenda: "Legenda do post", rascunho_id: 0, quantidade: 5 },
+    { acao: "rascunho", ambiente: "NEGOCIOS", origem: "kira", user_id: "111", chat_id: "111", imagem_id: 3, video_id: 0, legenda: "Legenda do post", faixa: "", rascunho_id: 0, quantidade: 5 },
   ],
 });
 const validarPedido = node({
@@ -48,7 +50,7 @@ const validarPedido = node({
     parameters: {
       mode: "runOnceForAllItems",
       language: "javaScript",
-      jsCode: "// Confere o pedido e escolhe o caminho. O ambiente vem do workflow da Kira (nó \"Ambiente atual\"), nunca da IA.\n// A IA só guarda rascunhos e consulta; publicar só vem do comando /instagram <número>, mandado pelo dono.\nconst AMBIENTE = 'NEGOCIOS';\nconst ACOES_DA_KIRA = ['rascunho', 'rascunhos', 'posts'];\nconst LIMITE_LEGENDA = 2200;\nconst LIMITE_HASHTAGS = 30;\n\nconst e = $input.first().json;\nconst texto = (v) => String(v ?? '').trim();\nconst inteiro = (v) => Math.max(0, Math.floor(Number(v) || 0));\nconst pedido = {\n  acao: texto(e.acao).toLowerCase(),\n  origem: texto(e.origem).toLowerCase(),\n  ambiente: texto(e.ambiente).toUpperCase(),\n  user_id: texto(e.user_id),\n  chat_id: texto(e.chat_id),\n  legenda: texto(e.legenda),\n  imagem_id: inteiro(e.imagem_id),\n  video_id: inteiro(e.video_id),\n  rascunho_id: inteiro(e.rascunho_id),\n  quantidade: Math.min(10, Math.max(1, inteiro(e.quantidade) || 5)),\n};\nconst recusar = (mensagem) => [{ json: { ...pedido, rota: 'recusar', ok: false, mensagem } }];\n\nif (pedido.acao === 'publicar') {\n  // O rascunho já nasceu no modo Negócios; o comando do dono publica em qualquer ambiente.\n  if (pedido.origem !== 'comando') {\n    return recusar('A publicação no Instagram só acontece quando o dono manda /instagram <número>. Mostre o rascunho e peça para ele mandar o comando.');\n  }\n  if (!pedido.rascunho_id) return recusar('Me diga qual rascunho publicar, por exemplo: /instagram 3');\n  if (!pedido.user_id) return recusar('Não consegui identificar quem pediu a publicação.');\n  return [{ json: { ...pedido, rota: 'publicar' } }];\n}\nif (pedido.ambiente !== AMBIENTE) {\n  return recusar('O Instagram da loja é do ambiente Negócios. Diga ao dono, em uma frase, que ele pode trocar dizendo \"modo negócios\". Não use nem invente dados do Instagram aqui.');\n}\nif (!ACOES_DA_KIRA.includes(pedido.acao)) return recusar('Ação inválida. Use rascunho, rascunhos ou posts.');\nif (!pedido.user_id) return recusar('Não consegui identificar o dono.');\nif (pedido.acao === 'rascunho') {\n  if (!pedido.imagem_id && !pedido.video_id) {\n    return recusar('Todo post do Instagram precisa de uma imagem ou de um vídeo. Para foto, gere ou edite uma com gerar_imagem (ou use o número de uma foto do dono) e passe imagem_id; para Reels, passe video_id (o Vídeo #N que ele mandou).');\n  }\n  if (pedido.imagem_id && pedido.video_id) return recusar('Escolha só um: imagem_id (post de foto) ou video_id (Reels).');\n  if (!pedido.legenda) return recusar('Faltou a legenda do post.');\n  if (pedido.legenda.length > LIMITE_LEGENDA) {\n    return recusar(`A legenda tem ${pedido.legenda.length} caracteres e o Instagram aceita até ${LIMITE_LEGENDA}. Encurte e tente de novo.`);\n  }\n  const hashtags = (pedido.legenda.match(/#[\\p{L}\\p{N}_]+/gu) || []).length;\n  if (hashtags > LIMITE_HASHTAGS) return recusar(`A legenda tem ${hashtags} hashtags e o Instagram aceita até ${LIMITE_HASHTAGS}.`);\n}\nreturn [{ json: { ...pedido, rota: pedido.acao } }];\n",
+      jsCode: "// Confere o pedido e escolhe o caminho. O ambiente vem do workflow da Kira (nó \"Ambiente atual\"), nunca da IA.\n// A IA só guarda rascunhos e consulta; publicar só vem do comando /instagram <número>, mandado pelo dono.\nconst AMBIENTE = 'NEGOCIOS';\nconst ACOES_DA_KIRA = ['rascunho', 'rascunhos', 'posts'];\nconst LIMITE_LEGENDA = 2200;\nconst LIMITE_HASHTAGS = 30;\n// A faixa no vídeo (só quando o dono pede): até 2 linhas de 40 caracteres, como no serviço de vídeo da VPS.\nconst LIMITE_LINHAS_FAIXA = 2;\nconst LIMITE_CARACTERES_FAIXA = 40;\n\nconst e = $input.first().json;\nconst texto = (v) => String(v ?? '').trim();\nconst inteiro = (v) => Math.max(0, Math.floor(Number(v) || 0));\nconst pedido = {\n  acao: texto(e.acao).toLowerCase(),\n  origem: texto(e.origem).toLowerCase(),\n  ambiente: texto(e.ambiente).toUpperCase(),\n  user_id: texto(e.user_id),\n  chat_id: texto(e.chat_id),\n  legenda: texto(e.legenda),\n  faixa: texto(e.faixa)\n    .split(/\\s*[|\\n]\\s*/)\n    .filter(Boolean)\n    .join(' | '),\n  imagem_id: inteiro(e.imagem_id),\n  video_id: inteiro(e.video_id),\n  rascunho_id: inteiro(e.rascunho_id),\n  quantidade: Math.min(10, Math.max(1, inteiro(e.quantidade) || 5)),\n};\nconst recusar = (mensagem) => [{ json: { ...pedido, rota: 'recusar', ok: false, mensagem } }];\n\nif (pedido.acao === 'publicar') {\n  // O rascunho já nasceu no modo Negócios; o comando do dono publica em qualquer ambiente.\n  if (pedido.origem !== 'comando') {\n    return recusar('A publicação no Instagram só acontece quando o dono manda /instagram <número>. Mostre o rascunho e peça para ele mandar o comando.');\n  }\n  if (!pedido.rascunho_id) return recusar('Me diga qual rascunho publicar, por exemplo: /instagram 3');\n  if (!pedido.user_id) return recusar('Não consegui identificar quem pediu a publicação.');\n  return [{ json: { ...pedido, rota: 'publicar' } }];\n}\nif (pedido.ambiente !== AMBIENTE) {\n  return recusar('O Instagram da loja é do ambiente Negócios. Diga ao dono, em uma frase, que ele pode trocar dizendo \"modo negócios\". Não use nem invente dados do Instagram aqui.');\n}\nif (!ACOES_DA_KIRA.includes(pedido.acao)) return recusar('Ação inválida. Use rascunho, rascunhos ou posts.');\nif (!pedido.user_id) return recusar('Não consegui identificar o dono.');\nif (pedido.acao === 'rascunho') {\n  if (!pedido.imagem_id && !pedido.video_id) {\n    return recusar('Todo post do Instagram precisa de uma imagem ou de um vídeo. Para foto, gere ou edite uma com gerar_imagem (ou use o número de uma foto do dono) e passe imagem_id; para Reels, passe video_id (o Vídeo #N que ele mandou).');\n  }\n  if (pedido.imagem_id && pedido.video_id) return recusar('Escolha só um: imagem_id (post de foto) ou video_id (Reels).');\n  if (pedido.faixa) {\n    if (!pedido.video_id) return recusar('A faixa no vídeo só vale para Reels (video_id). Em post de foto, deixe faixa vazia.');\n    const linhas = pedido.faixa.split(' | ');\n    if (linhas.length > LIMITE_LINHAS_FAIXA) return recusar(`A faixa aceita até ${LIMITE_LINHAS_FAIXA} linhas (separe com |).`);\n    if (linhas.some((l) => l.length > LIMITE_CARACTERES_FAIXA)) {\n      return recusar(`Cada linha da faixa aceita até ${LIMITE_CARACTERES_FAIXA} caracteres. Encurte e tente de novo.`);\n    }\n  }\n  if (!pedido.legenda) return recusar('Faltou a legenda do post.');\n  if (pedido.legenda.length > LIMITE_LEGENDA) {\n    return recusar(`A legenda tem ${pedido.legenda.length} caracteres e o Instagram aceita até ${LIMITE_LEGENDA}. Encurte e tente de novo.`);\n  }\n  const hashtags = (pedido.legenda.match(/#[\\p{L}\\p{N}_]+/gu) || []).length;\n  if (hashtags > LIMITE_HASHTAGS) return recusar(`A legenda tem ${hashtags} hashtags e o Instagram aceita até ${LIMITE_HASHTAGS}.`);\n}\nreturn [{ json: { ...pedido, rota: pedido.acao } }];\n",
     },
     position: [220, 600],
   },
@@ -185,6 +187,236 @@ const videoDoPostNaoServe = node({
     position: [1140, -40],
   },
   output: [{ ok: true, mensagem: "" }],
+});
+const temFaixa = ifElse({
+  version: 2.3,
+  config: {
+    name: "Tem faixa?",
+    parameters: {
+      conditions: {
+        options: { caseSensitive: true, leftValue: "", typeValidation: "loose", version: 2 },
+        conditions: [
+          {
+            id: "temFaixa-cond",
+            leftValue: expr("{{ String($('Validar pedido').first().json.faixa ?? '').trim() !== '' }}"),
+            rightValue: "",
+            operator: { type: "boolean", operation: "true", singleValue: true },
+          },
+        ],
+        combinator: "and",
+      },
+      options: {},
+    },
+    position: [1140, -260],
+  },
+});
+const avisarFaixa = node({
+  type: "n8n-nodes-base.telegram",
+  version: 1.2,
+  config: {
+    name: "Avisar faixa",
+    parameters: {
+      resource: "message",
+      operation: "sendMessage",
+      chatId: expr("{{ $('Validar pedido').first().json.chat_id }}"),
+      text: expr("{{ '⏳ Estou colocando a faixa no vídeo #' + $('Validar pedido').first().json.video_id + '. Leva uns 3 minutos; a prévia chega aqui. Não precisa pedir de novo.' }}"),
+      additionalFields: { appendAttribution: false },
+    },
+    credentials: { telegramApi: credTelegram },
+    onError: "continueRegularOutput",
+    position: [1250, -460],
+  },
+  output: [{ ok: true }],
+});
+const baixarVideoFaixa = node({
+  type: "n8n-nodes-base.telegram",
+  version: 1.2,
+  config: {
+    name: "Baixar vídeo (faixa)",
+    parameters: { resource: "file", operation: "get", fileId: expr("{{ $('Buscar vídeo do post').first().json.file_id }}"), download: true, additionalFields: {} },
+    credentials: { telegramApi: credTelegram },
+    onError: "continueErrorOutput",
+    position: [1360, -360],
+  },
+  output: [{ ok: true, result: { file_size: 6060695, file_path: "videos/file_2.mp4" } }],
+});
+const aplicarFaixa = node({
+  type: "n8n-nodes-base.httpRequest",
+  version: 4.2,
+  config: {
+    name: "Aplicar faixa",
+    parameters: {
+      method: "POST",
+      url: "http://kira-video:8080/faixa",
+      sendQuery: true,
+      queryParameters: {
+        parameters: [
+          { name: "texto", value: expr("{{ $('Validar pedido').first().json.faixa }}") },
+          { name: "cor", value: "amarelo" },
+          { name: "altura", value: "92" },
+          { name: "letra", value: "3.2" },
+        ],
+      },
+      sendBody: true,
+      contentType: "binaryData",
+      inputDataFieldName: "data",
+      options: { timeout: 300000, response: { response: { responseFormat: "file", outputPropertyName: "data" } } },
+    },
+    onError: "continueErrorOutput",
+    position: [1580, -360],
+  },
+  output: [{}],
+});
+const mostrarPreviaFaixa = node({
+  type: "n8n-nodes-base.telegram",
+  version: 1.2,
+  config: {
+    name: "Mostrar prévia (faixa)",
+    parameters: {
+      resource: "message",
+      operation: "sendVideo",
+      chatId: expr("{{ $('Validar pedido').first().json.chat_id }}"),
+      binaryData: true,
+      binaryPropertyName: "data",
+      additionalFields: {
+        caption: expr("{{ ('🎬 Prévia do Reels com a faixa\\n\\n' + $('Validar pedido').first().json.legenda).slice(0, 960) + '\\n\\nO número do rascunho para publicar vem na resposta da Kira.' }}"),
+      },
+    },
+    credentials: { telegramApi: credTelegram },
+    onError: "continueErrorOutput",
+    position: [1800, -360],
+  },
+  output: [{ ok: true, result: { video: { file_id: "BAACAgEAAxkBAAID", duration: 14, width: 720, height: 1280, file_size: 5569222 } } }],
+});
+const guardarVideoFaixa = node({
+  type: "n8n-nodes-base.dataTable",
+  version: 1.1,
+  config: {
+    name: "Guardar vídeo com faixa",
+    parameters: {
+      resource: "row",
+      operation: "insert",
+      dataTableId: { __rl: true, mode: "name", value: "kira_videos" },
+      columns: {
+        mappingMode: "defineBelow",
+        value: {
+          user_id: expr("{{ $('Validar pedido').first().json.user_id }}"),
+          chat_id: expr("{{ $('Validar pedido').first().json.chat_id }}"),
+          file_id: expr("{{ $json.result?.video?.file_id ?? $json.result?.document?.file_id ?? $json.result?.animation?.file_id ?? '' }}"),
+          duracao: expr("{{ $json.result?.video?.duration ?? $('Buscar vídeo do post').first().json.duracao ?? 0 }}"),
+          tamanho: expr("{{ $json.result?.video?.file_size ?? 0 }}"),
+          largura: expr("{{ $json.result?.video?.width ?? $('Buscar vídeo do post').first().json.largura ?? 0 }}"),
+          altura: expr("{{ $json.result?.video?.height ?? $('Buscar vídeo do post').first().json.altura ?? 0 }}"),
+          mime: "video/mp4",
+          legenda: expr("{{ 'faixa: ' + $('Validar pedido').first().json.faixa }}"),
+        },
+        matchingColumns: [],
+        schema: [
+          { id: "user_id", displayName: "user_id", required: false, defaultMatch: false, display: true, type: "string", canBeUsedToMatch: true },
+          { id: "chat_id", displayName: "chat_id", required: false, defaultMatch: false, display: true, type: "string", canBeUsedToMatch: true },
+          { id: "file_id", displayName: "file_id", required: false, defaultMatch: false, display: true, type: "string", canBeUsedToMatch: true },
+          { id: "duracao", displayName: "duracao", required: false, defaultMatch: false, display: true, type: "number", canBeUsedToMatch: true },
+          { id: "tamanho", displayName: "tamanho", required: false, defaultMatch: false, display: true, type: "number", canBeUsedToMatch: true },
+          { id: "largura", displayName: "largura", required: false, defaultMatch: false, display: true, type: "number", canBeUsedToMatch: true },
+          { id: "altura", displayName: "altura", required: false, defaultMatch: false, display: true, type: "number", canBeUsedToMatch: true },
+          { id: "mime", displayName: "mime", required: false, defaultMatch: false, display: true, type: "string", canBeUsedToMatch: true },
+          { id: "legenda", displayName: "legenda", required: false, defaultMatch: false, display: true, type: "string", canBeUsedToMatch: true },
+        ],
+      },
+      options: {},
+    },
+    executeOnce: true,
+    position: [2020, -360],
+  },
+  output: [{ id: 3, file_id: "BAACAgEAAxkBAAID" }],
+});
+const guardarRascunhoFaixa = node({
+  type: "n8n-nodes-base.dataTable",
+  version: 1.1,
+  config: {
+    name: "Guardar rascunho (faixa)",
+    parameters: {
+      resource: "row",
+      operation: "insert",
+      dataTableId: { __rl: true, mode: "name", value: "kira_instagram" },
+      columns: {
+        mappingMode: "defineBelow",
+        value: {
+          user_id: expr("{{ $('Validar pedido').first().json.user_id }}"),
+          chat_id: expr("{{ $('Validar pedido').first().json.chat_id }}"),
+          imagem_id: 0,
+          video_id: expr("{{ $json.id }}"),
+          legenda: expr("{{ $('Validar pedido').first().json.legenda }}"),
+          status: "pendente",
+        },
+        matchingColumns: [],
+        schema: [
+          { id: "user_id", displayName: "user_id", required: false, defaultMatch: false, display: true, type: "string", canBeUsedToMatch: true },
+          { id: "chat_id", displayName: "chat_id", required: false, defaultMatch: false, display: true, type: "string", canBeUsedToMatch: true },
+          { id: "imagem_id", displayName: "imagem_id", required: false, defaultMatch: false, display: true, type: "number", canBeUsedToMatch: true },
+          { id: "video_id", displayName: "video_id", required: false, defaultMatch: false, display: true, type: "number", canBeUsedToMatch: true },
+          { id: "legenda", displayName: "legenda", required: false, defaultMatch: false, display: true, type: "string", canBeUsedToMatch: true },
+          { id: "status", displayName: "status", required: false, defaultMatch: false, display: true, type: "string", canBeUsedToMatch: true },
+        ],
+      },
+      options: {},
+    },
+    executeOnce: true,
+    position: [2240, -360],
+  },
+  output: [{ id: 8, status: "pendente" }],
+});
+const rascunhoFaixaPronto = node({
+  type: "n8n-nodes-base.set",
+  version: 3.4,
+  config: {
+    name: "Rascunho com faixa pronto",
+    parameters: {
+      mode: "manual",
+      includeOtherFields: false,
+      options: {},
+      assignments: {
+        assignments: [
+          { id: "rcf-0", name: "ok", value: true, type: "boolean" },
+          { id: "rcf-1", name: "rascunho_id", value: expr("{{ $json.id }}"), type: "number" },
+          { id: "rcf-2", name: "video_id", value: expr("{{ $('Guardar vídeo com faixa').first().json.id }}"), type: "number" },
+          {
+            id: "rcf-3",
+            name: "mensagem",
+            type: "string",
+            value: expr("{{ 'Rascunho ' + $json.id + ' do Instagram guardado com o vídeo #' + $('Guardar vídeo com faixa').first().json.id + ' (cópia do vídeo #' + $('Validar pedido').first().json.video_id + ' com a faixa \"' + $('Validar pedido').first().json.faixa + '\"), e a prévia já foi enviada no Telegram. Mostre a legenda completa e diga que, para publicar, ele manda /instagram ' + $json.id + '. Nada foi publicado.' }}"),
+          },
+        ],
+      },
+    },
+    position: [2460, -360],
+  },
+  output: [{ ok: true, mensagem: "" }],
+});
+const faixaFalhou = node({
+  type: "n8n-nodes-base.set",
+  version: 3.4,
+  config: {
+    name: "Faixa falhou",
+    parameters: {
+      mode: "manual",
+      includeOtherFields: false,
+      options: {},
+      assignments: {
+        assignments: [
+          { id: "ff-0", name: "ok", value: false, type: "boolean" },
+          {
+            id: "ff-1",
+            name: "mensagem",
+            type: "string",
+            value: expr("{{ 'Não consegui colocar a faixa no vídeo #' + $('Validar pedido').first().json.video_id + ' (' + String($json.error?.description ?? $json.error?.message ?? $json.error ?? 'erro desconhecido').replace(/\\s+/g, ' ').slice(0, 200) + '). Nada foi guardado. Diga isso em uma frase e ofereça fazer o rascunho sem a faixa.' }}"),
+          },
+        ],
+      },
+    },
+    position: [1800, -180],
+  },
+  output: [{ ok: false, mensagem: "" }],
 });
 const buscarImagemDoPost = node({
   type: "n8n-nodes-base.dataTable",
@@ -1285,12 +1517,15 @@ export default workflow('kira-instagram', 'Kira — Instagram (ferramenta)', {
   .to(validarPedido)
   .to(
     qualCaminho
-      .onCase(0, fotoOuVideo.onTrue(buscarVideoDoPost.to(videoDoPostServe.onTrue(guardarRascunho).onFalse(videoDoPostNaoServe))).onFalse(buscarImagemDoPost.to(imagemDoPostExiste.onTrue(guardarRascunho.to(previaDeVideo.onTrue(mostrarPreviaVideo.to(rascunhoPronto)).onFalse(mostrarPrevia.to(rascunhoPronto)))).onFalse(imagemDoPostNaoEncontrada))))
+      .onCase(0, fotoOuVideo.onTrue(buscarVideoDoPost.to(videoDoPostServe.onTrue(temFaixa.onTrue(avisarFaixa.to(baixarVideoFaixa.to(aplicarFaixa.to(mostrarPreviaFaixa.to(guardarVideoFaixa.to(guardarRascunhoFaixa.to(rascunhoFaixaPronto))))))).onFalse(guardarRascunho)).onFalse(videoDoPostNaoServe))).onFalse(buscarImagemDoPost.to(imagemDoPostExiste.onTrue(guardarRascunho.to(previaDeVideo.onTrue(mostrarPreviaVideo.to(rascunhoPronto)).onFalse(mostrarPrevia.to(rascunhoPronto)))).onFalse(imagemDoPostNaoEncontrada))))
       .onCase(1, buscarRascunho.to(conferirRascunho.to(podePublicar.onTrue(gerarLink.to(marcarPublicando.to(contaDoInstagram.to(eReels.onTrue(criarReels.to(buscarVideoEnvio.to(baixarVideoEnvio.to(enviarVideo.to(avisarProcessamento.to(postCriado)))))).onFalse(criarPost.to(postCriado.to(esperarInstagram.to(statusDoPost.to(conferirProcessamento.to(postPronto.onCase(0, publicarPost.to(linkDoPost.to(marcarPublicado.to(postPublicado)))).onCase(1, esperarInstagram).onCase(2, explicarFalha))))))))))).onFalse(naoPodePublicar))))
       .onCase(2, buscarPosts.to(resumirPosts))
       .onCase(3, buscarRascunhos.to(listarRascunhos))
       .onCase(4, pedidoRecusado),
   )
+  .add(baixarVideoFaixa.onError(faixaFalhou))
+  .add(aplicarFaixa.onError(faixaFalhou))
+  .add(mostrarPreviaFaixa.onError(faixaFalhou))
   .add(contaDoInstagram.onError(explicarFalha))
   .add(criarReels.onError(explicarFalha))
   .add(baixarVideoEnvio.onError(explicarFalha))

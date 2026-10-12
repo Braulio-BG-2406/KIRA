@@ -47,6 +47,10 @@
               "type": "string"
             },
             {
+              "name": "faixa",
+              "type": "string"
+            },
+            {
               "name": "rascunho_id",
               "type": "number"
             },
@@ -70,7 +74,7 @@
       "parameters": {
         "mode": "runOnceForAllItems",
         "language": "javaScript",
-        "jsCode": "// Confere o pedido e escolhe o caminho. O ambiente vem do workflow da Kira (nó \"Ambiente atual\"), nunca da IA.\n// A IA só guarda rascunhos e consulta; publicar só vem do comando /instagram <número>, mandado pelo dono.\nconst AMBIENTE = 'NEGOCIOS';\nconst ACOES_DA_KIRA = ['rascunho', 'rascunhos', 'posts'];\nconst LIMITE_LEGENDA = 2200;\nconst LIMITE_HASHTAGS = 30;\n\nconst e = $input.first().json;\nconst texto = (v) => String(v ?? '').trim();\nconst inteiro = (v) => Math.max(0, Math.floor(Number(v) || 0));\nconst pedido = {\n  acao: texto(e.acao).toLowerCase(),\n  origem: texto(e.origem).toLowerCase(),\n  ambiente: texto(e.ambiente).toUpperCase(),\n  user_id: texto(e.user_id),\n  chat_id: texto(e.chat_id),\n  legenda: texto(e.legenda),\n  imagem_id: inteiro(e.imagem_id),\n  video_id: inteiro(e.video_id),\n  rascunho_id: inteiro(e.rascunho_id),\n  quantidade: Math.min(10, Math.max(1, inteiro(e.quantidade) || 5)),\n};\nconst recusar = (mensagem) => [{ json: { ...pedido, rota: 'recusar', ok: false, mensagem } }];\n\nif (pedido.acao === 'publicar') {\n  // O rascunho já nasceu no modo Negócios; o comando do dono publica em qualquer ambiente.\n  if (pedido.origem !== 'comando') {\n    return recusar('A publicação no Instagram só acontece quando o dono manda /instagram <número>. Mostre o rascunho e peça para ele mandar o comando.');\n  }\n  if (!pedido.rascunho_id) return recusar('Me diga qual rascunho publicar, por exemplo: /instagram 3');\n  if (!pedido.user_id) return recusar('Não consegui identificar quem pediu a publicação.');\n  return [{ json: { ...pedido, rota: 'publicar' } }];\n}\nif (pedido.ambiente !== AMBIENTE) {\n  return recusar('O Instagram da loja é do ambiente Negócios. Diga ao dono, em uma frase, que ele pode trocar dizendo \"modo negócios\". Não use nem invente dados do Instagram aqui.');\n}\nif (!ACOES_DA_KIRA.includes(pedido.acao)) return recusar('Ação inválida. Use rascunho, rascunhos ou posts.');\nif (!pedido.user_id) return recusar('Não consegui identificar o dono.');\nif (pedido.acao === 'rascunho') {\n  if (!pedido.imagem_id && !pedido.video_id) {\n    return recusar('Todo post do Instagram precisa de uma imagem ou de um vídeo. Para foto, gere ou edite uma com gerar_imagem (ou use o número de uma foto do dono) e passe imagem_id; para Reels, passe video_id (o Vídeo #N que ele mandou).');\n  }\n  if (pedido.imagem_id && pedido.video_id) return recusar('Escolha só um: imagem_id (post de foto) ou video_id (Reels).');\n  if (!pedido.legenda) return recusar('Faltou a legenda do post.');\n  if (pedido.legenda.length > LIMITE_LEGENDA) {\n    return recusar(`A legenda tem ${pedido.legenda.length} caracteres e o Instagram aceita até ${LIMITE_LEGENDA}. Encurte e tente de novo.`);\n  }\n  const hashtags = (pedido.legenda.match(/#[\\p{L}\\p{N}_]+/gu) || []).length;\n  if (hashtags > LIMITE_HASHTAGS) return recusar(`A legenda tem ${hashtags} hashtags e o Instagram aceita até ${LIMITE_HASHTAGS}.`);\n}\nreturn [{ json: { ...pedido, rota: pedido.acao } }];\n"
+        "jsCode": "// Confere o pedido e escolhe o caminho. O ambiente vem do workflow da Kira (nó \"Ambiente atual\"), nunca da IA.\n// A IA só guarda rascunhos e consulta; publicar só vem do comando /instagram <número>, mandado pelo dono.\nconst AMBIENTE = 'NEGOCIOS';\nconst ACOES_DA_KIRA = ['rascunho', 'rascunhos', 'posts'];\nconst LIMITE_LEGENDA = 2200;\nconst LIMITE_HASHTAGS = 30;\n// A faixa no vídeo (só quando o dono pede): até 2 linhas de 40 caracteres, como no serviço de vídeo da VPS.\nconst LIMITE_LINHAS_FAIXA = 2;\nconst LIMITE_CARACTERES_FAIXA = 40;\n\nconst e = $input.first().json;\nconst texto = (v) => String(v ?? '').trim();\nconst inteiro = (v) => Math.max(0, Math.floor(Number(v) || 0));\nconst pedido = {\n  acao: texto(e.acao).toLowerCase(),\n  origem: texto(e.origem).toLowerCase(),\n  ambiente: texto(e.ambiente).toUpperCase(),\n  user_id: texto(e.user_id),\n  chat_id: texto(e.chat_id),\n  legenda: texto(e.legenda),\n  faixa: texto(e.faixa)\n    .split(/\\s*[|\\n]\\s*/)\n    .filter(Boolean)\n    .join(' | '),\n  imagem_id: inteiro(e.imagem_id),\n  video_id: inteiro(e.video_id),\n  rascunho_id: inteiro(e.rascunho_id),\n  quantidade: Math.min(10, Math.max(1, inteiro(e.quantidade) || 5)),\n};\nconst recusar = (mensagem) => [{ json: { ...pedido, rota: 'recusar', ok: false, mensagem } }];\n\nif (pedido.acao === 'publicar') {\n  // O rascunho já nasceu no modo Negócios; o comando do dono publica em qualquer ambiente.\n  if (pedido.origem !== 'comando') {\n    return recusar('A publicação no Instagram só acontece quando o dono manda /instagram <número>. Mostre o rascunho e peça para ele mandar o comando.');\n  }\n  if (!pedido.rascunho_id) return recusar('Me diga qual rascunho publicar, por exemplo: /instagram 3');\n  if (!pedido.user_id) return recusar('Não consegui identificar quem pediu a publicação.');\n  return [{ json: { ...pedido, rota: 'publicar' } }];\n}\nif (pedido.ambiente !== AMBIENTE) {\n  return recusar('O Instagram da loja é do ambiente Negócios. Diga ao dono, em uma frase, que ele pode trocar dizendo \"modo negócios\". Não use nem invente dados do Instagram aqui.');\n}\nif (!ACOES_DA_KIRA.includes(pedido.acao)) return recusar('Ação inválida. Use rascunho, rascunhos ou posts.');\nif (!pedido.user_id) return recusar('Não consegui identificar o dono.');\nif (pedido.acao === 'rascunho') {\n  if (!pedido.imagem_id && !pedido.video_id) {\n    return recusar('Todo post do Instagram precisa de uma imagem ou de um vídeo. Para foto, gere ou edite uma com gerar_imagem (ou use o número de uma foto do dono) e passe imagem_id; para Reels, passe video_id (o Vídeo #N que ele mandou).');\n  }\n  if (pedido.imagem_id && pedido.video_id) return recusar('Escolha só um: imagem_id (post de foto) ou video_id (Reels).');\n  if (pedido.faixa) {\n    if (!pedido.video_id) return recusar('A faixa no vídeo só vale para Reels (video_id). Em post de foto, deixe faixa vazia.');\n    const linhas = pedido.faixa.split(' | ');\n    if (linhas.length > LIMITE_LINHAS_FAIXA) return recusar(`A faixa aceita até ${LIMITE_LINHAS_FAIXA} linhas (separe com |).`);\n    if (linhas.some((l) => l.length > LIMITE_CARACTERES_FAIXA)) {\n      return recusar(`Cada linha da faixa aceita até ${LIMITE_CARACTERES_FAIXA} caracteres. Encurte e tente de novo.`);\n    }\n  }\n  if (!pedido.legenda) return recusar('Faltou a legenda do post.');\n  if (pedido.legenda.length > LIMITE_LEGENDA) {\n    return recusar(`A legenda tem ${pedido.legenda.length} caracteres e o Instagram aceita até ${LIMITE_LEGENDA}. Encurte e tente de novo.`);\n  }\n  const hashtags = (pedido.legenda.match(/#[\\p{L}\\p{N}_]+/gu) || []).length;\n  if (hashtags > LIMITE_HASHTAGS) return recusar(`A legenda tem ${hashtags} hashtags e o Instagram aceita até ${LIMITE_HASHTAGS}.`);\n}\nreturn [{ json: { ...pedido, rota: pedido.acao } }];\n"
       }
     },
     {
@@ -293,6 +297,401 @@
           "combinator": "and"
         },
         "options": {}
+      }
+    },
+    {
+      "id": "42de8111-114f-434e-a2c3-c6534aff3554",
+      "name": "Tem faixa?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1140,
+        -260
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "temFaixa-cond",
+              "leftValue": "={{ String($('Validar pedido').first().json.faixa ?? '').trim() !== '' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "c5d51110-f4a6-4551-a820-16e2a01d77e9",
+      "name": "Avisar faixa",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1250,
+        -460
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $('Validar pedido').first().json.chat_id }}",
+        "text": "={{ '⏳ Estou colocando a faixa no vídeo #' + $('Validar pedido').first().json.video_id + '. Leva uns 3 minutos; a prévia chega aqui. Não precisa pedir de novo.' }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "credentials": {},
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "7541f475-ca52-4ea3-a81e-468b9a2c0171",
+      "name": "Baixar vídeo (faixa)",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1360,
+        -360
+      ],
+      "parameters": {
+        "resource": "file",
+        "operation": "get",
+        "fileId": "={{ $('Buscar vídeo do post').first().json.file_id }}",
+        "download": true,
+        "additionalFields": {}
+      },
+      "credentials": {},
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "18a9d362-69f9-4dc0-af9e-1f7deece579b",
+      "name": "Aplicar faixa",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1580,
+        -360
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://kira-video:8080/faixa",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "texto",
+              "value": "={{ $('Validar pedido').first().json.faixa }}"
+            },
+            {
+              "name": "cor",
+              "value": "amarelo"
+            },
+            {
+              "name": "altura",
+              "value": "92"
+            },
+            {
+              "name": "letra",
+              "value": "3.2"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {
+          "timeout": 300000,
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          }
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "73a83b07-77de-4bc1-a4b6-587ef46c5ecc",
+      "name": "Mostrar prévia (faixa)",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1800,
+        -360
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendVideo",
+        "chatId": "={{ $('Validar pedido').first().json.chat_id }}",
+        "binaryData": true,
+        "binaryPropertyName": "data",
+        "additionalFields": {
+          "caption": "={{ ('🎬 Prévia do Reels com a faixa\\n\\n' + $('Validar pedido').first().json.legenda).slice(0, 960) + '\\n\\nO número do rascunho para publicar vem na resposta da Kira.' }}"
+        }
+      },
+      "credentials": {},
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "99fdc4f3-d1c8-41ff-ab07-7eece09f2ea5",
+      "name": "Guardar vídeo com faixa",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2020,
+        -360
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "kira_videos"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "user_id": "={{ $('Validar pedido').first().json.user_id }}",
+            "chat_id": "={{ $('Validar pedido').first().json.chat_id }}",
+            "file_id": "={{ $json.result?.video?.file_id ?? $json.result?.document?.file_id ?? $json.result?.animation?.file_id ?? '' }}",
+            "duracao": "={{ $json.result?.video?.duration ?? $('Buscar vídeo do post').first().json.duracao ?? 0 }}",
+            "tamanho": "={{ $json.result?.video?.file_size ?? 0 }}",
+            "largura": "={{ $json.result?.video?.width ?? $('Buscar vídeo do post').first().json.largura ?? 0 }}",
+            "altura": "={{ $json.result?.video?.height ?? $('Buscar vídeo do post').first().json.altura ?? 0 }}",
+            "mime": "video/mp4",
+            "legenda": "={{ 'faixa: ' + $('Validar pedido').first().json.faixa }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "user_id",
+              "displayName": "user_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "chat_id",
+              "displayName": "chat_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "file_id",
+              "displayName": "file_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "duracao",
+              "displayName": "duracao",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "tamanho",
+              "displayName": "tamanho",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "largura",
+              "displayName": "largura",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "altura",
+              "displayName": "altura",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "mime",
+              "displayName": "mime",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "legenda",
+              "displayName": "legenda",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "9459fad1-7fb7-4a5f-afa1-653f53b3ecf0",
+      "name": "Guardar rascunho (faixa)",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2240,
+        -360
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "kira_instagram"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "user_id": "={{ $('Validar pedido').first().json.user_id }}",
+            "chat_id": "={{ $('Validar pedido').first().json.chat_id }}",
+            "imagem_id": 0,
+            "video_id": "={{ $json.id }}",
+            "legenda": "={{ $('Validar pedido').first().json.legenda }}",
+            "status": "pendente"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "user_id",
+              "displayName": "user_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "chat_id",
+              "displayName": "chat_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "imagem_id",
+              "displayName": "imagem_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "video_id",
+              "displayName": "video_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "legenda",
+              "displayName": "legenda",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "7b8eb0a5-8b02-4a70-a910-8198ff79a08c",
+      "name": "Rascunho com faixa pronto",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2460,
+        -360
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "rcf-0",
+              "name": "ok",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "rcf-1",
+              "name": "rascunho_id",
+              "value": "={{ $json.id }}",
+              "type": "number"
+            },
+            {
+              "id": "rcf-2",
+              "name": "video_id",
+              "value": "={{ $('Guardar vídeo com faixa').first().json.id }}",
+              "type": "number"
+            },
+            {
+              "id": "rcf-3",
+              "name": "mensagem",
+              "type": "string",
+              "value": "={{ 'Rascunho ' + $json.id + ' do Instagram guardado com o vídeo #' + $('Guardar vídeo com faixa').first().json.id + ' (cópia do vídeo #' + $('Validar pedido').first().json.video_id + ' com a faixa \"' + $('Validar pedido').first().json.faixa + '\"), e a prévia já foi enviada no Telegram. Mostre a legenda completa e diga que, para publicar, ele manda /instagram ' + $json.id + '. Nada foi publicado.' }}"
+            }
+          ]
+        }
       }
     },
     {
@@ -1593,6 +1992,37 @@
       }
     },
     {
+      "id": "b6ecaee5-689e-4f3b-aa36-d021f1534e03",
+      "name": "Faixa falhou",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1800,
+        -180
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ff-0",
+              "name": "ok",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "ff-1",
+              "name": "mensagem",
+              "type": "string",
+              "value": "={{ 'Não consegui colocar a faixa no vídeo #' + $('Validar pedido').first().json.video_id + ' (' + String($json.error?.description ?? $json.error?.message ?? $json.error ?? 'erro desconhecido').replace(/\\s+/g, ' ').slice(0, 200) + '). Nada foi guardado. Diga isso em uma frase e ofereça fazer o rascunho sem a faixa.' }}"
+            }
+          ]
+        }
+      }
+    },
+    {
       "id": "697c8a25-42bf-4ef0-a18d-3111d07be881",
       "name": "Marcar falha",
       "type": "n8n-nodes-base.dataTable",
@@ -2205,7 +2635,7 @@
       "main": [
         [
           {
-            "node": "Guardar rascunho",
+            "node": "Tem faixa?",
             "type": "main",
             "index": 0
           }
@@ -2213,6 +2643,111 @@
         [
           {
             "node": "Vídeo do post não serve",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tem faixa?": {
+      "main": [
+        [
+          {
+            "node": "Avisar faixa",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Guardar rascunho",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Avisar faixa": {
+      "main": [
+        [
+          {
+            "node": "Baixar vídeo (faixa)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Baixar vídeo (faixa)": {
+      "main": [
+        [
+          {
+            "node": "Aplicar faixa",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Faixa falhou",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aplicar faixa": {
+      "main": [
+        [
+          {
+            "node": "Mostrar prévia (faixa)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Faixa falhou",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mostrar prévia (faixa)": {
+      "main": [
+        [
+          {
+            "node": "Guardar vídeo com faixa",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Faixa falhou",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar vídeo com faixa": {
+      "main": [
+        [
+          {
+            "node": "Guardar rascunho (faixa)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar rascunho (faixa)": {
+      "main": [
+        [
+          {
+            "node": "Rascunho com faixa pronto",
             "type": "main",
             "index": 0
           }

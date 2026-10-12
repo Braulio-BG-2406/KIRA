@@ -401,6 +401,7 @@ const publicarNoInstagram = node({
           imagem_id: 0,
           video_id: 0,
           legenda: '',
+          faixa: '',
           quantidade: 5,
         },
         matchingColumns: [],
@@ -413,6 +414,7 @@ const publicarNoInstagram = node({
           { id: 'imagem_id', displayName: 'imagem_id', required: false, defaultMatch: false, display: true, canBeUsedToMatch: true, type: 'number' },
           { id: 'video_id', displayName: 'video_id', required: false, defaultMatch: false, display: true, canBeUsedToMatch: true, type: 'number' },
           { id: 'legenda', displayName: 'legenda', required: false, defaultMatch: false, display: true, canBeUsedToMatch: true, type: 'string' },
+          { id: 'faixa', displayName: 'faixa', required: false, defaultMatch: false, display: true, canBeUsedToMatch: true, type: 'string' },
           { id: 'rascunho_id', displayName: 'rascunho_id', required: false, defaultMatch: false, display: true, canBeUsedToMatch: true, type: 'number' },
           { id: 'quantidade', displayName: 'quantidade', required: false, defaultMatch: false, display: true, canBeUsedToMatch: true, type: 'number' },
         ],
@@ -1673,7 +1675,7 @@ const instagramLoja = tool({
     name: 'instagram',
     parameters: {
       description:
-        "Instagram da loja (só no modo Negócios). acao rascunho: guarda um post (imagem_id + legenda, ou video_id + legenda para um Reels) e já manda a prévia no Telegram. NÃO publica: quem publica é o dono, mandando /instagram <número do rascunho>. acao rascunhos: lista os rascunhos que esperam publicação. acao posts: seguidores, total de posts e os últimos posts com curtidas e comentários. Todo post precisa de uma imagem ou de um vídeo: gere ou edite a imagem antes com gerar_imagem (ou use a Foto #N dele); para Reels, use o Vídeo #N que ele mandou. Depois de guardar, mostre a legenda completa e o número do rascunho e diga que, para publicar, ele manda /instagram <número>. Nunca diga que publicou.",
+        "Instagram da loja (só no modo Negócios). acao rascunho: guarda um post (imagem_id + legenda, ou video_id + legenda para um Reels) e já manda a prévia no Telegram. Faixa amarela escrita no vídeo do Reels: só quando ele pedir faixa, tarja ou letreiro no vídeo, passe faixa; nos outros casos deixe vazia, porque o preço vai na legenda. Com faixa, a prévia leva uns 2 minutos. NÃO publica: quem publica é o dono, mandando /instagram <número do rascunho>. acao rascunhos: lista os rascunhos que esperam publicação. acao posts: seguidores, total de posts e os últimos posts com curtidas e comentários. Todo post precisa de uma imagem ou de um vídeo: gere ou edite a imagem antes com gerar_imagem (ou use a Foto #N dele); para Reels, use o Vídeo #N que ele mandou. Depois de guardar, mostre a legenda completa e o número do rascunho e diga que, para publicar, ele manda /instagram <número>. Nunca diga que publicou.",
       source: 'database',
       workflowId: { __rl: true, mode: 'id', value: '' },
       workflowInputs: {
@@ -1687,6 +1689,7 @@ const instagramLoja = tool({
           imagem_id: fromAi('imagem_id', 'Número da imagem do post (o #N de gerar_imagem ou da Foto #N dele); 0 para Reels ou quando não for rascunho', 'number', 0),
           video_id: fromAi('video_id', 'Número do vídeo para um Reels (o Vídeo #N que ele mandou); 0 para post de foto ou quando não for rascunho', 'number', 0),
           legenda: fromAi('legenda', 'Legenda completa do post, com emojis e hashtags (até 2.200 caracteres e 30 hashtags); vazio quando não for rascunho', 'string', ''),
+          faixa: fromAi('faixa', 'Texto da faixa amarela no pé do vídeo do Reels, só quando ele pedir faixa, tarja ou letreiro no vídeo: até 2 linhas separadas por | com até 40 caracteres cada (ex.: R$ 259,99 | Peça única). Vazio em todos os outros casos (o preço vai na legenda)', 'string', ''),
           rascunho_id: 0,
           quantidade: fromAi('quantidade', 'Quantos posts recentes mostrar, de 1 a 10', 'number', 5),
         },
@@ -1700,6 +1703,7 @@ const instagramLoja = tool({
           { id: 'imagem_id', displayName: 'imagem_id', required: false, defaultMatch: false, display: true, canBeUsedToMatch: true, type: 'number' },
           { id: 'video_id', displayName: 'video_id', required: false, defaultMatch: false, display: true, canBeUsedToMatch: true, type: 'number' },
           { id: 'legenda', displayName: 'legenda', required: false, defaultMatch: false, display: true, canBeUsedToMatch: true, type: 'string' },
+          { id: 'faixa', displayName: 'faixa', required: false, defaultMatch: false, display: true, canBeUsedToMatch: true, type: 'string' },
           { id: 'rascunho_id', displayName: 'rascunho_id', required: false, defaultMatch: false, display: true, canBeUsedToMatch: true, type: 'number' },
           { id: 'quantidade', displayName: 'quantidade', required: false, defaultMatch: false, display: true, canBeUsedToMatch: true, type: 'number' },
         ],

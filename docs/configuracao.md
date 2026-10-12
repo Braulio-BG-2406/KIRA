@@ -375,6 +375,7 @@ No modo **Negócios**, a ferramenta **instagram** cuida do Instagram profissiona
 
 - **Rascunho com prévia:** "Kira, faz um post pro Instagram com a imagem #12". Ela escreve a legenda, guarda o rascunho numerado na tabela `kira_instagram` e manda a **prévia** (a imagem com a legenda) no Telegram.
 - **Reels (vídeo):** mande o vídeo no Telegram, no modo Negócios. A Kira guarda e responde com o número dele (Vídeo #N). Depois peça "Kira, faz um Reels com o vídeo #N": ela escreve a legenda, guarda o rascunho e manda a **prévia do vídeo** no Telegram. O robô do Telegram só baixa vídeos de até **20 MB**: mande o vídeo normal (o Telegram comprime), não como arquivo, e de preferência em pé (9:16).
+- **Faixa no vídeo, só quando você pede:** "faz o Reels do vídeo #N com a faixa R$ 259,99 | Peça única". A Kira avisa que está montando, escreve a faixa amarela bem embaixo do vídeo (até 2 linhas de 40 caracteres) e manda a prévia já com a faixa. O vídeo com faixa vira outro Vídeo #N e o rascunho usa ele. Sem pedir, o preço vai só na legenda. Precisa do serviço de vídeo na VPS (abaixo).
 - **Publicar só com o seu comando:** o post só vai para o Instagram quando você manda `/instagram N` (N é o número do rascunho). A IA não tem como publicar: a publicação é um ramo fixo do workflow, disparado só pelo comando.
 - **Últimos posts:** "Kira, como está o Instagram da loja?" traz seguidores, total de posts e os últimos posts com curtidas e comentários.
 - Fora do modo Negócios, a ferramenta recusa e pede para você trocar de ambiente.
@@ -394,8 +395,9 @@ Passo a passo:
 5. No n8n, crie a credencial **Query Auth**: **Name** `access_token`, **Value** o token da Página, **Allowed HTTP Request Domains → Specific Domains** `graph.facebook.com,rupload.facebook.com` (o segundo é o endereço para onde vai o vídeo dos Reels). Dê um nome como "Instagram da loja".
 6. Crie as tabelas `kira_instagram` e `kira_videos` (colunas na [arquitetura](arquitetura.md#dados)).
 7. Importe o sub-workflow e selecione a credencial do Instagram nos 8 nós HTTP (**Conta do Instagram**, **Criar post**, **Criar Reels**, **Enviar vídeo**, **Status do post**, **Publicar post**, **Link do post** e **Buscar posts**) e a do Telegram em **Mostrar prévia**, **Mostrar prévia (vídeo)**, **Avisar processamento**, **Baixar vídeo (envio)**, **Baixar imagem (link)** e **Baixar vídeo (link)**. Publique (o webhook da imagem só funciona publicado).
-8. Na Kira, aponte a ferramenta **instagram** e o nó **Publicar no Instagram** (grupo **Comandos**) para esse sub-workflow e publique.
-9. Teste: no modo Negócios, peça "Kira, como está o Instagram da loja?". Depois peça um post com uma imagem (ou mande um vídeo curto e peça um Reels), confira a prévia e mande `/instagram N`.
+8. Faixa no vídeo (opcional): na VPS, rode `bash instalar-video.sh <endereço raw da pasta vps/video>` ([`vps/instalar-video.sh`](../vps/instalar-video.sh)). Ele sobe o serviço `kira-video` (Python + ffmpeg) ao lado do n8n, sem porta aberta na internet; o n8n fala com ele em `http://kira-video:8080`. Na VPS pequena (2 GB), um vídeo de 15 segundos leva uns 2 minutos.
+9. Na Kira, aponte a ferramenta **instagram** e o nó **Publicar no Instagram** (grupo **Comandos**) para esse sub-workflow e publique.
+10. Teste: no modo Negócios, peça "Kira, como está o Instagram da loja?". Depois peça um post com uma imagem (ou mande um vídeo curto e peça um Reels), confira a prévia e mande `/instagram N`.
 
 Limites: até 100 posts por dia (regra do Instagram), legenda com até 2.200 caracteres e 30 hashtags, um post por imagem ou vídeo (sem carrossel por enquanto). Reels: vídeo de até 20 MB pelo Telegram; o Instagram aceita de 3 segundos a 15 minutos. As execuções que dão certo não ficam guardadas no n8n, porque as respostas de leitura do Facebook trazem links com a chave de acesso; se algo falhar, o motivo fica na coluna `erro` da tabela `kira_instagram` e a Kira conta no Telegram.
 

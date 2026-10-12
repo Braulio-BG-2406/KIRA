@@ -2354,7 +2354,8 @@ teste('instagram: Reels com o vídeo guardado (video_id), nunca imagem e vídeo 
   // rascunho: vídeo do próprio dono, até 20 MB (limite do robô do Telegram), prévia com sendVideo
   assert.deepEqual(ligacoes('Qual caminho?')[0], ['Foto ou vídeo?']);
   assert.deepEqual(ligacoes('Foto ou vídeo?'), [['Buscar vídeo do post'], ['Buscar imagem do post']]);
-  assert.deepEqual(ligacoes('Vídeo do post serve?'), [['Guardar rascunho'], ['Vídeo do post não serve']]);
+  assert.deepEqual(ligacoes('Vídeo do post serve?'), [['Tem faixa?'], ['Vídeo do post não serve']]);
+  assert.deepEqual(ligacoes('Tem faixa?')[1], ['Guardar rascunho']);
   assert.deepEqual(ligacoes('Prévia de vídeo?'), [['Mostrar prévia (vídeo)'], ['Mostrar prévia']]);
   assert.deepEqual(noDe(insta, 'Buscar vídeo do post').parameters.filters.conditions.map((c) => c.keyName), ['id', 'user_id']);
   assert.equal(noDe(insta, 'Buscar vídeo do post').parameters.dataTableId.value, 'kira_videos');
@@ -2404,6 +2405,35 @@ teste('instagram: Reels com o vídeo guardado (video_id), nunca imagem e vídeo 
   assert.deepEqual(ligacoes('Baixar vídeo (link)'), [['Entregar vídeo'], ['Imagem não encontrada']]);
   const tipo = noDe(insta, 'Entregar vídeo').parameters.options.responseHeaders.entries.find((h) => h.name === 'Content-Type');
   assert.equal(tipo.value, 'video/mp4');
+});
+teste('instagram: faixa no vídeo só quando o dono pede (amarela, bem embaixo, letra menor) e nunca em foto', () => {
+  const faixa = (dados) => pedidoInsta({ acao: 'rascunho', ambiente: 'NEGOCIOS', legenda: 'Oi', ...dados });
+  assert.equal(faixa({ video_id: 2, faixa: '  R$ 259,99\nPeça única ' }).faixa, 'R$ 259,99 | Peça única');
+  assert.equal(faixa({ video_id: 2 }).faixa, '');
+  assert.match(faixa({ imagem_id: 3, faixa: 'R$ 10' }).mensagem, /só vale para Reels/);
+  assert.match(faixa({ video_id: 2, faixa: 'a | b | c' }).mensagem, /até 2 linhas/);
+  assert.match(faixa({ video_id: 2, faixa: 'x'.repeat(41) }).mensagem, /até 40 caracteres/);
+  const ligacoes = (nome) => (insta.connections[nome]?.main ?? []).map((saida) => (saida ?? []).map((l) => l.node));
+  assert.deepEqual(ligacoes('Tem faixa?'), [['Avisar faixa'], ['Guardar rascunho']]);
+  assert.deepEqual(ligacoes('Avisar faixa'), [['Baixar vídeo (faixa)']]);
+  assert.deepEqual(ligacoes('Baixar vídeo (faixa)'), [['Aplicar faixa'], ['Faixa falhou']]);
+  assert.deepEqual(ligacoes('Aplicar faixa'), [['Mostrar prévia (faixa)'], ['Faixa falhou']]);
+  assert.deepEqual(ligacoes('Mostrar prévia (faixa)'), [['Guardar vídeo com faixa'], ['Faixa falhou']]);
+  assert.deepEqual(ligacoes('Guardar vídeo com faixa'), [['Guardar rascunho (faixa)']]);
+  assert.deepEqual(ligacoes('Guardar rascunho (faixa)'), [['Rascunho com faixa pronto']]);
+  const aplicar = noDe(insta, 'Aplicar faixa').parameters;
+  assert.equal(aplicar.url, 'http://kira-video:8080/faixa');
+  const q = Object.fromEntries(aplicar.queryParameters.parameters.map((p) => [p.name, p.value]));
+  assert.deepEqual([q.cor, q.altura, q.letra], ['amarelo', '92', '3.2']);
+  assert.match(q.texto, /\.faixa/);
+  assert.equal(noDe(insta, 'Mostrar prévia (faixa)').parameters.binaryData, true);
+  assert.equal(noDe(insta, 'Guardar vídeo com faixa').parameters.dataTableId.value, 'kira_videos');
+  assert.match(noDe(insta, 'Guardar rascunho (faixa)').parameters.columns.value.video_id, /\$json\.id/);
+  assert.match(JSON.stringify(noDe(insta, 'Faixa falhou').parameters), /Nada foi guardado/);
+  // na Kira: a IA só passa faixa quando ele pede; o /instagram nunca manda faixa
+  assert.match(nos['instagram'].parameters.workflowInputs.value.faixa, /\$fromAI\('faixa'/);
+  assert.match(nos['instagram'].parameters.description, /só quando ele pedir faixa/);
+  assert.equal(nos['Publicar no Instagram'].parameters.workflowInputs.value.faixa, '');
 });
 teste('expressões: nenhum "}}" no meio de uma expressão (o n8n fecharia a expressão antes da hora)', () => {
   for (const arquivo of readdirSync(new URL('n8n/workflows/', raiz))) {

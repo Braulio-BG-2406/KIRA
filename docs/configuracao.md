@@ -395,11 +395,28 @@ Passo a passo:
 5. No n8n, crie a credencial **Query Auth**: **Name** `access_token`, **Value** o token da Página, **Allowed HTTP Request Domains → Specific Domains** `graph.facebook.com,rupload.facebook.com` (o segundo é o endereço para onde vai o vídeo dos Reels). Dê um nome como "Instagram da loja".
 6. Crie as tabelas `kira_instagram` e `kira_videos` (colunas na [arquitetura](arquitetura.md#dados)).
 7. Importe o sub-workflow e selecione a credencial do Instagram nos 8 nós HTTP (**Conta do Instagram**, **Criar post**, **Criar Reels**, **Enviar vídeo**, **Status do post**, **Publicar post**, **Link do post** e **Buscar posts**) e a do Telegram em **Mostrar prévia**, **Mostrar prévia (vídeo)**, **Avisar processamento**, **Baixar vídeo (envio)**, **Baixar imagem (link)** e **Baixar vídeo (link)**. Publique (o webhook da imagem só funciona publicado).
-8. Faixa no vídeo (opcional): na VPS, rode `bash instalar-video.sh <endereço raw da pasta vps/video>` ([`vps/instalar-video.sh`](../vps/instalar-video.sh)). Ele sobe o serviço `kira-video` (Python + ffmpeg) ao lado do n8n, sem porta aberta na internet; o n8n fala com ele em `http://kira-video:8080`. Na VPS pequena (2 GB), um vídeo de 15 segundos leva uns 2 minutos.
+8. Faixa no vídeo e vídeo vitrine (opcional): na VPS, rode `bash instalar-video.sh <endereço raw da pasta vps/video>` ([`vps/instalar-video.sh`](../vps/instalar-video.sh)). Ele sobe o serviço `kira-video` (Python + ffmpeg) ao lado do n8n, sem porta aberta na internet; o n8n fala com ele em `http://kira-video:8080`. Para atualizar o serviço depois, rode o mesmo comando de novo.
 9. Na Kira, aponte a ferramenta **instagram** e o nó **Publicar no Instagram** (grupo **Comandos**) para esse sub-workflow e publique.
 10. Teste: no modo Negócios, peça "Kira, como está o Instagram da loja?". Depois peça um post com uma imagem (ou mande um vídeo curto e peça um Reels), confira a prévia e mande `/instagram N`.
 
 Limites: até 100 posts por dia (regra do Instagram), legenda com até 2.200 caracteres e 30 hashtags, um post por imagem ou vídeo (sem carrossel por enquanto). Reels: vídeo de até 20 MB pelo Telegram; o Instagram aceita de 3 segundos a 15 minutos. As execuções que dão certo não ficam guardadas no n8n, porque as respostas de leitura do Facebook trazem links com a chave de acesso; se algo falhar, o motivo fica na coluna `erro` da tabela `kira_instagram` e a Kira conta no Telegram.
+
+## 24. Vídeo vitrine (fotos + música, grátis)
+
+Um vídeo vertical para Reels feito das suas fotos, sem IA e sem custo: cada foto aparece inteira sobre um fundo desfocado dela mesma, com um zoom ou deslize suave, transições entre as fotos e a sua música de fundo (com entrada e saída suaves). O vídeo sai em 720x1280, de 6 a 20 segundos (10 se você não disser).
+
+- **Guardar uma música:** mande o arquivo de áudio (MP3, por exemplo) no Telegram com a legenda **música**. A Kira responde com o número dela (Música #N), sem gastar o Gemini. Sem a legenda, o áudio vira conversa por voz, como sempre. Use músicas livres de direitos (por exemplo, da Biblioteca de áudio do YouTube ou do Pixabay Music), de até 20 MB.
+- **Pedir o vídeo:** "Kira, faz um vídeo vitrine da foto #12 e da #13" (de 1 a 3 fotos: as que você mandou ou as imagens geradas). Pode dizer a música ("com a música #2") e a duração ("de 15 segundos"); sem dizer, vai a última música que você mandou. A Kira avisa "⏳", e o vídeo chega no Telegram com um número (Vídeo #N).
+- **Virar Reels:** "faz um Reels com o vídeo #N", como qualquer outro vídeo (seção 23).
+
+Como funciona por dentro: a ferramenta **video_vitrine** da Kira chama o sub-workflow **Kira — vídeo vitrine (ferramenta)** ([`kira-video-vitrine.json`](../n8n/workflows/kira-video-vitrine.json)), que acha as fotos (`kira_imagens`) e a música (`kira_musicas`) do próprio dono, baixa os arquivos do Telegram e manda tudo para o serviço de vídeo da VPS (rota `/vitrine`), que monta o vídeo com o ffmpeg. O vídeo vai para o Telegram e entra em `kira_videos`.
+
+Passo a passo:
+1. Na VPS, instale (ou atualize) o serviço de vídeo, como no passo 8 da seção 23.
+2. Crie a tabela `kira_musicas` (colunas na [arquitetura](arquitetura.md#dados)).
+3. Importe o sub-workflow, selecione a credencial do Telegram em **Avisar**, **Baixar arquivos** e **Mandar vídeo** e publique.
+4. Na Kira, aponte a ferramenta **video_vitrine** para esse sub-workflow e publique.
+5. Teste: mande uma música com a legenda "música" e depois peça "faz um vídeo vitrine da foto #N".
 
 ## Personalizar
 

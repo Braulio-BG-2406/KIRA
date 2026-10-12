@@ -104,7 +104,7 @@ const normalizar = node({
           {
             id: 'n-tipo-entrada',
             name: 'tipo_entrada',
-            value: expr("{{ ($json.message.voice || $json.message.audio) ? 'voz' : (['/start', '/ajuda', '/help', '/comandos', '/status', '/memorias', '/memoria', '/limpar', '/reset', '/id', '/publicar', '/instagram'].includes((($json.message.text ?? '').trim().split(/\\s+/)[0] || '').split('@')[0].toLowerCase()) ? 'comando' : (($json.message.video || $json.message.video_note || String($json.message.document?.mime_type ?? '').startsWith('video/')) ? 'video' : (($json.message.photo || String($json.message.document?.mime_type ?? '').startsWith('image/')) ? 'imagem' : (($json.message.text ?? '').trim() ? 'texto' : 'outro')))) }}"),
+            value: expr("{{ (($json.message.audio || String($json.message.document?.mime_type ?? '').startsWith('audio/')) && /m[uú]sica/i.test(String($json.message.caption ?? ''))) ? 'musica' : (($json.message.voice || $json.message.audio) ? 'voz' : (['/start', '/ajuda', '/help', '/comandos', '/status', '/memorias', '/memoria', '/limpar', '/reset', '/id', '/publicar', '/instagram'].includes((($json.message.text ?? '').trim().split(/\\s+/)[0] || '').split('@')[0].toLowerCase()) ? 'comando' : (($json.message.video || $json.message.video_note || String($json.message.document?.mime_type ?? '').startsWith('video/')) ? 'video' : (($json.message.photo || String($json.message.document?.mime_type ?? '').startsWith('image/')) ? 'imagem' : (($json.message.text ?? '').trim() ? 'texto' : 'outro'))))) }}"),
             type: 'string',
           },
           {
@@ -128,6 +128,12 @@ const normalizar = node({
           { id: 'n-video-largura', name: 'video_largura', value: expr("{{ Number($json.message.video?.width ?? $json.message.video_note?.length ?? 0) }}"), type: 'number' },
           { id: 'n-video-altura', name: 'video_altura', value: expr("{{ Number($json.message.video?.height ?? $json.message.video_note?.length ?? 0) }}"), type: 'number' },
           { id: 'n-video-mime', name: 'video_mime', value: expr("{{ String($json.message.video?.mime_type ?? $json.message.document?.mime_type ?? 'video/mp4') }}"), type: 'string' },
+          // Música para o vídeo vitrine: arquivo de áudio com a legenda "música" (sem a legenda, o áudio vira conversa por voz).
+          { id: 'n-musica-file-id', name: 'musica_file_id', value: expr("{{ $json.message.audio?.file_id ?? (String($json.message.document?.mime_type ?? '').startsWith('audio/') ? $json.message.document.file_id : '') }}"), type: 'string' },
+          { id: 'n-musica-titulo', name: 'musica_titulo', value: expr("{{ String([$json.message.audio?.performer, $json.message.audio?.title].filter(Boolean).join(' - ') || $json.message.audio?.file_name || $json.message.document?.file_name || '').slice(0, 120) }}"), type: 'string' },
+          { id: 'n-musica-duracao', name: 'musica_duracao', value: expr("{{ Number($json.message.audio?.duration ?? 0) }}"), type: 'number' },
+          { id: 'n-musica-tamanho', name: 'musica_tamanho', value: expr("{{ Number($json.message.audio?.file_size ?? $json.message.document?.file_size ?? 0) }}"), type: 'number' },
+          { id: 'n-musica-mime', name: 'musica_mime', value: expr("{{ String($json.message.audio?.mime_type ?? $json.message.document?.mime_type ?? 'audio/mpeg') }}"), type: 'string' },
           {
             id: 'n-na-lista',
             name: 'usuario_na_lista',
@@ -255,6 +261,17 @@ const tipoMensagem = switchCase({
               options: { caseSensitive: true, leftValue: '', typeValidation: 'strict', version: 2 },
               conditions: [
                 { id: 'tipo-video', leftValue: expr("{{ $('Normalizar entrada').first().json.tipo_entrada }}"), rightValue: 'video', operator: { type: 'string', operation: 'equals' } },
+              ],
+              combinator: 'and',
+            },
+          },
+          {
+            renameOutput: true,
+            outputKey: 'Música',
+            conditions: {
+              options: { caseSensitive: true, leftValue: '', typeValidation: 'strict', version: 2 },
+              conditions: [
+                { id: 'tipo-musica', leftValue: expr("{{ $('Normalizar entrada').first().json.tipo_entrada }}"), rightValue: 'musica', operator: { type: 'string', operation: 'equals' } },
               ],
               combinator: 'and',
             },
@@ -963,6 +980,70 @@ const guardarVideo = node({
     position: [1460, 780],
   },
   output: [{ id: 3, user_id: '111111111', chat_id: '111111111', file_id: 'BAACAgEAAxkBAAIC', duracao: 15, tamanho: 4500000, largura: 720, altura: 1280, mime: 'video/mp4', legenda: '' }],
+});
+
+// Música do Telegram (arquivo de áudio com a legenda "música"): fica guardada com um número (Música #N) para ser o
+// fundo do vídeo vitrine (ferramenta video_vitrine). Resposta fixa, sem gastar uma chamada do Gemini.
+const guardarMusica = node({
+  type: 'n8n-nodes-base.dataTable',
+  version: 1.1,
+  config: {
+    name: 'Guardar música',
+    parameters: {
+      resource: 'row',
+      operation: 'insert',
+      dataTableId: { __rl: true, mode: 'name', value: 'kira_musicas' },
+      columns: {
+        mappingMode: 'defineBelow',
+        value: {
+          user_id: expr("{{ $('Normalizar entrada').first().json.user_id }}"),
+          chat_id: expr("{{ $('Normalizar entrada').first().json.chat_id }}"),
+          file_id: expr("{{ $('Normalizar entrada').first().json.musica_file_id }}"),
+          titulo: expr("{{ $('Normalizar entrada').first().json.musica_titulo }}"),
+          duracao: expr("{{ $('Normalizar entrada').first().json.musica_duracao }}"),
+          tamanho: expr("{{ $('Normalizar entrada').first().json.musica_tamanho }}"),
+          mime: expr("{{ $('Normalizar entrada').first().json.musica_mime }}"),
+        },
+        matchingColumns: [],
+        schema: [
+          { id: 'user_id', displayName: 'user_id', required: false, defaultMatch: false, display: true, type: 'string', canBeUsedToMatch: true },
+          { id: 'chat_id', displayName: 'chat_id', required: false, defaultMatch: false, display: true, type: 'string', canBeUsedToMatch: true },
+          { id: 'file_id', displayName: 'file_id', required: false, defaultMatch: false, display: true, type: 'string', canBeUsedToMatch: true },
+          { id: 'titulo', displayName: 'titulo', required: false, defaultMatch: false, display: true, type: 'string', canBeUsedToMatch: true },
+          { id: 'duracao', displayName: 'duracao', required: false, defaultMatch: false, display: true, type: 'number', canBeUsedToMatch: true },
+          { id: 'tamanho', displayName: 'tamanho', required: false, defaultMatch: false, display: true, type: 'number', canBeUsedToMatch: true },
+          { id: 'mime', displayName: 'mime', required: false, defaultMatch: false, display: true, type: 'string', canBeUsedToMatch: true },
+        ],
+      },
+      options: {},
+    },
+    onError: 'continueRegularOutput',
+    position: [1460, 940],
+  },
+  output: [{ id: 1, user_id: '111111111', chat_id: '111111111', file_id: 'CQACAgEAAxkBAAIC', titulo: 'Artista - Música', duracao: 95, tamanho: 2300000, mime: 'audio/mpeg' }],
+});
+
+const respostaMusicaGuardada = node({
+  type: 'n8n-nodes-base.set',
+  version: 3.5,
+  config: {
+    name: 'Resposta: música guardada',
+    parameters: {
+      mode: 'manual',
+      includeOtherFields: false,
+      assignments: {
+        assignments: [
+          { id: 'mg-texto', name: 'texto_resposta', value: expr("{{ $json.id ? ('🎵 Guardei a música #' + $json.id + ($('Normalizar entrada').first().json.musica_titulo ? ' (' + $('Normalizar entrada').first().json.musica_titulo + ')' : '') + '.' + ($('Normalizar entrada').first().json.musica_tamanho > 20 * 1024 * 1024 ? ' ⚠️ Mas ela passa de 20 MB e o robô do Telegram não consegue baixar: mande uma versão menor.' : ' Para usar, peça um **vídeo vitrine**, por exemplo: \"faz um vídeo vitrine da foto #N\". Se você não disser a música, uso a última que mandou.')) : 'Não consegui guardar a música agora. Tente mandar de novo daqui a pouco.' }}"), type: 'string' },
+          { id: 'mg-modo', name: 'modo_resposta', value: 'texto', type: 'string' },
+          { id: 'mg-status', name: 'status', value: expr("{{ $json.id ? 'ok' : 'erro' }}"), type: 'string' },
+          { id: 'mg-erro', name: 'erro', value: expr("{{ $json.id ? '' : String($json.error?.message ?? $json.error ?? 'kira_musicas') }}"), type: 'string' },
+          { id: 'mg-entrada', name: 'entrada', value: expr("{{ '[música] ' + $('Normalizar entrada').first().json.musica_titulo }}"), type: 'string' },
+        ],
+      },
+    },
+    position: [1680, 940],
+  },
+  output: [{ texto_resposta: '🎵 Guardei a música #1 (Artista - Música).', modo_resposta: 'texto', status: 'ok', erro: '', entrada: '[música] Artista - Música' }],
 });
 
 const pergunta = node({
@@ -1675,7 +1756,7 @@ const instagramLoja = tool({
     name: 'instagram',
     parameters: {
       description:
-        "Instagram da loja (só no modo Negócios). acao rascunho: guarda um post (imagem_id + legenda, ou video_id + legenda para um Reels) e já manda a prévia no Telegram. Faixa amarela escrita no vídeo do Reels: só quando ele pedir faixa, tarja ou letreiro no vídeo, passe faixa; nos outros casos deixe vazia, porque o preço vai na legenda. Com faixa, a prévia leva uns 2 minutos. NÃO publica: quem publica é o dono, mandando /instagram <número do rascunho>. acao rascunhos: lista os rascunhos que esperam publicação. acao posts: seguidores, total de posts e os últimos posts com curtidas e comentários. Todo post precisa de uma imagem ou de um vídeo: gere ou edite a imagem antes com gerar_imagem (ou use a Foto #N dele); para Reels, use o Vídeo #N que ele mandou. Depois de guardar, mostre a legenda completa e o número do rascunho e diga que, para publicar, ele manda /instagram <número>. Nunca diga que publicou.",
+        "Instagram da loja (só no modo Negócios). acao rascunho: guarda um post (imagem_id + legenda, ou video_id + legenda para um Reels) e já manda a prévia no Telegram. Faixa amarela escrita no vídeo do Reels: só quando ele pedir faixa, tarja ou letreiro no vídeo, passe faixa; nos outros casos deixe vazia, porque o preço vai na legenda. Com faixa, a prévia leva uns 2 minutos. NÃO publica: quem publica é o dono, mandando /instagram <número do rascunho>. acao rascunhos: lista os rascunhos que esperam publicação. acao posts: seguidores, total de posts e os últimos posts com curtidas e comentários. Todo post precisa de uma imagem ou de um vídeo: gere ou edite a imagem antes com gerar_imagem (ou use a Foto #N dele); para Reels, use o Vídeo #N que ele mandou ou um feito com video_vitrine. Depois de guardar, mostre a legenda completa e o número do rascunho e diga que, para publicar, ele manda /instagram <número>. Nunca diga que publicou.",
       source: 'database',
       workflowId: { __rl: true, mode: 'id', value: '' },
       workflowInputs: {
@@ -1712,6 +1793,43 @@ const instagramLoja = tool({
       },
     },
     position: [4800, 800],
+  },
+});
+
+// Vídeo vitrine: sub-workflow da ferramenta video_vitrine (n8n/sdk/kira-video-vitrine.workflow.ts). Junta de 1 a 3
+// fotos com a música do dono num vídeo vertical, no serviço de vídeo da VPS: grátis, sem IA.
+const videoVitrine = tool({
+  type: '@n8n/n8n-nodes-langchain.toolWorkflow',
+  version: 2.2,
+  config: {
+    name: 'video_vitrine',
+    parameters: {
+      description:
+        'Vídeo vitrine, grátis e sem IA: junta de 1 a 3 fotos (a Foto #N que ele mandou ou a Imagem #N gerada) num vídeo vertical para Reels, com movimento suave, transições e a música de fundo que ele mandou (Música #N). Leva uns 2 minutos: a ferramenta já avisa e manda o vídeo no Telegram. Devolve o Vídeo #N, que serve para um Reels (instagram, video_id). Use quando ele pedir um vídeo das fotos, vídeo vitrine ou Reels a partir de fotos. Não é vídeo com IA.',
+      source: 'database',
+      workflowId: { __rl: true, mode: 'id', value: '' },
+      workflowInputs: {
+        mappingMode: 'defineBelow',
+        value: {
+          user_id: expr("{{ $('Normalizar entrada').first().json.user_id }}"),
+          chat_id: expr("{{ $('Normalizar entrada').first().json.chat_id }}"),
+          fotos: fromAi('fotos', 'Números das fotos ou imagens (#N), na ordem do vídeo, separados por vírgula (ex.: 12, 13); de 1 a 3', 'string'),
+          musica: fromAi('musica', 'Número da música (#N) que ele pediu; 0 para usar a última que ele mandou', 'number', 0),
+          duracao: fromAi('duracao', 'Duração do vídeo em segundos, de 6 a 20; 10 se ele não disser', 'number', 10),
+        },
+        matchingColumns: [],
+        schema: [
+          { id: 'user_id', displayName: 'user_id', required: false, defaultMatch: false, display: true, canBeUsedToMatch: true, type: 'string' },
+          { id: 'chat_id', displayName: 'chat_id', required: false, defaultMatch: false, display: true, canBeUsedToMatch: true, type: 'string' },
+          { id: 'fotos', displayName: 'fotos', required: false, defaultMatch: false, display: true, canBeUsedToMatch: true, type: 'string' },
+          { id: 'musica', displayName: 'musica', required: false, defaultMatch: false, display: true, canBeUsedToMatch: true, type: 'number' },
+          { id: 'duracao', displayName: 'duracao', required: false, defaultMatch: false, display: true, canBeUsedToMatch: true, type: 'number' },
+        ],
+        attemptToConvertTypes: false,
+        convertFieldsToString: false,
+      },
+    },
+    position: [4928, 800],
   },
 });
 
@@ -2133,6 +2251,7 @@ const kira = node({
         consultarPlanilhaNegocio,
         consultarPowerBi,
         instagramLoja,
+        videoVitrine,
       ],
     },
     onError: 'continueErrorOutput',
@@ -2338,7 +2457,7 @@ const respostaTipoNaoSuportado = node({
           {
             id: 'tn-texto',
             name: 'texto_resposta',
-            value: 'Por enquanto eu entendo **texto**, **áudio** 🎙️, **fotos** 📷 e guardo **vídeos** 🎬 (para o Instagram). Documentos e outros tipos de mensagem chegam nas próximas versões!',
+            value: 'Por enquanto eu entendo **texto**, **áudio** 🎙️, **fotos** 📷 e guardo **vídeos** 🎬 (para o Instagram). Para guardar uma **música** 🎵 para os vídeos, mande o arquivo de áudio com a legenda "música". Documentos e outros tipos de mensagem chegam nas próximas versões!',
             type: 'string',
           },
           { id: 'tn-modo', name: 'modo_resposta', value: 'texto', type: 'string' },
@@ -2593,7 +2712,8 @@ export default workflow('kira-1-0', 'Kira 1.0 — Assistente pessoal (Telegram +
             .onCase(2, pergunta)
             .onCase(3, baixarImagem.to(analisarImagem.to(guardarFoto.to(pergunta))))
             .onCase(4, guardarVideo.to(pergunta))
-            .onCase(5, respostaTipoNaoSuportado)))),
+            .onCase(5, guardarMusica.to(respostaMusicaGuardada))
+            .onCase(6, respostaTipoNaoSuportado)))),
         ),
       )
       .onFalse(respostaAcessoNegado),
@@ -2623,6 +2743,8 @@ export default workflow('kira-1-0', 'Kira 1.0 — Assistente pessoal (Telegram +
   .to(respostaPronta)
   .add(respostaTipoNaoSuportado)
   .to(respostaPronta)
+  .add(respostaMusicaGuardada)
+  .to(respostaPronta)
   .add(respostaPronta)
   .to(responderEmVoz.onTrue(gerarVoz.to(prepararAudio.to(converterAudio.to(enviarAudio.to(registrar))))).onFalse(dividirMensagem))
   .add(gerarVoz.onError(dividirMensagem))
@@ -2639,7 +2761,7 @@ export default workflow('kira-1-0', 'Kira 1.0 — Assistente pessoal (Telegram +
     description: 'Lê a mensagem do Telegram e confere se é você (campo ids_autorizados da configuração).',
   })
   .group('Roteamento', [mostrarDigitando, ambientesDaKira, buscarAmbiente, ambienteAtual, tipoMensagem], {
-    description: 'Mostra "digitando…", descobre o ambiente ativo (tabela kira_config) e separa a mensagem por tipo: comando, voz, texto, imagem, vídeo ou outro.',
+    description: 'Mostra "digitando…", descobre o ambiente ativo (tabela kira_config) e separa a mensagem por tipo: comando, voz, texto, imagem, vídeo, música ou outro.',
   })
   .group('Comandos', [ehPublicar, buscarRascunho, rascunhoEncontrado, rascunhoTemImagem, buscarImagemLinkedin, baixarImagemLinkedin, publicarLinkedinImagem, publicarLinkedin, marcarPublicado, ehInstagram, publicarNoInstagram, ehLimpar, limparHistorico, memoriaLimpeza, buscarMemoriasComando, respostaComando], {
     description: '/start, /ajuda, /status, /memorias, /limpar, /id, /publicar (LinkedIn) e /instagram (Instagram da loja).',
@@ -2653,8 +2775,8 @@ export default workflow('kira-1-0', 'Kira 1.0 — Assistente pessoal (Telegram +
   .group('Memórias e contexto', [buscarMemorias, memoriasAmbiente, contexto], {
     description: 'Busca as memórias do ambiente ativo e monta o contexto da conversa: nome, perfil, data, ambiente e canal (texto ou voz).',
   })
-  .group('Cérebro da Kira', [kira, geminiPrincipal, geminiReserva, memoriaConversa, salvarMemoria, apagarMemoria, emailsRecentes, buscarEmails, lerEmail, agenda, criarRascunhoResposta, buscarArquivosDrive, lerArquivoDrive, rascunhoLinkedin, buscarConversas, criarTarefa, listarTarefas, concluirTarefa, salvarContato, buscarContatos, gerarImagem, anexarImagemEmail, conversasTeams, lerConversaTeams, enviarMensagemTeams, consultarPedidos, pesquisarInternet, consultarPlanilhaNegocio, consultarPowerBi, instagramLoja], {
-    description: 'A Kira (Gemini) responde no ambiente ativo: memórias, tarefas, Outlook, Drive, Teams, Power BI, pedidos, negócio, Instagram e imagens.',
+  .group('Cérebro da Kira', [kira, geminiPrincipal, geminiReserva, memoriaConversa, salvarMemoria, apagarMemoria, emailsRecentes, buscarEmails, lerEmail, agenda, criarRascunhoResposta, buscarArquivosDrive, lerArquivoDrive, rascunhoLinkedin, buscarConversas, criarTarefa, listarTarefas, concluirTarefa, salvarContato, buscarContatos, gerarImagem, anexarImagemEmail, conversasTeams, lerConversaTeams, enviarMensagemTeams, consultarPedidos, pesquisarInternet, consultarPlanilhaNegocio, consultarPowerBi, instagramLoja, videoVitrine], {
+    description: 'A Kira (Gemini) responde no ambiente ativo: memórias, tarefas, Outlook, Drive, Teams, Power BI, pedidos, negócio, Instagram, imagens e vídeos.',
   })
   .group('Histórico quebrado', [ultimasConversas, resumoConversas, reiniciarHistorico, memoriaReinicio, repetirPergunta], {
     description: 'Se o Gemini recusar o histórico, reinicia a conversa com um resumo das últimas trocas e repete a pergunta (uma vez).',

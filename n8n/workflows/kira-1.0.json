@@ -138,7 +138,7 @@
             {
               "id": "n-tipo-entrada",
               "name": "tipo_entrada",
-              "value": "={{ ($json.message.voice || $json.message.audio) ? 'voz' : (['/start', '/ajuda', '/help', '/comandos', '/status', '/memorias', '/memoria', '/limpar', '/reset', '/id', '/publicar', '/instagram'].includes((($json.message.text ?? '').trim().split(/\\s+/)[0] || '').split('@')[0].toLowerCase()) ? 'comando' : (($json.message.video || $json.message.video_note || String($json.message.document?.mime_type ?? '').startsWith('video/')) ? 'video' : (($json.message.photo || String($json.message.document?.mime_type ?? '').startsWith('image/')) ? 'imagem' : (($json.message.text ?? '').trim() ? 'texto' : 'outro')))) }}",
+              "value": "={{ (($json.message.audio || String($json.message.document?.mime_type ?? '').startsWith('audio/')) && /m[uú]sica/i.test(String($json.message.caption ?? ''))) ? 'musica' : (($json.message.voice || $json.message.audio) ? 'voz' : (['/start', '/ajuda', '/help', '/comandos', '/status', '/memorias', '/memoria', '/limpar', '/reset', '/id', '/publicar', '/instagram'].includes((($json.message.text ?? '').trim().split(/\\s+/)[0] || '').split('@')[0].toLowerCase()) ? 'comando' : (($json.message.video || $json.message.video_note || String($json.message.document?.mime_type ?? '').startsWith('video/')) ? 'video' : (($json.message.photo || String($json.message.document?.mime_type ?? '').startsWith('image/')) ? 'imagem' : (($json.message.text ?? '').trim() ? 'texto' : 'outro'))))) }}",
               "type": "string"
             },
             {
@@ -205,6 +205,36 @@
               "id": "n-video-mime",
               "name": "video_mime",
               "value": "={{ String($json.message.video?.mime_type ?? $json.message.document?.mime_type ?? 'video/mp4') }}",
+              "type": "string"
+            },
+            {
+              "id": "n-musica-file-id",
+              "name": "musica_file_id",
+              "value": "={{ $json.message.audio?.file_id ?? (String($json.message.document?.mime_type ?? '').startsWith('audio/') ? $json.message.document.file_id : '') }}",
+              "type": "string"
+            },
+            {
+              "id": "n-musica-titulo",
+              "name": "musica_titulo",
+              "value": "={{ String([$json.message.audio?.performer, $json.message.audio?.title].filter(Boolean).join(' - ') || $json.message.audio?.file_name || $json.message.document?.file_name || '').slice(0, 120) }}",
+              "type": "string"
+            },
+            {
+              "id": "n-musica-duracao",
+              "name": "musica_duracao",
+              "value": "={{ Number($json.message.audio?.duration ?? 0) }}",
+              "type": "number"
+            },
+            {
+              "id": "n-musica-tamanho",
+              "name": "musica_tamanho",
+              "value": "={{ Number($json.message.audio?.file_size ?? $json.message.document?.file_size ?? 0) }}",
+              "type": "number"
+            },
+            {
+              "id": "n-musica-mime",
+              "name": "musica_mime",
+              "value": "={{ String($json.message.audio?.mime_type ?? $json.message.document?.mime_type ?? 'audio/mpeg') }}",
               "type": "string"
             },
             {
@@ -488,6 +518,30 @@
                     "id": "tipo-video",
                     "leftValue": "={{ $('Normalizar entrada').first().json.tipo_entrada }}",
                     "rightValue": "video",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "renameOutput": true,
+              "outputKey": "Música",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "tipo-musica",
+                    "leftValue": "={{ $('Normalizar entrada').first().json.tipo_entrada }}",
+                    "rightValue": "musica",
                     "operator": {
                       "type": "string",
                       "operation": "equals"
@@ -1425,6 +1479,153 @@
       "onError": "continueRegularOutput"
     },
     {
+      "id": "d7ebd704-3d2b-43eb-a082-389295e87d72",
+      "name": "Guardar música",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1460,
+        940
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "kira_musicas"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "user_id": "={{ $('Normalizar entrada').first().json.user_id }}",
+            "chat_id": "={{ $('Normalizar entrada').first().json.chat_id }}",
+            "file_id": "={{ $('Normalizar entrada').first().json.musica_file_id }}",
+            "titulo": "={{ $('Normalizar entrada').first().json.musica_titulo }}",
+            "duracao": "={{ $('Normalizar entrada').first().json.musica_duracao }}",
+            "tamanho": "={{ $('Normalizar entrada').first().json.musica_tamanho }}",
+            "mime": "={{ $('Normalizar entrada').first().json.musica_mime }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "user_id",
+              "displayName": "user_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "chat_id",
+              "displayName": "chat_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "file_id",
+              "displayName": "file_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "titulo",
+              "displayName": "titulo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "duracao",
+              "displayName": "duracao",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "tamanho",
+              "displayName": "tamanho",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "mime",
+              "displayName": "mime",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "c944958b-ac10-49d2-a3a4-6aa309ab99dd",
+      "name": "Resposta: música guardada",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1680,
+        940
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "mg-texto",
+              "name": "texto_resposta",
+              "value": "={{ $json.id ? ('🎵 Guardei a música #' + $json.id + ($('Normalizar entrada').first().json.musica_titulo ? ' (' + $('Normalizar entrada').first().json.musica_titulo + ')' : '') + '.' + ($('Normalizar entrada').first().json.musica_tamanho > 20 * 1024 * 1024 ? ' ⚠️ Mas ela passa de 20 MB e o robô do Telegram não consegue baixar: mande uma versão menor.' : ' Para usar, peça um **vídeo vitrine**, por exemplo: \"faz um vídeo vitrine da foto #N\". Se você não disser a música, uso a última que mandou.')) : 'Não consegui guardar a música agora. Tente mandar de novo daqui a pouco.' }}",
+              "type": "string"
+            },
+            {
+              "id": "mg-modo",
+              "name": "modo_resposta",
+              "value": "texto",
+              "type": "string"
+            },
+            {
+              "id": "mg-status",
+              "name": "status",
+              "value": "={{ $json.id ? 'ok' : 'erro' }}",
+              "type": "string"
+            },
+            {
+              "id": "mg-erro",
+              "name": "erro",
+              "value": "={{ $json.id ? '' : String($json.error?.message ?? $json.error ?? 'kira_musicas') }}",
+              "type": "string"
+            },
+            {
+              "id": "mg-entrada",
+              "name": "entrada",
+              "value": "={{ '[música] ' + $('Normalizar entrada').first().json.musica_titulo }}",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
       "id": "3b88c9f0-5518-4b4d-abb1-c97ea8215a73",
       "name": "Resposta: tipo não suportado",
       "type": "n8n-nodes-base.set",
@@ -1441,7 +1642,7 @@
             {
               "id": "tn-texto",
               "name": "texto_resposta",
-              "value": "Por enquanto eu entendo **texto**, **áudio** 🎙️, **fotos** 📷 e guardo **vídeos** 🎬 (para o Instagram). Documentos e outros tipos de mensagem chegam nas próximas versões!",
+              "value": "Por enquanto eu entendo **texto**, **áudio** 🎙️, **fotos** 📷 e guardo **vídeos** 🎬 (para o Instagram). Para guardar uma **música** 🎵 para os vídeos, mande o arquivo de áudio com a legenda \"música\". Documentos e outros tipos de mensagem chegam nas próximas versões!",
               "type": "string"
             },
             {
@@ -3434,7 +3635,7 @@
         800
       ],
       "parameters": {
-        "description": "Instagram da loja (só no modo Negócios). acao rascunho: guarda um post (imagem_id + legenda, ou video_id + legenda para um Reels) e já manda a prévia no Telegram. Faixa amarela escrita no vídeo do Reels: só quando ele pedir faixa, tarja ou letreiro no vídeo, passe faixa; nos outros casos deixe vazia, porque o preço vai na legenda. Com faixa, a prévia leva uns 2 minutos. NÃO publica: quem publica é o dono, mandando /instagram <número do rascunho>. acao rascunhos: lista os rascunhos que esperam publicação. acao posts: seguidores, total de posts e os últimos posts com curtidas e comentários. Todo post precisa de uma imagem ou de um vídeo: gere ou edite a imagem antes com gerar_imagem (ou use a Foto #N dele); para Reels, use o Vídeo #N que ele mandou. Depois de guardar, mostre a legenda completa e o número do rascunho e diga que, para publicar, ele manda /instagram <número>. Nunca diga que publicou.",
+        "description": "Instagram da loja (só no modo Negócios). acao rascunho: guarda um post (imagem_id + legenda, ou video_id + legenda para um Reels) e já manda a prévia no Telegram. Faixa amarela escrita no vídeo do Reels: só quando ele pedir faixa, tarja ou letreiro no vídeo, passe faixa; nos outros casos deixe vazia, porque o preço vai na legenda. Com faixa, a prévia leva uns 2 minutos. NÃO publica: quem publica é o dono, mandando /instagram <número do rascunho>. acao rascunhos: lista os rascunhos que esperam publicação. acao posts: seguidores, total de posts e os últimos posts com curtidas e comentários. Todo post precisa de uma imagem ou de um vídeo: gere ou edite a imagem antes com gerar_imagem (ou use a Foto #N dele); para Reels, use o Vídeo #N que ele mandou ou um feito com video_vitrine. Depois de guardar, mostre a legenda completa e o número do rascunho e diga que, para publicar, ele manda /instagram <número>. Nunca diga que publicou.",
         "source": "database",
         "workflowId": {
           "__rl": true,
@@ -3551,6 +3752,85 @@
             {
               "id": "quantidade",
               "displayName": "quantidade",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      }
+    },
+    {
+      "id": "67630719-60df-4f74-a08f-dc5212e1688e",
+      "name": "video_vitrine",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        4928,
+        800
+      ],
+      "parameters": {
+        "description": "Vídeo vitrine, grátis e sem IA: junta de 1 a 3 fotos (a Foto #N que ele mandou ou a Imagem #N gerada) num vídeo vertical para Reels, com movimento suave, transições e a música de fundo que ele mandou (Música #N). Leva uns 2 minutos: a ferramenta já avisa e manda o vídeo no Telegram. Devolve o Vídeo #N, que serve para um Reels (instagram, video_id). Use quando ele pedir um vídeo das fotos, vídeo vitrine ou Reels a partir de fotos. Não é vídeo com IA.",
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": ""
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "user_id": "={{ $('Normalizar entrada').first().json.user_id }}",
+            "chat_id": "={{ $('Normalizar entrada').first().json.chat_id }}",
+            "fotos": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('fotos', 'Números das fotos ou imagens (#N), na ordem do vídeo, separados por vírgula (ex.: 12, 13); de 1 a 3') }}",
+            "musica": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('musica', 'Número da música (#N) que ele pediu; 0 para usar a última que ele mandou', 'number', 0) }}",
+            "duracao": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('duracao', 'Duração do vídeo em segundos, de 6 a 20; 10 se ele não disser', 'number', 10) }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "user_id",
+              "displayName": "user_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "chat_id",
+              "displayName": "chat_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "fotos",
+              "displayName": "fotos",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "musica",
+              "displayName": "musica",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number"
+            },
+            {
+              "id": "duracao",
+              "displayName": "duracao",
               "required": false,
               "defaultMatch": false,
               "display": true,
@@ -4302,6 +4582,13 @@
         ],
         [
           {
+            "node": "Guardar música",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
             "node": "Resposta: tipo não suportado",
             "type": "main",
             "index": 0
@@ -4622,6 +4909,28 @@
         [
           {
             "node": "Pergunta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar música": {
+      "main": [
+        [
+          {
+            "node": "Resposta: música guardada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resposta: música guardada": {
+      "main": [
+        [
+          {
+            "node": "Resposta pronta",
             "type": "main",
             "index": 0
           }
@@ -5093,6 +5402,17 @@
         ]
       ]
     },
+    "video_vitrine": {
+      "ai_tool": [
+        [
+          {
+            "node": "Kira",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Resposta da Kira": {
       "main": [
         [
@@ -5338,7 +5658,7 @@
         "7e4f0dd5-3c0a-407f-acf0-955357fec71f",
         "9f5f139a-c92d-4af2-a579-500ed350c138"
       ],
-      "description": "Mostra \"digitando…\", descobre o ambiente ativo (tabela kira_config) e separa a mensagem por tipo: comando, voz, texto, imagem, vídeo ou outro."
+      "description": "Mostra \"digitando…\", descobre o ambiente ativo (tabela kira_config) e separa a mensagem por tipo: comando, voz, texto, imagem, vídeo, música ou o"
     },
     {
       "id": "82a385bc-b448-4b8a-a81e-148b3637fba2",
@@ -5425,9 +5745,10 @@
         "9f8c0edd-242b-49e2-a1b7-5d187196de94",
         "9ea1f6b4-cb95-4c88-a76c-1a845466f71d",
         "d82c44f2-3021-4bdc-a547-9cab4f261ee7",
-        "894e62a5-bfce-457e-a76a-ae8be84bdca6"
+        "894e62a5-bfce-457e-a76a-ae8be84bdca6",
+        "67630719-60df-4f74-a08f-dc5212e1688e"
       ],
-      "description": "A Kira (Gemini) responde no ambiente ativo: memórias, tarefas, Outlook, Drive, Teams, Power BI, pedidos, negócio, Instagram e imagens."
+      "description": "A Kira (Gemini) responde no ambiente ativo: memórias, tarefas, Outlook, Drive, Teams, Power BI, pedidos, negócio, Instagram, imagens e vídeos."
     },
     {
       "id": "847fe4bc-607c-4670-a717-2fe8066f3caa",

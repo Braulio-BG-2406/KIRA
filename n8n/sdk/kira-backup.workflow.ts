@@ -189,6 +189,20 @@ const lerVideos = node({
   output: [{ id: 1 }],
 });
 
+const lerMusicas = node({
+  type: 'n8n-nodes-base.dataTable',
+  version: 1.1,
+  config: {
+    name: "Ler kira_musicas",
+    parameters: { resource: 'row', operation: 'get', dataTableId: { __rl: true, mode: 'name', value: "kira_musicas" }, returnAll: true },
+    alwaysOutputData: true,
+    executeOnce: true,
+    onError: 'continueRegularOutput',
+    position: [2440, 480],
+  },
+  output: [{ id: 1 }],
+});
+
 const acharPasta = node({
   type: 'n8n-nodes-base.httpRequest',
   version: 4.2,
@@ -278,7 +292,7 @@ const montar = node({
   version: 2,
   config: {
     name: 'Montar backup',
-    parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: "// Junta as tabelas da Kira num arquivo JSON (a cópia de segurança da semana) e conta as linhas de cada uma.\n// Uma tabela que não abriu fica de fora e entra na lista de falhas; se nenhuma abrir, o backup para com erro.\nconst cfg = $('Configuração do backup').first().json;\nconst TABELAS = ['kira_config', 'kira_memoria', 'kira_tarefas', 'kira_contatos', 'kira_logs', 'kira_linkedin', 'kira_imagens', 'kira_emails_auto', 'kira_saude', 'kira_instagram', 'kira_videos'];\nconst backup = { kira_backup: 1, gerado_em: new Date().toISOString(), tabelas: {} };\nconst linhas = {};\nconst falhas = [];\nfor (const nome of TABELAS) {\n  let itens;\n  try {\n    itens = $('Ler ' + nome).all().map((i) => i.json);\n  } catch (e) {\n    falhas.push(`${nome} (não rodou)`);\n    continue;\n  }\n  const comErro = itens.find((r) => r && r.error);\n  if (comErro) {\n    const e = comErro.error;\n    falhas.push(`${nome} (${String((e && e.message) || e).replace(/\\s+/g, ' ').slice(0, 80)})`);\n    continue;\n  }\n  // Tabela vazia: o n8n entrega um item vazio, que não entra no backup.\n  const registros = itens.filter((r) => r && r.id !== undefined);\n  backup.tabelas[nome] = registros;\n  linhas[nome] = registros.length;\n}\nif (!Object.keys(backup.tabelas).length) throw new Error('Não consegui ler nenhuma tabela da Kira: ' + falhas.join('; '));\nbackup.linhas = linhas;\nbackup.falhas = falhas;\nconst texto = JSON.stringify(backup);\nconst arquivo = `${cfg.prefixo || 'kira-backup-'}${cfg.hoje}.json`;\nreturn [\n  {\n    json: { arquivo, pasta_id: $('Pasta do backup').first().json.pasta_id, tamanho_kb: Math.round(Buffer.byteLength(texto) / 1024), linhas, falhas },\n    binary: { data: { data: Buffer.from(texto, 'utf8').toString('base64'), mimeType: 'application/json', fileName: arquivo } },\n  },\n];\n" },
+    parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: "// Junta as tabelas da Kira num arquivo JSON (a cópia de segurança da semana) e conta as linhas de cada uma.\n// Uma tabela que não abriu fica de fora e entra na lista de falhas; se nenhuma abrir, o backup para com erro.\nconst cfg = $('Configuração do backup').first().json;\nconst TABELAS = ['kira_config', 'kira_memoria', 'kira_tarefas', 'kira_contatos', 'kira_logs', 'kira_linkedin', 'kira_imagens', 'kira_emails_auto', 'kira_saude', 'kira_instagram', 'kira_videos', 'kira_musicas'];\nconst backup = { kira_backup: 1, gerado_em: new Date().toISOString(), tabelas: {} };\nconst linhas = {};\nconst falhas = [];\nfor (const nome of TABELAS) {\n  let itens;\n  try {\n    itens = $('Ler ' + nome).all().map((i) => i.json);\n  } catch (e) {\n    falhas.push(`${nome} (não rodou)`);\n    continue;\n  }\n  const comErro = itens.find((r) => r && r.error);\n  if (comErro) {\n    const e = comErro.error;\n    falhas.push(`${nome} (${String((e && e.message) || e).replace(/\\s+/g, ' ').slice(0, 80)})`);\n    continue;\n  }\n  // Tabela vazia: o n8n entrega um item vazio, que não entra no backup.\n  const registros = itens.filter((r) => r && r.id !== undefined);\n  backup.tabelas[nome] = registros;\n  linhas[nome] = registros.length;\n}\nif (!Object.keys(backup.tabelas).length) throw new Error('Não consegui ler nenhuma tabela da Kira: ' + falhas.join('; '));\nbackup.linhas = linhas;\nbackup.falhas = falhas;\nconst texto = JSON.stringify(backup);\nconst arquivo = `${cfg.prefixo || 'kira-backup-'}${cfg.hoje}.json`;\nreturn [\n  {\n    json: { arquivo, pasta_id: $('Pasta do backup').first().json.pasta_id, tamanho_kb: Math.round(Buffer.byteLength(texto) / 1024), linhas, falhas },\n    binary: { data: { data: Buffer.from(texto, 'utf8').toString('base64'), mimeType: 'application/json', fileName: arquivo } },\n  },\n];\n" },
     position: [3120, 300],
   },
   output: [{ arquivo: 'kira-backup-2026-10-04.json', pasta_id: 'pasta1', tamanho_kb: 10, linhas: {}, falhas: [] }],
@@ -391,6 +405,7 @@ export default workflow('kira-backup', 'Kira — Backup semanal (domingo 3h)', {
   .to(lerSaude)
   .to(lerInstagram)
   .to(lerVideos)
+  .to(lerMusicas)
   .to(acharPasta)
   .to(pastaExiste.onTrue(pastaDoBackup).onFalse(criarPasta.to(pastaDoBackup)))
   .add(pastaDoBackup)

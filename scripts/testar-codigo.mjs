@@ -338,7 +338,7 @@ teste('fotos: foto ou imagem enviada como arquivo vai para o leitor de imagens; 
   // caminho: Tipo de mensagem (Imagem) → Baixar imagem → Analisar imagem (Gemini) → Guardar foto → Pergunta; o resto → tipo não suportado
   const saidas = (no) => workflow.connections[no].main.map((s) => (s ?? []).map((c) => c.node));
   assert.deepEqual(saidas('Tipo de mensagem')[3], ['Baixar imagem']);
-  assert.deepEqual(saidas('Tipo de mensagem')[5], ['Resposta: tipo não suportado']);
+  assert.deepEqual(saidas('Tipo de mensagem')[6], ['Resposta: tipo não suportado']);
   assert.deepEqual(saidas('Baixar imagem'), [['Analisar imagem (Gemini)'], ['Resposta de erro']]);
   assert.deepEqual(saidas('Analisar imagem (Gemini)'), [['Guardar foto'], ['Resposta de erro']]);
   assert.deepEqual(saidas('Guardar foto'), [['Pergunta']]);
@@ -2182,12 +2182,13 @@ const lerTabelas = {
   'Ler kira_saude': [{ error: 'Data table not found' }],
   'Ler kira_instagram': [{}],
   'Ler kira_videos': [{ id: 1, file_id: 'v1' }],
+  'Ler kira_musicas': [{ id: 1, file_id: 'm1' }, { id: 2, file_id: 'm2' }],
 };
 teste('backup: junta as tabelas num JSON, conta as linhas e anota a tabela que não abriu', () => {
   const [r] = executar(noDe(backup, 'Montar backup').parameters.jsCode, { nosAnteriores: lerTabelas });
   assert.equal(r.arquivo, 'kira-backup-2026-10-04.json');
   assert.equal(r.pasta_id, 'pasta1');
-  assert.deepEqual(r.linhas, { kira_config: 1, kira_memoria: 2, kira_tarefas: 0, kira_contatos: 0, kira_logs: 1, kira_linkedin: 0, kira_imagens: 0, kira_emails_auto: 1, kira_instagram: 0, kira_videos: 1 });
+  assert.deepEqual(r.linhas, { kira_config: 1, kira_memoria: 2, kira_tarefas: 0, kira_contatos: 0, kira_logs: 1, kira_linkedin: 0, kira_imagens: 0, kira_emails_auto: 1, kira_instagram: 0, kira_videos: 1, kira_musicas: 2 });
   assert.deepEqual(r.falhas, ['kira_saude (Data table not found)']);
   const vazio = Object.fromEntries(Object.entries(lerTabelas).map(([k, v]) => [k, k.startsWith('Ler ') ? [{ error: { message: 'sem acesso' } }] : v]));
   assert.throws(() => executar(noDe(backup, 'Montar backup').parameters.jsCode, { nosAnteriores: vazio }), /nenhuma tabela/);
@@ -2209,7 +2210,7 @@ teste('backup: o arquivo leva os registros; backup parcial para com erro (avisa)
   const montado = itens[0].json;
   assert.throws(() => rodarBackup('Conferência (só números)', { 'Montar backup': montado }, [{ id: 'arq1' }]), /sem estas tabelas: kira_saude/);
   assert.throws(() => rodarBackup('Conferência (só números)', { 'Montar backup': { ...montado, falhas: [] } }, [{}]), /não confirmou/);
-  assert.equal(rodarBackup('Conferência (só números)', { 'Montar backup': { ...montado, falhas: [] } }, [{ id: 'arq1' }])[0].tabelas, 10);
+  assert.equal(rodarBackup('Conferência (só números)', { 'Montar backup': { ...montado, falhas: [] } }, [{ id: 'arq1' }])[0].tabelas, 11);
   const arquivos = [
     { id: 'a', name: 'kira-backup-2026-09-20.json', createdTime: '2026-09-20T06:00:00Z' },
     { id: 'b', name: 'kira-backup-2026-10-04.json', createdTime: '2026-10-04T06:00:00Z' },
@@ -2456,6 +2457,131 @@ teste('nós Code "uma vez por item" não devolvem lista (o n8n recusa e a execu�
   }
 });
 
+// Músicas e vídeo vitrine: o dono manda a música pelo Telegram (áudio com a legenda "música") e pede um vídeo das
+// fotos; o serviço de vídeo da VPS monta o vídeo, sem custo de IA.
+teste('música: áudio com a legenda "música" vira Música #N; sem a legenda, continua sendo conversa por voz', () => {
+  const normal = Object.fromEntries(nos['Normalizar entrada'].parameters.assignments.assignments.map((a) => [a.name, a.value]));
+  const avaliar = (expressao, json) => new Function('$json', `return (${expressao.slice(3, -2)})`)(json);
+  const tipo = (message) => avaliar(normal.tipo_entrada, { message });
+  const audio = { file_id: 'm1', duration: 95, performer: 'Artista', title: 'Tema', mime_type: 'audio/mpeg', file_size: 2300000 };
+  assert.equal(tipo({ audio, caption: 'Música' }), 'musica');
+  assert.equal(tipo({ audio, caption: 'MUSICA para os vídeos' }), 'musica');
+  assert.equal(tipo({ document: { file_id: 'd', mime_type: 'audio/mpeg', file_name: 'tema.mp3' }, caption: 'música' }), 'musica');
+  assert.equal(tipo({ audio }), 'voz');
+  assert.equal(tipo({ voice: { file_id: 'v' }, caption: 'música' }), 'voz');
+  assert.equal(tipo({ document: { file_id: 'd', mime_type: 'application/pdf' }, caption: 'música' }), 'outro');
+  assert.equal(avaliar(normal.musica_file_id, { message: { audio } }), 'm1');
+  assert.equal(avaliar(normal.musica_titulo, { message: { audio } }), 'Artista - Tema');
+  assert.equal(avaliar(normal.musica_titulo, { message: { document: { file_id: 'd', mime_type: 'audio/mpeg', file_name: 'tema.mp3' } } }), 'tema.mp3');
+  assert.equal(avaliar(normal.musica_tamanho, { message: { audio } }), 2300000);
+  // caminho: Tipo de mensagem (Música) → Guardar música (kira_musicas) → resposta fixa, sem chamar o Gemini
+  const saidas = (no) => workflow.connections[no].main.map((s) => (s ?? []).map((c) => c.node));
+  const regra = nos['Tipo de mensagem'].parameters.rules.values[5];
+  assert.deepEqual([regra.outputKey, regra.conditions.conditions[0].rightValue], ['Música', 'musica']);
+  assert.deepEqual(saidas('Tipo de mensagem')[5], ['Guardar música']);
+  assert.deepEqual(saidas('Guardar música'), [['Resposta: música guardada']]);
+  assert.deepEqual(saidas('Resposta: música guardada'), [['Resposta pronta']]);
+  const guardar = nos['Guardar música'];
+  assert.equal(guardar.parameters.dataTableId.value, 'kira_musicas');
+  assert.match(guardar.parameters.columns.value.file_id, /musica_file_id/);
+  assert.equal(guardar.onError, 'continueRegularOutput');
+  const resposta = Object.fromEntries(nos['Resposta: música guardada'].parameters.assignments.assignments.map((a) => [a.name, a.value]));
+  const responder = (json, tamanho = 2300000) =>
+    new Function('$', '$json', `return (${resposta.texto_resposta.slice(3, -2)})`)(
+      () => ({ first: () => ({ json: { musica_titulo: 'Artista - Tema', musica_tamanho: tamanho } }) }),
+      json,
+    );
+  assert.match(responder({ id: 4 }), /^🎵 Guardei a música #4 \(Artista - Tema\)\. Para usar, peça um \*\*vídeo vitrine\*\*/);
+  assert.match(responder({ id: 5 }, 25 * 1048576), /passa de 20 MB/);
+  assert.match(responder({ error: 'x' }), /Não consegui guardar a música/);
+  assert.match(JSON.stringify(nos['Resposta: tipo não suportado'].parameters), /legenda \\"música\\"/);
+});
+teste('vídeo vitrine: a ferramenta da Kira pede as fotos, a música e a duração; o dono vem do workflow', () => {
+  const ferramenta = nos['video_vitrine'];
+  assert.equal(ferramenta.type, '@n8n/n8n-nodes-langchain.toolWorkflow');
+  assert.ok(workflow.connections['video_vitrine'].ai_tool[0].some((c) => c.node === 'Kira'));
+  const valores = ferramenta.parameters.workflowInputs.value;
+  assert.match(valores.user_id, /\$\('Normalizar entrada'\)/);
+  assert.match(valores.chat_id, /\$\('Normalizar entrada'\)/);
+  assert.match(valores.fotos, /\$fromAI\('fotos'/);
+  assert.match(valores.musica, /\$fromAI\('musica'.*'number', 0\)/);
+  assert.match(valores.duracao, /\$fromAI\('duracao'.*'number', 10\)/);
+  assert.match(ferramenta.parameters.description, /grátis e sem IA/);
+  assert.match(nos['instagram'].parameters.description, /feito com video_vitrine/);
+  const vitrine = JSON.parse(ler('n8n/workflows/kira-video-vitrine.json'));
+  assert.equal(vitrine.settings.callerPolicy, 'workflowsFromSameOwner');
+  const entradas = noDe(vitrine, 'Pedido da Kira').parameters.workflowInputs.values.map((v) => v.name);
+  assert.deepEqual(entradas, Object.keys(valores));
+});
+const vitrine = JSON.parse(ler('n8n/workflows/kira-video-vitrine.json'));
+teste('vídeo vitrine: confere o pedido (1 a 3 fotos, duração de 6 a 20 s) e escolhe os arquivos do próprio dono', () => {
+  const validar = (e) => executar(noDe(vitrine, 'Validar pedido').parameters.jsCode, { entrada: [e] })[0];
+  let p = validar({ user_id: '111', chat_id: '111', fotos: '#12 e #13, 12', musica: 0, duracao: 30 });
+  assert.deepEqual([p.ok, p.fotos, p.duracao, p.musica], [true, [12, 13], 20, 0]);
+  assert.equal(validar({ user_id: '111', chat_id: '111', fotos: '1', duracao: 2 }).duracao, 6);
+  assert.equal(validar({ user_id: '111', chat_id: '111', fotos: '' }).duracao, 10);
+  assert.match(validar({ user_id: '111', chat_id: '111', fotos: '' }).mensagem, /Diga quais fotos/);
+  assert.match(validar({ user_id: '111', chat_id: '111', fotos: '1 2 3 4' }).mensagem, /no máximo 3 fotos/);
+  assert.match(validar({ user_id: '', chat_id: '111', fotos: '1' }).mensagem, /identificar o dono/);
+
+  const separar = (pedido, fotos, musicas) =>
+    executar(noDe(vitrine, 'Separar arquivos').parameters.jsCode, {
+      nosAnteriores: { 'Validar pedido': pedido, 'Buscar fotos': fotos, 'Buscar músicas': musicas },
+    });
+  const pedido = { user_id: '111', chat_id: '111', fotos: [13, 12], musica: 0, duracao: 10, ok: true };
+  const fotos = [{ id: 12, file_id: 'f12' }, { id: 13, file_id: 'f13' }, { id: 14, file_id: null }];
+  const musicas = [{ id: 1, file_id: 'm1', titulo: 'a', tamanho: 1000 }, { id: 3, file_id: 'm3', titulo: 'b', tamanho: 1000 }];
+  // fotos na ordem pedida e, sem música pedida, a última que ele mandou
+  let r = separar(pedido, fotos, musicas);
+  assert.deepEqual(r.map((i) => [i.campo, i.file_id]), [['foto1', 'f13'], ['foto2', 'f12'], ['musica', 'm3']]);
+  assert.equal(r[0].musica_id, 3);
+  assert.deepEqual(separar({ ...pedido, musica: 1 }, fotos, musicas).at(-1).file_id, 'm1');
+  // sem música guardada, o vídeo sai mudo; foto inexistente (ou sem arquivo) e música inexistente param com aviso
+  r = separar(pedido, fotos, [{}]);
+  assert.deepEqual([r.length, r[0].musica_id], [2, 0]);
+  assert.match(separar({ ...pedido, fotos: [12, 14, 99] }, fotos, musicas)[0].mensagem, /foto #14, #99/);
+  assert.match(separar({ ...pedido, musica: 7 }, fotos, musicas)[0].mensagem, /música #7/);
+  assert.match(separar(pedido, fotos, [{ id: 2, file_id: 'm2', tamanho: 21 * 1048576 }])[0].mensagem, /20 MB/);
+  // a busca é só pelas fotos e músicas do próprio dono
+  for (const no of ['Buscar fotos', 'Buscar músicas']) {
+    assert.deepEqual(noDe(vitrine, no).parameters.filters.conditions.map((c) => c.keyName), ['user_id']);
+  }
+});
+teste('vídeo vitrine: monta o formulário com fotos e música e para (avisando) se um arquivo não baixou', async () => {
+  const codigo = noDe(vitrine, 'Montar formulário').parameters.jsCode;
+  const Assincrona = Object.getPrototypeOf(async () => {}).constructor;
+  const campos = ['foto1', 'foto2', 'musica'].map((campo) => ({ ok: true, fotos: [1, 2], musica_id: 3, musica_titulo: 'b', duracao: 12, campo, file_id: 'x' }));
+  const arquivo = (texto, tipo) => ({ json: {}, binary: { data: { data: Buffer.from(texto).toString('base64'), mimeType: tipo } } });
+  const montar = (itens) =>
+    new Assincrona('$', '$input', 'Buffer', codigo).call(
+      { helpers: { getBinaryDataBuffer: async (i) => Buffer.from(itens[i].binary.data.data, 'base64') } },
+      () => ({ all: () => campos.map((json) => ({ json })) }),
+      { all: () => itens },
+      Buffer,
+    );
+  const [r] = await montar([arquivo('F1', 'image/jpeg'), arquivo('F2', 'image/png'), arquivo('MP3', 'audio/mpeg')]);
+  assert.deepEqual(r.json, { ok: true, fotos: [1, 2], musica_id: 3, musica_titulo: 'b', duracao: 12 });
+  const [, fronteira] = r.binary.data.mimeType.match(/^multipart\/form-data; boundary=(\S+)$/);
+  const corpo = Buffer.from(r.binary.data.data, 'base64').toString();
+  assert.equal(corpo.split(`--${fronteira}`).length, 5);
+  assert.match(corpo, /name="foto2"; filename="foto2"\r\nContent-Type: image\/png\r\n\r\nF2\r\n/);
+  assert.match(corpo, /name="musica"; filename="musica"\r\nContent-Type: audio\/mpeg\r\n\r\nMP3\r\n/);
+  assert.ok(corpo.endsWith(`--${fronteira}--\r\n`));
+  await assert.rejects(montar([arquivo('F1', 'image/jpeg'), { json: { error: 'x' } }, arquivo('MP3', 'audio/mpeg')]), /baixar a 2ª foto/);
+  // o vídeo sai do serviço de vídeo da VPS (rede interna do Docker) e vira Vídeo #N
+  const servico = noDe(vitrine, 'Montar vídeo vitrine');
+  assert.equal(servico.parameters.url, 'http://kira-video:8080/vitrine');
+  assert.equal(servico.parameters.contentType, 'binaryData');
+  assert.equal(noDe(vitrine, 'Guardar vídeo').parameters.dataTableId.value, 'kira_videos');
+  // qualquer falha vira uma mensagem curta para a Kira, sem o "[line N]" do n8n
+  const naoDeu = noDe(vitrine, 'Não deu certo').parameters.assignments.assignments.find((a) => a.name === 'mensagem').value;
+  const erro = (json) => new Function('$json', `return (${naoDeu.slice(3, -2)})`)(json);
+  assert.equal(erro({ error: { message: 'Não consegui baixar a música do Telegram [line 11]' } }), 'Não consegui montar o vídeo vitrine (Não consegui baixar a música do Telegram). Diga isso em uma frase.');
+  assert.equal(erro({ mensagem: 'Não encontrei a foto #9.' }), 'Não encontrei a foto #9.');
+  const saidas = (no) => vitrine.connections[no].main.map((s) => (s ?? []).map((c) => c.node));
+  for (const no of ['Montar formulário', 'Montar vídeo vitrine', 'Mandar vídeo']) assert.deepEqual(saidas(no)[1], ['Não deu certo']);
+  assert.equal(noDe(vitrine, 'Baixar arquivos').onError, 'continueRegularOutput');
+});
 teste('vps: o serviço de vídeo (faixa nos Reels) não abre porta na internet e roda sem root', () => {
   const script = ler('vps/instalar-video.sh');
   const override = script.slice(script.indexOf("<<'YAML'"), script.indexOf('\nYAML\n'));
@@ -2508,6 +2634,8 @@ teste('segurança: nenhum token do Telegram, chave do Google ou caminho de webho
     'n8n/sdk/kira-backup.workflow.ts',
     'n8n/workflows/kira-instagram.json',
     'n8n/sdk/kira-instagram.workflow.ts',
+    'n8n/workflows/kira-video-vitrine.json',
+    'n8n/sdk/kira-video-vitrine.workflow.ts',
   ];
   for (const arquivo of arquivos) {
     const conteudo = ler(arquivo);

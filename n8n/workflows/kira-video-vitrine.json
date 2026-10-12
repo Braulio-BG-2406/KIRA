@@ -1,0 +1,691 @@
+{
+  "name": "Kira — Vídeo vitrine (ferramenta)",
+  "nodes": [
+    {
+      "id": "6b98902d-c7ea-451e-af79-0127b4e551bd",
+      "name": "Pedido da Kira",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "user_id",
+              "type": "string"
+            },
+            {
+              "name": "chat_id",
+              "type": "string"
+            },
+            {
+              "name": "fotos",
+              "type": "string"
+            },
+            {
+              "name": "musica",
+              "type": "number"
+            },
+            {
+              "name": "duracao",
+              "type": "number"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "f3f0ad22-53d3-475f-a62c-9cee7548e46f",
+      "name": "Validar pedido",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Confere o pedido do vídeo vitrine: de 1 a 3 fotos (números da Foto #N ou Imagem #N), a música e a duração.\nconst MAX_FOTOS = 3;\nconst e = $input.first().json;\nconst texto = (v) => String(v ?? '').trim();\nconst fotos = [...new Set((texto(e.fotos).match(/\\d+/g) || []).map(Number).filter((n) => n > 0))];\nconst duracao = Math.min(20, Math.max(6, Math.round(Number(e.duracao) || 10)));\nconst pedido = {\n  user_id: texto(e.user_id),\n  chat_id: texto(e.chat_id),\n  fotos,\n  musica: Math.max(0, Math.floor(Number(e.musica) || 0)),\n  duracao,\n};\nlet mensagem = '';\nif (!pedido.user_id || !pedido.chat_id) mensagem = 'Não consegui identificar o dono.';\nelse if (!fotos.length) mensagem = 'Diga quais fotos usar (o número da Foto #N ou da Imagem #N), de 1 a 3.';\nelse if (fotos.length > MAX_FOTOS) mensagem = `O vídeo vitrine usa no máximo ${MAX_FOTOS} fotos. Escolha até ${MAX_FOTOS}.`;\nreturn [{ json: { ...pedido, ok: !mensagem, mensagem } }];\n"
+      }
+    },
+    {
+      "id": "191b6032-9738-4161-aab9-cc11a87bf23a",
+      "name": "Pedido certo?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        440,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "pedido-ok",
+              "leftValue": "={{ $json.ok === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "c934fb4a-bdb5-466e-a4c5-5d9018405eac",
+      "name": "Buscar fotos",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        660,
+        200
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "kira_imagens"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "user_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Validar pedido').first().json.user_id }}"
+            }
+          ]
+        },
+        "returnAll": true
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "a48c51b9-2b9e-466c-ab56-a576a5ad30a6",
+      "name": "Buscar músicas",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        880,
+        200
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "kira_musicas"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "user_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Validar pedido').first().json.user_id }}"
+            }
+          ]
+        },
+        "returnAll": true
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "5d315a82-de4c-4e94-ae88-36ea1cd1ddb2",
+      "name": "Separar arquivos",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        200
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Escolhe os arquivos do vídeo: as fotos pedidas (só as do próprio dono, na ordem pedida) e a música (a pedida\n// ou, se veio 0, a última que ele mandou). Devolve um item por arquivo, com o campo do formulário.\nconst pedido = $('Validar pedido').first().json;\nconst imagens = $('Buscar fotos').all().map((i) => i.json).filter((r) => r && r.id);\nconst musicas = $('Buscar músicas').all().map((i) => i.json).filter((r) => r && r.id && r.file_id);\nconst porId = new Map(imagens.map((r) => [Number(r.id), r]));\nconst faltando = pedido.fotos.filter((n) => !String(porId.get(n)?.file_id ?? '').trim());\nif (faltando.length) {\n  return [{ json: { ok: false, mensagem: `Não encontrei a foto #${faltando.join(', #')} (ou ela não chegou a ser guardada). Confira o número.` } }];\n}\nlet musica = null;\nif (pedido.musica) {\n  musica = musicas.find((m) => Number(m.id) === pedido.musica) || null;\n  if (!musica) return [{ json: { ok: false, mensagem: `Não encontrei a música #${pedido.musica}. Ele pode mandar o arquivo de áudio com a legenda \"música\".` } }];\n} else if (musicas.length) {\n  musica = musicas.reduce((a, b) => (Number(b.id) > Number(a.id) ? b : a));\n}\nif (musica && Number(musica.tamanho) > 20 * 1024 * 1024) {\n  return [{ json: { ok: false, mensagem: `A música #${musica.id} passa de 20 MB e o robô do Telegram não consegue baixar. Peça um arquivo menor.` } }];\n}\nconst comum = { ok: true, fotos: pedido.fotos, musica_id: musica ? Number(musica.id) : 0, musica_titulo: musica?.titulo ?? '', duracao: pedido.duracao };\nconst itens = pedido.fotos.map((n, i) => ({ json: { ...comum, campo: `foto${i + 1}`, file_id: porId.get(n).file_id } }));\nif (musica) itens.push({ json: { ...comum, campo: 'musica', file_id: musica.file_id } });\nreturn itens;\n"
+      }
+    },
+    {
+      "id": "2337c0bb-ce9c-4fd8-a1a4-c3eaf97af2cc",
+      "name": "Arquivos certos?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1320,
+        200
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "arquivos-ok",
+              "leftValue": "={{ $json.ok === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "4b8d2367-9e1e-4225-aeaf-e6c3ca5c4f09",
+      "name": "Avisar",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1540,
+        40
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $('Validar pedido').first().json.chat_id }}",
+        "text": "={{ '⏳ Estou montando o vídeo vitrine (' + $('Validar pedido').first().json.fotos.length + (($('Validar pedido').first().json.fotos.length > 1) ? ' fotos' : ' foto') + ($json.musica_id ? ', com a música #' + $json.musica_id : ', sem música') + '). Leva uns 2 minutos; o vídeo chega aqui. Não precisa pedir de novo.' }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "credentials": {},
+      "executeOnce": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "3925332f-7f3d-4691-a3da-699ec584957d",
+      "name": "Não deu certo",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1760,
+        460
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "nd-0",
+              "name": "ok",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "nd-1",
+              "name": "mensagem",
+              "type": "string",
+              "value": "={{ $json.mensagem || ('Não consegui montar o vídeo vitrine (' + String($json.error?.description ?? $json.error?.message ?? $json.error ?? 'erro desconhecido').replace(/\\s*\\[line \\d+\\]/g, '').replace(/\\s+/g, ' ').slice(0, 200) + '). Diga isso em uma frase.') }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "9e039758-69a1-4398-a94a-97b99dd7caa7",
+      "name": "Baixar arquivos",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1540,
+        200
+      ],
+      "parameters": {
+        "resource": "file",
+        "operation": "get",
+        "fileId": "={{ $json.file_id }}",
+        "download": true,
+        "additionalFields": {}
+      },
+      "credentials": {},
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "07017b99-014c-4f9f-a192-c0cf5ac723a4",
+      "name": "Montar formulário",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        200
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Junta as fotos e a música baixadas do Telegram num formulário multipart (foto1, foto2, foto3, musica) para o\n// serviço de vídeo da VPS. Cada arquivo baixado chega na mesma ordem dos pedidos do \"Separar arquivos\"; se algum\n// não baixou, para tudo e diz qual, para o vídeo não sair com a foto errada.\nconst itens = $input.all();\nconst campos = $('Separar arquivos').all().map((i) => i.json);\nconst nomes = { foto1: 'a 1ª foto', foto2: 'a 2ª foto', foto3: 'a 3ª foto', musica: 'a música' };\nconst fronteira = 'kira' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);\nconst partes = [];\nfor (let i = 0; i < campos.length; i++) {\n  const campo = campos[i].campo;\n  if (!itens[i]?.binary?.data) throw new Error(`Não consegui baixar ${nomes[campo] || campo} do Telegram`);\n  const dados = await this.helpers.getBinaryDataBuffer(i, 'data');\n  const tipo = itens[i].binary.data.mimeType || 'application/octet-stream';\n  partes.push(Buffer.from(`--${fronteira}\\r\\nContent-Disposition: form-data; name=\"${campo}\"; filename=\"${campo}\"\\r\\nContent-Type: ${tipo}\\r\\n\\r\\n`));\n  partes.push(dados);\n  partes.push(Buffer.from('\\r\\n'));\n}\npartes.push(Buffer.from(`--${fronteira}--\\r\\n`));\nconst corpo = Buffer.concat(partes);\nconst { campo, file_id, ...pedido } = campos[0];\nreturn [\n  {\n    json: pedido,\n    binary: { data: { data: corpo.toString('base64'), mimeType: `multipart/form-data; boundary=${fronteira}`, fileName: 'formulario' } },\n  },\n];\n"
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "1b974eae-98f2-42fc-acc4-94168207b357",
+      "name": "Montar vídeo vitrine",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1980,
+        200
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://kira-video:8080/vitrine",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "duracao",
+              "value": "={{ $json.duracao }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {
+          "timeout": 300000,
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          }
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "d2ccb421-677b-4ca2-a56e-6dc1471dfb44",
+      "name": "Mandar vídeo",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2200,
+        200
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendVideo",
+        "chatId": "={{ $('Validar pedido').first().json.chat_id }}",
+        "binaryData": true,
+        "binaryPropertyName": "data",
+        "additionalFields": {
+          "caption": "={{ '🎬 Vídeo vitrine (foto #' + $('Validar pedido').first().json.fotos.join(', #') + ($('Montar formulário').first().json.musica_id ? '; música #' + $('Montar formulário').first().json.musica_id : '; sem música') + ').' }}"
+        }
+      },
+      "credentials": {},
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "f2d8275a-df3b-48d5-a717-d1f0ac8d6551",
+      "name": "Guardar vídeo",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2420,
+        200
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "kira_videos"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "user_id": "={{ $('Validar pedido').first().json.user_id }}",
+            "chat_id": "={{ $('Validar pedido').first().json.chat_id }}",
+            "file_id": "={{ $json.result?.video?.file_id ?? $json.result?.document?.file_id ?? '' }}",
+            "duracao": "={{ $json.result?.video?.duration ?? 0 }}",
+            "tamanho": "={{ $json.result?.video?.file_size ?? 0 }}",
+            "largura": "={{ $json.result?.video?.width ?? 720 }}",
+            "altura": "={{ $json.result?.video?.height ?? 1280 }}",
+            "mime": "video/mp4",
+            "legenda": "={{ 'vitrine: foto #' + $('Validar pedido').first().json.fotos.join(', #') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "user_id",
+              "displayName": "user_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "chat_id",
+              "displayName": "chat_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "file_id",
+              "displayName": "file_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "duracao",
+              "displayName": "duracao",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "tamanho",
+              "displayName": "tamanho",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "largura",
+              "displayName": "largura",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "altura",
+              "displayName": "altura",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "mime",
+              "displayName": "mime",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "legenda",
+              "displayName": "legenda",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "921f1b97-0ffb-435f-a65f-8ba9e9a2465b",
+      "name": "Vídeo pronto",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2640,
+        200
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "vp-0",
+              "name": "ok",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "vp-1",
+              "name": "video_id",
+              "value": "={{ $json.id }}",
+              "type": "number"
+            },
+            {
+              "id": "vp-2",
+              "name": "mensagem",
+              "type": "string",
+              "value": "={{ 'Vídeo #' + $json.id + ' (vitrine) pronto e já enviado no Telegram, com a foto #' + $('Validar pedido').first().json.fotos.join(', #') + ($('Montar formulário').first().json.musica_id ? ' e a música #' + $('Montar formulário').first().json.musica_id : ', sem música (ele ainda não mandou nenhuma)') + '. Diga o número do vídeo e ofereça fazer o Reels com ele (ferramenta instagram, video_id ' + $json.id + ').' }}"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Pedido da Kira": {
+      "main": [
+        [
+          {
+            "node": "Validar pedido",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar pedido": {
+      "main": [
+        [
+          {
+            "node": "Pedido certo?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pedido certo?": {
+      "main": [
+        [
+          {
+            "node": "Buscar fotos",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Não deu certo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar fotos": {
+      "main": [
+        [
+          {
+            "node": "Buscar músicas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar músicas": {
+      "main": [
+        [
+          {
+            "node": "Separar arquivos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Separar arquivos": {
+      "main": [
+        [
+          {
+            "node": "Arquivos certos?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Arquivos certos?": {
+      "main": [
+        [
+          {
+            "node": "Avisar",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Baixar arquivos",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Não deu certo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Baixar arquivos": {
+      "main": [
+        [
+          {
+            "node": "Montar formulário",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar formulário": {
+      "main": [
+        [
+          {
+            "node": "Montar vídeo vitrine",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Não deu certo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar vídeo vitrine": {
+      "main": [
+        [
+          {
+            "node": "Mandar vídeo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Não deu certo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mandar vídeo": {
+      "main": [
+        [
+          {
+            "node": "Guardar vídeo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Não deu certo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar vídeo": {
+      "main": [
+        [
+          {
+            "node": "Vídeo pronto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Sao_Paulo",
+    "callerPolicy": "workflowsFromSameOwner",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "all",
+    "saveManualExecutions": false
+  },
+  "tags": []
+}

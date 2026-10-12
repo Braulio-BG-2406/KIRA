@@ -42,6 +42,7 @@ services:
       - /tmp:size=300m
     environment:
       - PORTA=8080
+      - HOME=/tmp
 YAML
 
 echo "==> 2/3 Montando e subindo o serviço (a primeira vez leva alguns minutos)"

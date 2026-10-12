@@ -2359,12 +2359,23 @@ teste('instagram: Reels com o vídeo guardado (video_id), nunca imagem e vídeo 
   assert.match(conferir({ id: 4, status: 'pendente', imagem_id: 0, video_id: 0, legenda: 'x' }).mensagem, /sem imagem, sem vídeo/);
   assert.deepEqual(ligacoes('Conta do Instagram')[0], ['É Reels?']);
   assert.deepEqual(ligacoes('É Reels?'), [['Criar Reels'], ['Criar post']]);
-  assert.deepEqual(ligacoes('Criar Reels'), [['Avisar processamento'], ['Explicar falha']]);
+  // o vídeo vai direto do Telegram para o Instagram (envio "resumable"), sem o link público
+  assert.deepEqual(ligacoes('Criar Reels'), [['Buscar vídeo (envio)'], ['Explicar falha']]);
+  assert.deepEqual(ligacoes('Buscar vídeo (envio)'), [['Baixar vídeo (envio)']]);
+  assert.deepEqual(ligacoes('Baixar vídeo (envio)'), [['Enviar vídeo'], ['Explicar falha']]);
+  assert.deepEqual(ligacoes('Enviar vídeo'), [['Avisar processamento'], ['Explicar falha']]);
+  assert.deepEqual(noDe(insta, 'Buscar vídeo (envio)').parameters.filters.conditions.map((c) => c.keyName), ['id', 'user_id']);
+  const envio = noDe(insta, 'Enviar vídeo').parameters;
+  assert.deepEqual([envio.method, envio.contentType, envio.inputDataFieldName], ['POST', 'binaryData', 'data']);
+  assert.match(envio.url, /Criar Reels'\)\.first\(\)\.json\.uri/);
+  assert.match(envio.url, /rupload\.facebook\.com\/ig-api-upload/);
+  const cabecalhos = Object.fromEntries(envio.headerParameters.parameters.map((h) => [h.name, h.value]));
+  assert.equal(cabecalhos.offset, '0');
+  assert.match(cabecalhos.file_size, /file_size/);
   assert.deepEqual(ligacoes('Criar post')[0], ['Post criado']);
   assert.deepEqual(ligacoes('Avisar processamento'), [['Post criado']]);
   const corpo = Object.fromEntries(noDe(insta, 'Criar Reels').parameters.bodyParameters.parameters.map((p) => [p.name, p.value]));
-  assert.equal(corpo.media_type, 'REELS');
-  assert.match(corpo.video_url, /link_imagem/);
+  assert.deepEqual([corpo.media_type, corpo.upload_type, corpo.video_url], ['REELS', 'resumable', undefined]);
   assert.match(noDe(insta, 'Publicar post').parameters.bodyParameters.parameters[0].value, /Post criado/);
   assert.match(noDe(insta, 'Status do post').parameters.url, /Post criado/);
   assert.match(noDe(insta, 'Esperar o Instagram').parameters.amount, /reels \? 10 : 3/);

@@ -902,8 +902,8 @@
               "value": "REELS"
             },
             {
-              "name": "video_url",
-              "value": "={{ $('Gerar link da imagem').first().json.link_imagem }}"
+              "name": "upload_type",
+              "value": "resumable"
             },
             {
               "name": "caption",
@@ -923,12 +923,105 @@
       "onError": "continueErrorOutput"
     },
     {
+      "id": "ce573b24-fba2-47d2-aa4d-45420ff280e1",
+      "name": "Buscar vídeo (envio)",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2400,
+        400
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "kira_videos"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Conferir rascunho').first().json.video_id }}"
+            },
+            {
+              "keyName": "user_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Conferir rascunho').first().json.user_id }}"
+            }
+          ]
+        },
+        "limit": 1
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "92cc56df-27c6-4155-ae1f-ba4af87fbf0f",
+      "name": "Baixar vídeo (envio)",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2620,
+        400
+      ],
+      "parameters": {
+        "resource": "file",
+        "operation": "get",
+        "fileId": "={{ $json.file_id ?? '' }}",
+        "download": true,
+        "additionalFields": {}
+      },
+      "credentials": {},
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "78e10b0e-9a17-4c4a-adca-c379984847ae",
+      "name": "Enviar vídeo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2840,
+        400
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Criar Reels').first().json.uri || ('https://rupload.facebook.com/ig-api-upload/v23.0/' + $('Criar Reels').first().json.id) }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "offset",
+              "value": "0"
+            },
+            {
+              "name": "file_size",
+              "value": "={{ String($('Baixar vídeo (envio)').first().json.result?.file_size || $('Buscar vídeo (envio)').first().json.tamanho || '') }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {
+          "timeout": 180000
+        }
+      },
+      "credentials": {},
+      "onError": "continueErrorOutput"
+    },
+    {
       "id": "c1c7ea2a-d305-41c8-ac02-68e833b977d3",
       "name": "Avisar processamento",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
-        2400,
+        3060,
         400
       ],
       "parameters": {
@@ -949,7 +1042,7 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        2620,
+        3280,
         480
       ],
       "parameters": {
@@ -974,7 +1067,7 @@
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
       "position": [
-        2840,
+        3500,
         480
       ],
       "parameters": {
@@ -989,7 +1082,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        3060,
+        3720,
         480
       ],
       "parameters": {
@@ -1019,7 +1112,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3280,
+        3940,
         480
       ],
       "parameters": {
@@ -1034,7 +1127,7 @@
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3.4,
       "position": [
-        3500,
+        4160,
         480
       ],
       "parameters": {
@@ -1103,7 +1196,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        3720,
+        4380,
         480
       ],
       "parameters": {
@@ -1137,7 +1230,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        3940,
+        4600,
         480
       ],
       "parameters": {
@@ -1167,7 +1260,7 @@
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
       "position": [
-        4160,
+        4820,
         480
       ],
       "parameters": {
@@ -1257,7 +1350,7 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        4380,
+        5040,
         480
       ],
       "parameters": {
@@ -1300,7 +1393,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3500,
+        4160,
         760
       ],
       "parameters": {
@@ -1505,7 +1598,7 @@
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
       "position": [
-        3720,
+        4380,
         760
       ],
       "parameters": {
@@ -1575,7 +1668,7 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        3940,
+        4600,
         760
       ],
       "parameters": {
@@ -2305,6 +2398,53 @@
       ]
     },
     "Criar Reels": {
+      "main": [
+        [
+          {
+            "node": "Buscar vídeo (envio)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Explicar falha",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar vídeo (envio)": {
+      "main": [
+        [
+          {
+            "node": "Baixar vídeo (envio)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Baixar vídeo (envio)": {
+      "main": [
+        [
+          {
+            "node": "Enviar vídeo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Explicar falha",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar vídeo": {
       "main": [
         [
           {

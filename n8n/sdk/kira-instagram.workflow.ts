@@ -6,7 +6,7 @@
 // (name access_token) guarda o token da Página do Facebook ligada ao Instagram da loja.
 // O Instagram só aceita mídia por um link público: o webhook "Imagem pública" entrega a imagem guardada no
 // Telegram (já em JPEG e no formato aceito) ou o vídeo (Reels, até 20 MB), só enquanto o post está sendo
-// publicado (chave aleatória).
+// publicado (chave aleatória). O Reels não usa o link: o vídeo vai direto para o Instagram (envio "resumable").
 // As leituras do Facebook trazem links com a chave de acesso: execuções que deram certo não ficam guardadas.
 import { workflow, node, trigger, ifElse, switchCase, expr, newCredential } from '@n8n/workflow-sdk';
 
@@ -547,7 +547,7 @@ const criarReels = node({
       bodyParameters: {
         parameters: [
           { name: "media_type", value: "REELS" },
-          { name: "video_url", value: expr("{{ $('Gerar link da imagem').first().json.link_imagem }}") },
+          { name: "upload_type", value: "resumable" },
           { name: "caption", value: expr("{{ $('Gerar link da imagem').first().json.legenda }}") },
           { name: "share_to_feed", value: "true" },
         ],
@@ -558,7 +558,71 @@ const criarReels = node({
     onError: "continueErrorOutput",
     position: [2180, 400],
   },
-  output: [{ id: "181" }],
+  output: [{ id: "181", uri: "https://rupload.facebook.com/ig-api-upload/v23.0/181" }],
+});
+const buscarVideoEnvio = node({
+  type: "n8n-nodes-base.dataTable",
+  version: 1.1,
+  config: {
+    name: "Buscar vídeo (envio)",
+    parameters: {
+      resource: "row",
+      operation: "get",
+      dataTableId: { __rl: true, mode: "name", value: "kira_videos" },
+      matchType: "allConditions",
+      filters: {
+        conditions: [
+          { keyName: "id", condition: "eq", keyValue: expr("{{ $('Conferir rascunho').first().json.video_id }}") },
+          { keyName: "user_id", condition: "eq", keyValue: expr("{{ $('Conferir rascunho').first().json.user_id }}") },
+        ],
+      },
+      limit: 1,
+    },
+    alwaysOutputData: true,
+    executeOnce: true,
+    position: [2400, 400],
+  },
+  output: [{ id: 1 }],
+});
+const baixarVideoEnvio = node({
+  type: "n8n-nodes-base.telegram",
+  version: 1.2,
+  config: {
+    name: "Baixar vídeo (envio)",
+    parameters: { resource: "file", operation: "get", fileId: expr("{{ $json.file_id ?? '' }}"), download: true, additionalFields: {} },
+    credentials: { telegramApi: credTelegram },
+    onError: "continueErrorOutput",
+    position: [2620, 400],
+  },
+  output: [{ ok: true, result: { file_size: 6060695, file_path: "videos/file_2.mp4" } }],
+});
+const enviarVideo = node({
+  type: "n8n-nodes-base.httpRequest",
+  version: 4.2,
+  config: {
+    name: "Enviar vídeo",
+    parameters: {
+      method: "POST",
+      url: expr("{{ $('Criar Reels').first().json.uri || ('https://rupload.facebook.com/ig-api-upload/v23.0/' + $('Criar Reels').first().json.id) }}"),
+      authentication: "genericCredentialType",
+      genericAuthType: "httpQueryAuth",
+      sendHeaders: true,
+      headerParameters: {
+        parameters: [
+          { name: "offset", value: "0" },
+          { name: "file_size", value: expr("{{ String($('Baixar vídeo (envio)').first().json.result?.file_size || $('Buscar vídeo (envio)').first().json.tamanho || '') }}") },
+        ],
+      },
+      sendBody: true,
+      contentType: "binaryData",
+      inputDataFieldName: "data",
+      options: { timeout: 180000 },
+    },
+    credentials: { httpQueryAuth: credInstagram },
+    onError: "continueErrorOutput",
+    position: [2840, 400],
+  },
+  output: [{ success: true }],
 });
 const avisarProcessamento = node({
   type: "n8n-nodes-base.telegram",
@@ -574,7 +638,7 @@ const avisarProcessamento = node({
     },
     credentials: { telegramApi: credTelegram },
     onError: "continueRegularOutput",
-    position: [2400, 400],
+    position: [3060, 400],
   },
   output: [{ ok: true }],
 });
@@ -619,7 +683,7 @@ const postCriado = node({
       },
       options: {},
     },
-    position: [2620, 480],
+    position: [3280, 480],
   },
   output: [{ ok: true, mensagem: "" }],
 });
@@ -629,7 +693,7 @@ const esperarInstagram = node({
   config: {
     name: "Esperar o Instagram",
     parameters: { resume: "timeInterval", amount: expr("{{ $('Conferir rascunho').first().json.reels ? 10 : 3 }}"), unit: "seconds" },
-    position: [2840, 480],
+    position: [3500, 480],
   },
   output: [{ id: "179" }],
 });
@@ -649,7 +713,7 @@ const statusDoPost = node({
     },
     credentials: { httpQueryAuth: credInstagram },
     onError: "continueErrorOutput",
-    position: [3060, 480],
+    position: [3720, 480],
   },
   output: [{ id: "179", status_code: "FINISHED" }],
 });
@@ -663,7 +727,7 @@ const conferirProcessamento = node({
       language: "javaScript",
       jsCode: "// Confere se o Instagram terminou de processar a mídia antes de publicar: até 1 minuto para foto e 6 minutos para\n// vídeo (Reels, conferido a cada 10 segundos).\nlet reels = false;\ntry {\n  reels = $('Conferir rascunho').first().json.reels === true;\n} catch (e) {\n  reels = false;\n}\nconst MAX_TENTATIVAS = reels ? 36 : 20;\nconst r = $input.first().json ?? {};\nconst codigo = String(r.status_code ?? '');\nconst tentativa = $runIndex + 1;\nlet situacao = 'esperar';\nlet motivo = '';\nif (codigo === 'FINISHED') situacao = 'pronto';\nelse if (['ERROR', 'EXPIRED', 'PUBLISHED'].includes(codigo)) {\n  situacao = 'falhou';\n  motivo = `O Instagram não aceitou o post: ${r.status || codigo}`;\n} else if (tentativa >= MAX_TENTATIVAS) {\n  situacao = 'falhou';\n  motivo = `O Instagram demorou demais para processar ${reels ? 'o vídeo' : 'a imagem'}. Tente de novo em alguns minutos.`;\n}\nreturn [{ json: { situacao, status_code: codigo, tentativa, ...(motivo ? { error: { message: motivo } } : {}) } }];\n",
     },
-    position: [3280, 480],
+    position: [3940, 480],
   },
   output: [{ ok: true }],
 });
@@ -697,7 +761,7 @@ const postPronto = switchCase({
       },
       options: { fallbackOutput: "extra", renameFallbackOutput: "Falhou" },
     },
-    position: [3500, 480],
+    position: [4160, 480],
   },
 });
 const publicarPost = node({
@@ -720,7 +784,7 @@ const publicarPost = node({
     retryOnFail: true,
     maxTries: 2,
     waitBetweenTries: 5000,
-    position: [3720, 480],
+    position: [4380, 480],
   },
   output: [{ id: "180" }],
 });
@@ -740,7 +804,7 @@ const linkDoPost = node({
     },
     credentials: { httpQueryAuth: credInstagram },
     onError: "continueRegularOutput",
-    position: [3940, 480],
+    position: [4600, 480],
   },
   output: [{ id: "180", permalink: "https://www.instagram.com/p/abc/" }],
 });
@@ -777,7 +841,7 @@ const marcarPublicado = node({
     },
     executeOnce: true,
     onError: "continueRegularOutput",
-    position: [4160, 480],
+    position: [4820, 480],
   },
   output: [{ id: 1 }],
 });
@@ -804,7 +868,7 @@ const postPublicado = node({
       },
       options: {},
     },
-    position: [4380, 480],
+    position: [5040, 480],
   },
   output: [{ ok: true, mensagem: "" }],
 });
@@ -818,7 +882,7 @@ const explicarFalha = node({
       language: "javaScript",
       jsCode: "// Traduz o erro do Facebook/Instagram em uma frase curta (sem chaves nem links).\nconst pedido = $('Validar pedido').first().json;\nconst item = $input.first().json ?? {};\nfunction motivoDoErro(v) {\n  const e = v?.error ?? v;\n  for (const c of [e?.description, e?.message, typeof e === 'string' ? e : '']) {\n    if (!c) continue;\n    const s = String(c);\n    const ini = s.indexOf('{');\n    const fim = s.lastIndexOf('}');\n    let trecho = ini >= 0 && fim > ini ? s.slice(ini, fim + 1) : '';\n    for (let i = 0; trecho && i < 2; i++) {\n      try {\n        const j = JSON.parse(trecho);\n        const g = j.error ?? j;\n        return String(g.error_user_msg || g.message || s);\n      } catch (x) {\n        trecho = trecho.replace(/\\\\\"/g, '\"').replace(/\\\\\\\\/g, '\\\\');\n      }\n    }\n    return s;\n  }\n  return 'erro desconhecido';\n}\nlet motivo = motivoDoErro(item)\n  .replace(/access_token=[^&\\s\"]+/gi, 'access_token=…')\n  .replace(/EAA[A-Za-z0-9]{20,}/g, '…')\n  .replace(/\\s+/g, ' ')\n  .trim()\n  .slice(0, 300);\nconst DICAS = [\n  [/aspect ratio|proporç/i, 'o formato da imagem não é aceito pelo Instagram'],\n  [/video|vídeo|duration|2207026|2207057/i, 'o Instagram não aceitou o vídeo (formato, duração ou tamanho)'],\n  [/could not be fetched|only photo or video|media type|URI/i, 'o Instagram não conseguiu baixar a imagem pelo link temporário'],\n  [/permission|permiss/i, 'falta permissão no app da Meta'],\n  [/session has expired|expired|invalid oauth|Error validating access token/i, 'a chave do Instagram venceu ou foi desligada; é preciso gerar outra'],\n  [/limit|limite/i, 'o limite de publicações do dia foi atingido'],\n];\nconst dica = DICAS.find(([re]) => re.test(motivo))?.[1];\nreturn [{ json: { ...pedido, ok: false, motivo, dica: dica ?? '' } }];\n",
     },
-    position: [3500, 760],
+    position: [4160, 760],
   },
   output: [{ ok: true }],
 });
@@ -847,7 +911,7 @@ const marcarFalha = node({
     },
     executeOnce: true,
     onError: "continueRegularOutput",
-    position: [3720, 760],
+    position: [4380, 760],
   },
   output: [{ id: 1 }],
 });
@@ -872,7 +936,7 @@ const falhaNaPublicacao = node({
       },
       options: {},
     },
-    position: [3940, 760],
+    position: [4600, 760],
   },
   output: [{ ok: true, mensagem: "" }],
 });
@@ -1222,13 +1286,15 @@ export default workflow('kira-instagram', 'Kira — Instagram (ferramenta)', {
   .to(
     qualCaminho
       .onCase(0, fotoOuVideo.onTrue(buscarVideoDoPost.to(videoDoPostServe.onTrue(guardarRascunho).onFalse(videoDoPostNaoServe))).onFalse(buscarImagemDoPost.to(imagemDoPostExiste.onTrue(guardarRascunho.to(previaDeVideo.onTrue(mostrarPreviaVideo.to(rascunhoPronto)).onFalse(mostrarPrevia.to(rascunhoPronto)))).onFalse(imagemDoPostNaoEncontrada))))
-      .onCase(1, buscarRascunho.to(conferirRascunho.to(podePublicar.onTrue(gerarLink.to(marcarPublicando.to(contaDoInstagram.to(eReels.onTrue(criarReels.to(avisarProcessamento.to(postCriado))).onFalse(criarPost.to(postCriado.to(esperarInstagram.to(statusDoPost.to(conferirProcessamento.to(postPronto.onCase(0, publicarPost.to(linkDoPost.to(marcarPublicado.to(postPublicado)))).onCase(1, esperarInstagram).onCase(2, explicarFalha))))))))))).onFalse(naoPodePublicar))))
+      .onCase(1, buscarRascunho.to(conferirRascunho.to(podePublicar.onTrue(gerarLink.to(marcarPublicando.to(contaDoInstagram.to(eReels.onTrue(criarReels.to(buscarVideoEnvio.to(baixarVideoEnvio.to(enviarVideo.to(avisarProcessamento.to(postCriado)))))).onFalse(criarPost.to(postCriado.to(esperarInstagram.to(statusDoPost.to(conferirProcessamento.to(postPronto.onCase(0, publicarPost.to(linkDoPost.to(marcarPublicado.to(postPublicado)))).onCase(1, esperarInstagram).onCase(2, explicarFalha))))))))))).onFalse(naoPodePublicar))))
       .onCase(2, buscarPosts.to(resumirPosts))
       .onCase(3, buscarRascunhos.to(listarRascunhos))
       .onCase(4, pedidoRecusado),
   )
   .add(contaDoInstagram.onError(explicarFalha))
   .add(criarReels.onError(explicarFalha))
+  .add(baixarVideoEnvio.onError(explicarFalha))
+  .add(enviarVideo.onError(explicarFalha))
   .add(criarPost.onError(explicarFalha))
   .add(statusDoPost.onError(explicarFalha))
   .add(publicarPost.onError(explicarFalha.to(marcarFalha.to(falhaNaPublicacao))))

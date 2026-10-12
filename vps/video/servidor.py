@@ -4,12 +4,13 @@
 # internet). Usa só a biblioteca padrão do Python e o ffmpeg.
 #
 #   GET  /saude                               -> "ok"
-#   POST /faixa?texto=...&cor=amarelo&altura=70   (corpo: o vídeo)  -> o vídeo MP4 com a faixa
+#   POST /faixa?texto=...&cor=amarelo&altura=70&letra=4.5   (corpo: o vídeo)  -> o vídeo MP4 com a faixa
 #
 # texto: até 2 linhas (separe com "|" ou quebra de linha), até 40 caracteres cada.
 # cor: amarelo (padrão), vermelho, preto ou branco.
-# altura: onde fica o centro da faixa, em % da altura do vídeo (40 a 85; padrão 70). No Reels, o Instagram cobre
+# altura: onde fica o centro da faixa, em % da altura do vídeo (40 a 95; padrão 70). No Reels, o Instagram cobre
 # a parte de baixo do vídeo com o nome da conta e a legenda; 70% fica logo acima dessa área.
+# letra: tamanho da letra, em % da altura do vídeo (2 a 7; padrão 4.5). A letra encolhe se o texto não couber.
 # O vídeo sai em H.264 + AAC, com o índice no começo do arquivo (o formato que o Instagram pede).
 import json
 import os
@@ -80,11 +81,11 @@ def medidas(caminho):
     return int(video['width']), int(video['height']), tem_audio
 
 
-def montar_filtro(largura, altura, linhas, cor, centro_pct, pasta):
+def montar_filtro(largura, altura, linhas, cor, centro_pct, pasta, letra_pct=4.5):
     caixa, cor_texto = CORES.get(cor, CORES['amarelo'])
     # Largura e altura pares (o H.264 exige); a letra encolhe para a linha mais longa caber em 90% da largura.
     maior = max(len(l) for l in linhas)
-    tamanho = int(min(altura * 0.045, (largura * 0.90) / (0.62 * maior)))
+    tamanho = int(min(altura * letra_pct / 100, (largura * 0.90) / (0.62 * maior)))
     tamanho = max(tamanho, 14)
     espaco = int(tamanho * 0.35)
     margem = int(tamanho * 0.6)
@@ -104,18 +105,19 @@ def montar_filtro(largura, altura, linhas, cor, centro_pct, pasta):
     return ','.join(partes)
 
 
-def aplicar_faixa(dados, texto, cor='amarelo', centro_pct=70):
+def aplicar_faixa(dados, texto, cor='amarelo', centro_pct=70, letra_pct=4.5):
     linhas = linhas_do_texto(texto)
     if cor not in CORES:
         raise Recusa('cor inválida: use amarelo, vermelho, preto ou branco')
-    centro_pct = max(40, min(85, int(centro_pct)))
+    centro_pct = max(40, min(95, int(centro_pct)))
+    letra_pct = max(2.0, min(7.0, float(letra_pct)))
     with tempfile.TemporaryDirectory() as pasta:
         entrada = os.path.join(pasta, 'entrada')
         saida = os.path.join(pasta, 'saida.mp4')
         with open(entrada, 'wb') as f:
             f.write(dados)
         largura, altura, tem_audio = medidas(entrada)
-        filtro = montar_filtro(largura, altura, linhas, cor, centro_pct, pasta)
+        filtro = montar_filtro(largura, altura, linhas, cor, centro_pct, pasta, letra_pct)
         cmd = ['ffmpeg', '-hide_banner', '-loglevel', 'error', '-y', '-i', entrada]
         if not tem_audio:
             # Vídeo sem som ganha um áudio mudo: o Instagram recusa alguns Reels sem faixa de áudio.
@@ -168,12 +170,16 @@ class Atendente(BaseHTTPRequestHandler):
         texto = (q.get('texto') or [''])[0]
         cor = (q.get('cor') or ['amarelo'])[0].strip().lower() or 'amarelo'
         try:
-            centro = int((q.get('altura') or ['70'])[0])
+            centro = int(float((q.get('altura') or ['70'])[0]))
         except ValueError:
             centro = 70
         try:
+            letra = float((q.get('letra') or ['4.5'])[0].replace(',', '.'))
+        except ValueError:
+            letra = 4.5
+        try:
             with FILA:
-                video = aplicar_faixa(dados, texto, cor, centro)
+                video = aplicar_faixa(dados, texto, cor, centro, letra)
         except Recusa as e:
             return self.responder(400, {'erro': str(e)})
         except subprocess.TimeoutExpired:

@@ -1,0 +1,6 @@
+{
+  "name": "kira-bancos-teste",
+  "private": true,
+  "scripts": { "test": "node simular.js" },
+  "devDependencies": { "luxon": "3.5.0" }
+}

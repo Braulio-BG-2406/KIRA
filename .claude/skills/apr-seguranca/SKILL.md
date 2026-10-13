@@ -21,6 +21,24 @@ O modelo tem um padrão fixo, que o script já monta sozinho:
 | 4 | Bloqueio de Energia | `"bloqueio_energia": true` |
 | 5 | **Atividade principal** – passos, riscos e medidas | o que você escreve |
 | 6 | 5S, limpeza e organização da área | sempre |
+| — | **Lista de presença do treinamento da APR** (última página: declaração, 13 linhas de nome/cargo/assinatura/data e assinaturas dos responsáveis) | sempre |
+
+## Regras fixas da empresa (pedidas pelo usuário — valem para toda APR)
+
+1. **Lista de presença em todas as APRs.** O script já inclui a página
+   "ANEXO 9 - LISTA DE PRESENÇA DO TREINAMENTO DA APR / DECLARAÇÃO DE MÉTODO"
+   no final, com datas, descrição, responsáveis e local preenchidos. Nunca
+   entregue uma APR sem ela.
+2. **Sem redundância.** Nenhum assunto ou linha deve se repetir entre as etapas
+   nem dentro da atividade principal. O que as etapas padrão já dizem (EPIs
+   obrigatórios, distância de veículos, acessos seguros, telefone ao caminhar,
+   aberturas no piso, isolamento do perímetro, bloqueio de energia, medidor e
+   máscara de NH3, chuveiros de emergência...) não volta na atividade
+   principal. O script remove sozinho as medidas do catálogo já cobertas
+   (`temas_cobertos` das etapas e `temas` das medidas) e lista o que omitiu;
+   mas o que **você** escreve (`passos`, `riscos_extras`, `medidas_extras`)
+   também não pode repetir nada disso. Antes de entregar, rode
+   `scripts/verificar_redundancia.py` (passo 7).
 
 Seu trabalho é a atividade principal: descrever os passos de execução e
 escolher os riscos certos. Os textos das etapas padrão e das medidas de cada
@@ -71,7 +89,18 @@ vêm numerados (riscos 1, 2, 3... e medidas 1., 1.1., 1.2...) pelo script.
    `/mnt/user-data/outputs` no claude.ai); se não houver, o diretório atual.
    `--pdf` precisa do LibreOffice; se faltar, entregue só o .xlsx.
 
-7. **Entregar** o .xlsx (e o PDF) com um resumo curto: datas, etapas incluídas,
+7. **Revisar redundância:**
+
+   ```bash
+   python <caminho-da-skill>/scripts/verificar_redundancia.py "<APR gerada>.xlsx"
+   ```
+
+   O resultado esperado é "0 possível(is) redundância(s)". Se apontar algo,
+   corrija o JSON (tire a medida extra repetida, troque um risco extra por
+   uma chave do catálogo) e gere de novo. Repetição entre o transporte (ida)
+   e o 5S (volta) sobre carga do carrinho é aceitável.
+
+8. **Entregar** o .xlsx (e o PDF) com um resumo curto: datas, etapas incluídas,
    riscos principais e as suposições feitas. Não repita a APR no chat.
 
 Para corrigir algo depois (trocar risco, incluir passo, mudar local), edite o
@@ -139,7 +168,8 @@ Campos opcionais:
 | `ruido` | Exposição a ruído | quase sempre (área industrial, lixadeira, furadeira) |
 | `poeiras_fumos` | Poeiras e fumos metálicos | solda, corte, lixamento |
 | `quimicos_tintas` | Produtos químicos (tintas e solventes) | retoque de pintura, solventes |
-| `nh3` | NH3 (amônia) | linhas/equipamentos de amônia |
+| `nh3` | NH3 (amônia) – abertura de linha | abrir/intervir em linhas ou equipamentos de amônia |
+| `nh3_proximidade` | Proximidade de linhas de amônia (NH3) | trabalho a quente ou montagem perto de linhas de amônia (CM01/CM02) sem abri-las |
 | `co2` | CO2 (asfixia / baixa temperatura) | linhas, tanques e usina de CO2 |
 | `quimicos_processo` | Produtos químicos de processo | assepsia, CIP, dosagem, ETA |
 | `biologico` | Agentes biológicos | ETEI, efluente, lodo, água de torre |
@@ -164,6 +194,11 @@ Campos opcionais:
 | `tombamento_escada` | Tombamento de escada | escada extensiva ou de abrir |
 | `espaco_confinado` | Espaço confinado (atmosfera perigosa) | tanques, silos, filtros fechados, poços |
 
+Não marque riscos que só repetem uma etapa padrão (ex.: `atropelamento` sem
+munck/PEMT/veículo na atividade — o transporte já trata disso). Se um risco do
+catálogo ficar sem nenhuma medida depois da deduplicação, o script o retira da
+lista sozinho.
+
 Coerência importa: se os passos têm solda, não pode faltar `poeiras_fumos`,
 `queimaduras` e `incendio`; se há pintura, `quimicos_tintas`; se há munck,
 `carga_suspensa`, `atropelamento` e `tombamento_equipamento`.
@@ -175,5 +210,6 @@ Coerência importa: se os passos têm solda, não pode faltar `poeiras_fumos`,
 - `assets/fotos/`: pictogramas usados nas etapas padrão. Se o usuário mandar a
   foto da equipe, salve como `assets/fotos/equipe.jpg` para ela aparecer na
   etapa 1, como no modelo original.
-- `assets/modelo-anexo9.xlsx`: molde da página (cabeçalho, títulos da tabela e
-  assinaturas), tirado da planilha da empresa.
+- `assets/modelo-anexo9.xlsx`: molde tirado da planilha da empresa — linhas
+  1-19: página da APR (cabeçalho, títulos da tabela, assinaturas); linhas
+  20-46: lista de presença.

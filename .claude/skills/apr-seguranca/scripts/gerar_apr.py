@@ -12,7 +12,12 @@ As datas são calculadas aqui, não no JSON:
                                          seguinte, se o início cair depois)
 
 Cada página repete cabeçalho, títulos da tabela e bloco de assinaturas, como no
-modelo. Etapas longas continuam na página seguinte com "Continuação...".
+modelo. Etapas longas continuam na página seguinte com "Continuação...". A última
+página é sempre a LISTA DE PRESENÇA DO TREINAMENTO DA APR.
+
+Redundância: uma medida da atividade principal é omitida quando o tema dela já
+está coberto por uma etapa padrão incluída (temas_cobertos) ou por outra medida,
+ou quando o texto é quase igual a uma linha já escrita.
 """
 
 import argparse
@@ -22,8 +27,10 @@ import re
 import shutil
 import subprocess
 import sys
+import unicodedata
 from copy import copy
 from datetime import date, datetime, timedelta
+from difflib import SequenceMatcher
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -45,7 +52,8 @@ MOLDE_CABECALHO = range(2, 9)
 MOLDE_TITULOS = range(9, 13)
 MOLDE_CONTEUDO = 13
 MOLDE_ASSINATURAS = range(14, 19)
-NCOLS = 19  # A..S
+MOLDE_LISTA = range(20, 47)  # lista de presença do treinamento da APR
+NCOLS = 20  # A..T
 
 ALTURA_MAX_LINHA = 409       # limite do Excel para uma linha
 CAPACIDADE_PAGINA = 585      # pontos de conteúdo por página, como no modelo original
@@ -112,13 +120,43 @@ def fatiar(texto: str, chars: int, capacidade: int) -> list[str]:
     return ["\n".join(f).strip("\n") for f in fatias] or [""]
 
 
+# ---------------------------------------------------------- redundância
+
+def normalizar(texto: str) -> str:
+    t = unicodedata.normalize("NFKD", str(texto)).encode("ascii", "ignore").decode().lower()
+    t = re.sub(r"^[#\-•*\s]*(\d+(\.\d+)*\.?)?\s*", "", t)  # numeração e marcadores
+    return " ".join(re.sub(r"[^a-z0-9 ]+", " ", t).split())
+
+
+class Deduplicador:
+    """Recusa medidas cujo tema já foi tratado ou cujo texto já apareceu."""
+
+    def __init__(self, temas=(), textos=()):
+        self.temas = set(temas)
+        self.textos = [n for n in (normalizar(t) for t in textos) if len(n) > 15]
+        self.omitidas = []
+
+    def aceitar(self, texto: str, temas=()) -> bool:
+        n = normalizar(texto)
+        if set(temas) & self.temas or any(SequenceMatcher(None, n, v).ratio() >= 0.88 for v in self.textos):
+            self.omitidas.append(texto)
+            return False
+        self.temas |= set(temas)
+        self.textos.append(n)
+        return True
+
+
+def medida(m) -> tuple[str, list]:
+    return (m["t"], m.get("temas", [])) if isinstance(m, dict) else (m, [])
+
+
 # ------------------------------------------------------------- conteúdo
 
 def carregar_json(caminho: Path) -> dict:
     return json.loads(caminho.read_text(encoding="utf-8"))
 
 
-def montar_atividade(ativ: dict, biblio: dict, cfg: dict, base_json: Path) -> dict:
+def montar_atividade(ativ: dict, biblio: dict, cfg: dict, base_json: Path, dedup: Deduplicador) -> dict:
     """Etapa da atividade principal a partir do catálogo de riscos."""
     catalogo = biblio["riscos"]
     escolhidos = []
@@ -133,24 +171,27 @@ def montar_atividade(ativ: dict, biblio: dict, cfg: dict, base_json: Path) -> di
             sys.exit(f"Categoria inválida em riscos_extras: {extra.get('categoria')}")
         escolhidos.append(extra)
 
+    if not escolhidos:
+        sys.exit("A atividade precisa de pelo menos um risco em 'riscos' ou 'riscos_extras'.")
+
     linhas_riscos, blocos_medidas, fotos_por_titulo = [], [], {}
     n = 0
     for cat, rotulo in biblio["categorias"]:
-        da_cat = [r for r in escolhidos if r["categoria"] == cat]
-        if not da_cat:
-            continue
-        if linhas_riscos:
-            linhas_riscos.append("")
-        linhas_riscos.append(rotulo)
-        for r in da_cat:
+        cabecalho_feito = False
+        for r in (r for r in escolhidos if r["categoria"] == cat):
+            aceitas = [t for t, temas in map(medida, r["medidas"]) if dedup.aceitar(t, temas)]
+            if not aceitas:  # tudo já coberto em outro lugar: o risco não entra
+                continue
+            if not cabecalho_feito:
+                if linhas_riscos:
+                    linhas_riscos.append("")
+                linhas_riscos.append(rotulo)
+                cabecalho_feito = True
             n += 1
             linhas_riscos.append(f"{n}. {r['titulo']}")
-            medidas = [f"{n}. {r['medidas'][0]}"] + [
-                f"{n}.{i}. {m}" for i, m in enumerate(r["medidas"][1:], start=1)]
+            medidas = [f"{n}. {aceitas[0]}"] + [f"{n}.{i}. {m}" for i, m in enumerate(aceitas[1:], start=1)]
             blocos_medidas.append(r["titulo"] + "\n" + "\n".join(medidas))
             fotos_por_titulo[r["titulo"]] = r.get("fotos", [])
-    if not escolhidos:
-        sys.exit("A atividade precisa de pelo menos um risco em 'riscos' ou 'riscos_extras'.")
 
     passos = ativ.get("passos", [])
     tecnicas = "\n\n".join(f"{i} Passo: {p}" for i, p in enumerate(passos, start=1))
@@ -201,6 +242,7 @@ def montar_etapas(dados: dict, biblio: dict, cfg: dict, base_json: Path) -> list
 
     def de_padrao(chave):
         e = dict(padrao[chave])
+        e.setdefault("temas_cobertos", [])
         for campo in ("sequencia", "tecnicas", "riscos", "medidas"):
             e[campo] = e[campo].format(**fmt)
         e["fotos"] = [str(FOTOS / f) for f in e.get("fotos", []) if (FOTOS / f).exists()]
@@ -211,8 +253,17 @@ def montar_etapas(dados: dict, biblio: dict, cfg: dict, base_json: Path) -> list
         etapas.append(de_padrao("rota_fuga_nh3"))
     if dados.get("bloqueio_energia", True):
         etapas.append(de_padrao("bloqueio_energia"))
+    # o que as etapas padrão já disseram não se repete na atividade principal
+    dedup = Deduplicador(
+        temas=[t for e in etapas for t in e["temas_cobertos"]],
+        textos=[l for e in etapas for l in e["medidas"].split("\n")],
+    )
     for a in atividades:
-        etapas.append(montar_atividade(a, biblio, cfg, base_json))
+        etapas.append(montar_atividade(a, biblio, cfg, base_json, dedup))
+    if dedup.omitidas:
+        print(f"Redundâncias evitadas ({len(dedup.omitidas)} medidas já cobertas):")
+        for t in dedup.omitidas:
+            print(f"  - {t[:110]}")
     for extra in dados.get("etapas_extras", []):
         etapas.append({
             "sequencia": extra["sequencia"], "tecnicas": extra.get("tecnicas", ""),
@@ -280,11 +331,12 @@ class Molde:
 
     def __init__(self, ws):
         self.celulas = {}
-        for r in range(1, MOLDE_ASSINATURAS.stop):
+        for r in range(1, MOLDE_LISTA.stop):
             for c in range(1, NCOLS + 1):
                 cel = ws.cell(r, c)
                 self.celulas[(r, c)] = (cel.value, copy(cel._style))
-        self.alturas = {r: ws.row_dimensions[r].height for r in range(1, MOLDE_ASSINATURAS.stop)}
+        self.alturas = {r: ws.row_dimensions[r].height for r in range(1, MOLDE_LISTA.stop)}
+        self.ocultas = {r: bool(ws.row_dimensions[r].hidden) for r in range(1, MOLDE_LISTA.stop)}
         self.mesclas = [(m.min_row, m.min_col, m.max_row, m.max_col) for m in ws.merged_cells.ranges]
 
     def copiar_linha(self, ws, origem: int, destino: int, altura=None):
@@ -294,6 +346,7 @@ class Molde:
             cel._style = copy(estilo)
             cel.value = valor
         ws.row_dimensions[destino].height = altura if altura is not None else self.alturas[origem]
+        ws.row_dimensions[destino].hidden = self.ocultas[origem] if altura is None else False
 
     def copiar_faixa(self, ws, linhas: range, destino: int) -> list:
         desloc = destino - linhas.start
@@ -391,6 +444,23 @@ def gerar_planilha(dados: dict, cfg: dict, paginas: list, datas: dict, destino: 
         linha += len(MOLDE_ASSINATURAS)
         ws.row_breaks.append(Break(id=linha - 1))
 
+    # lista de presença do treinamento da APR (sempre a última página)
+    ini = linha
+    mesclas += molde.copiar_faixa(ws, MOLDE_LISTA, ini)
+    d = ini - MOLDE_LISTA.start
+    for (r, c), valor in {(22, 8): datas["inicio"], (22, 15): datas["termino"]}.items():
+        cel = ws.cell(r + d, c)
+        cel.value = valor
+        cel.number_format = "DD/MM/YYYY"
+    ws.cell(23 + d, 6).value = dados.get("descricao") or dados["atividade"]
+    ws.cell(24 + d, 6).value = dados.get("responsavel") or cfg["responsavel"]
+    ws.cell(24 + d, 16).value = dados.get("telefone_responsavel") or cfg["telefone_responsavel"]
+    ws.cell(25 + d, 6).value = dados.get("responsavel_seguranca") or cfg["responsavel_seguranca"]
+    ws.cell(25 + d, 16).value = dados.get("telefone_seguranca") or cfg["telefone_seguranca"]
+    ws.cell(26 + d, 6).value = dados.get("local", "")
+    linha += len(MOLDE_LISTA)
+    ws.row_breaks.append(Break(id=linha - 1))
+
     for r1, c1, r2, c2 in mesclas:
         ws.merge_cells(start_row=r1, start_column=c1, end_row=r2, end_column=c2)
     ws.print_area = f"A1:R{linha - 1}"
@@ -449,7 +519,7 @@ def main():
     destino = saida / nome_arquivo(dados["atividade"])
     gerar_planilha(dados, cfg, paginas, datas, destino)
     fmt = "%d/%m/%Y"
-    print(f"XLSX: {destino} ({len(paginas)} páginas)")
+    print(f"XLSX: {destino} ({len(paginas) + 1} páginas, incluindo a lista de presença)")
     print(f"Elaboração {datas['elaboracao']:{fmt}} | Início {datas['inicio']:{fmt}} | Término {datas['termino']:{fmt}}")
     if args.pdf:
         pdf = converter_pdf(destino)

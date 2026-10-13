@@ -56,6 +56,10 @@ Use os scripts desta skill (rode com `python3`, sempre numa pasta nova):
    em que linha fica cada imagem.
 5. Leia o texto de todos os exemplos lado a lado e marque o que se repete
    igual em todos.
+6. **Percorra cada exemplo até a última página.** Anexos no fim do arquivo
+   (lista de presença, termos, recomendações de equipamentos) também são
+   padrão. Na APR, a lista de presença ficou de fora na primeira entrega
+   porque só olhei as linhas numeradas da tabela.
 
 ## Fase 3 — Separar o fixo do variável
 
@@ -71,6 +75,13 @@ Monte uma tabela para você mesmo (e mostre um resumo ao usuário):
 
 Copie os textos fixos **literalmente** (é o padrão já aceito pelo cliente);
 corrija só erros de digitação evidentes e conte ao usuário quais.
+
+**Redundância:** textos fixos de várias seções costumam repetir o mesmo
+assunto (EPIs, distância de veículos, telefone ao caminhar, isolamento...).
+Unifique dentro dos textos fixos e marque cada medida do catálogo com
+`temas`; cada seção fixa declara `temas_cobertos`. O gerador omite o que já
+foi dito e lista o que omitiu. Inclua na skill gerada um verificador de
+linhas parecidas (ver `verificar_redundancia.py` da apr-seguranca).
 
 ## Fase 4 — Construir a skill
 
@@ -128,4 +139,7 @@ completo de referência em `references/exemplo_gerar_apr.py`.
 - [ ] Nenhum bloco minúsculo sobrando sozinho numa página.
 - [ ] Fotos de pessoas/local fora da skill sem autorização; repositório
       público avisado.
+- [ ] Exemplo percorrido até a última página (anexos e listas incluídos).
+- [ ] Nenhum assunto repetido entre seções fixas e variáveis (temas +
+      verificador de redundância).
 - [ ] Exemplos refeitos e comparados lado a lado com os originais.

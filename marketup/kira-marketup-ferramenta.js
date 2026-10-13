@@ -182,9 +182,12 @@ const lerAcesso = node({
       jsCode: `// Tira o acesso da resposta do login (o Item pode vir em base64) e passa adiante só o token e a conta.
 const resposta = $input.first().json;
 if (resposta.error) {
-  const bruto = [resposta.error.message, resposta.error.description].filter(Boolean).join(' ');
-  if (/senha inv/i.test(bruto)) return [{ json: { error: { message: 'Usuário ou senha inválidos no MarketUP' } } }];
-  return [{ json: { error: { message: String(resposta.error.message || 'erro no login').slice(0, 300), description: String(resposta.error.description || '').slice(0, 300) } } }];
+  // O erro pode vir como texto ou como objeto (message/description), conforme a falha.
+  const erro = resposta.error;
+  const mensagem = typeof erro === 'string' ? erro : String(erro.message || erro.name || JSON.stringify(erro));
+  const descricao = typeof erro === 'string' ? '' : String(erro.description || '');
+  if (/senha inv/i.test(mensagem + ' ' + descricao)) return [{ json: { error: { message: 'Usuário ou senha inválidos no MarketUP' } } }];
+  return [{ json: { error: { message: mensagem.slice(0, 300) || 'erro no login', description: descricao.slice(0, 300) } } }];
 }
 
 const abrir = (valor) => {

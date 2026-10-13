@@ -47,6 +47,16 @@ A senha fica guardada criptografada no n8n. Não mande a senha pelo Telegram nem
 
 Se a senha do MarketUP mudar, é só atualizar essa credencial.
 
+### Se a Kira disser que o login não deu certo
+
+- **"Usuário ou senha inválidos no MarketUP"**: o MarketUP recebeu o pedido e recusou.
+  - Confira o JSON da credencial: tem de estar dentro de `"body"`, com `Login` e `Password` exatamente assim (L e P maiúsculos), sem espaço antes ou depois do e-mail e da senha. Se a senha tiver `"` ou `\`, escreva `\"` ou `\\`.
+  - Teste o mesmo e-mail e a mesma senha em `infinitejs.marketup.com`, numa janela anônima.
+  - Se você entra com o botão do Google, a conta não tem senha do MarketUP: crie uma em "recuperar a senha" ou, melhor, crie um usuário só para a Kira (abaixo).
+- **"does not have any credentials set"**: a credencial não está escolhida no passo **Entrar no MarketUP**.
+
+Dica de segurança: crie no MarketUP um usuário só para a Kira, com um perfil que só pode ver (sem incluir, alterar ou excluir), e use esse login na credencial.
+
 ## Passo a passo para publicar um produto novo
 
 O que a Kira ensina com `como_publicar` (MarketUP → Loja Integrada, a integração ativa nesta conta):

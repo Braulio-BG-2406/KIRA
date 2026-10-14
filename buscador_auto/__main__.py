@@ -18,6 +18,7 @@ from pathlib import Path
 from . import config as cfg_mod
 from .avaliacao import avaliar_lote
 from .categorias import NOMES, TIPO_FIPE, detectar_categoria
+from .faixas import FAIXAS, OUTROS, faixa_do_anuncio
 from .fipe import ClienteFipe
 from .fontes import FONTES, MercadoLivre, criar_sessao, ler_planilha
 from .historico import Historico
@@ -45,7 +46,7 @@ def _processar(anuncios: list[Anuncio], config: dict, args, titulo: str, aviso: 
     historico = Historico(geral["banco"])
     historico.registrar(avaliacoes)
 
-    print(tabela_terminal(avaliacoes, int(geral.get("limite_terminal", 20))))
+    print(tabela_terminal(avaliacoes, int(geral.get("limite_por_faixa", 5))))
     saida = Path(geral["saida"])
     carimbo = dt.datetime.now().strftime("%Y%m%d-%H%M")
     html = salvar_html(avaliacoes, saida / "ultimo.html", titulo, aviso)
@@ -59,16 +60,35 @@ def _processar(anuncios: list[Anuncio], config: dict, args, titulo: str, aviso: 
             print("Telegram não configurado (TELEGRAM_BOT_TOKEN e TELEGRAM_CHAT_ID).", file=sys.stderr)
         else:
             escolhidas = historico.para_notificar(avaliacoes, int(geral["score_minimo_alerta"]))
-            for av in escolhidas[: int(geral.get("max_alertas", 10))]:
+            limite = int(geral.get("max_alertas_por_faixa", 3))
+            por_faixa: dict[str, int] = {}
+            enviadas = 0
+            for av in escolhidas:  # já vêm da maior para a menor nota
+                faixa = av.faixa or OUTROS
+                if por_faixa.get(faixa, 0) >= limite:
+                    continue
+                por_faixa[faixa] = por_faixa.get(faixa, 0) + 1
                 if enviar_telegram(tg["token"], tg["chat_id"], mensagem(av)):
                     historico.marcar_notificado(av)
-            print(f"Telegram: {len(escolhidas)} oportunidade(s) nova(s) acima da nota {geral['score_minimo_alerta']}.")
+                    enviadas += 1
+            print(f"Telegram: {enviadas} aviso(s) enviado(s), até {limite} por faixa, nota mínima "
+                  f"{geral['score_minimo_alerta']}.")
     return 0
+
+
+def _da_faixa(a: Anuncio, busca, config: dict) -> bool:
+    """Um caminhão Mercedes achado na busca premium não entra como premium (e vice-versa)."""
+    if not busca.faixa:
+        return True
+    categoria = detectar_categoria(a.texto_completo, a.categoria or busca.categoria)
+    return faixa_do_anuncio(a, categoria, config) == busca.faixa
 
 
 def cmd_buscar(args) -> int:
     config = cfg_mod.carregar(args.config)
     buscas = cfg_mod.buscas(config)
+    if args.faixa:
+        buscas = [b for b in buscas if b.faixa == args.faixa]
     if args.so:
         buscas = [b for b in buscas if args.so.lower() in b.nome.lower()]
     if not buscas:
@@ -96,7 +116,7 @@ def cmd_buscar(args) -> int:
             except Exception as erro:  # uma fonte fora do ar não derruba as outras
                 log.warning("[%s] %s: %s", busca.nome, nome, erro)
                 continue
-            aceitos = [a for a in achados if busca.aceita(a)]
+            aceitos = [a for a in achados if busca.aceita(a) and _da_faixa(a, busca, config)]
             for a in aceitos:
                 a.busca = busca.nome
                 a.categoria = a.categoria or busca.categoria
@@ -176,7 +196,8 @@ def main(argv: list[str] | None = None) -> int:
 
     b = sub.add_parser("buscar", help="procura anúncios nas fontes configuradas")
     comum(b, config_obrigatorio=True)
-    b.add_argument("--so", help="roda só as buscas cujo nome contém este texto")
+    b.add_argument("--faixa", choices=FAIXAS, help="roda só uma faixa: pesados, populares ou premium")
+    b.add_argument("--so", help="roda só as buscas cujo nome contém este texto (ex.: Onix, BMW)")
     b.add_argument("--notificar", action="store_true", help="envia as melhores para o Telegram")
     b.set_defaults(func=cmd_buscar)
 

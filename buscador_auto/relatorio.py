@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 
 from .categorias import NOMES
+from .faixas import FAIXAS, NOMES_FAIXA, OUTROS
 from .modelos import Avaliacao
 from .texto import formatar_pct, formatar_reais
 
@@ -27,6 +28,8 @@ def para_dict(av: Avaliacao) -> dict:
         "imagem": a.imagem,
         "categoria": av.categoria,
         "categoria_nome": NOMES.get(av.categoria, av.categoria),
+        "faixa": av.faixa or OUTROS,
+        "faixa_nome": NOMES_FAIXA.get(av.faixa or OUTROS, av.faixa),
         "preco": a.preco,
         "ano": a.ano,
         "km": a.km,
@@ -59,22 +62,37 @@ def para_dict(av: Avaliacao) -> dict:
     }
 
 
-def tabela_terminal(avaliacoes: list[Avaliacao], limite: int = 20) -> str:
+BOAS = ("ÓTIMA", "BOA")
+
+
+def e_oportunidade(av: Avaliacao) -> bool:
+    return not av.risco_alto and (av.veredito_revenda in BOAS or av.veredito_uso in BOAS)
+
+
+def tabela_terminal(avaliacoes: list[Avaliacao], limite_por_faixa: int = 5) -> str:
+    """Resumo por faixa (pesados, populares, premium), só os melhores de cada uma."""
     if not avaliacoes:
         return "Nenhum anúncio avaliado."
     cab = f"{'Nota':>4}  {'Revenda':<14} {'Uso':<14} {'Preço':>13} {'FIPE aj.':>13} {'Abaixo':>7} {'Lucro':>13}  Veículo"
-    linhas = [cab, "-" * len(cab)]
-    for av in avaliacoes[:limite]:
-        a = av.anuncio
-        risco = " ⚠" if av.risco_alto else ""
-        linhas.append(
-            f"{av.score:>4}  {av.veredito_revenda:<14} {av.veredito_uso:<14} {formatar_reais(a.preco):>13} "
-            f"{formatar_reais(av.fipe_ajustada):>13} {formatar_pct(av.desconto_fipe_pct):>7} "
-            f"{formatar_reais(av.lucro):>13}  {a.titulo[:60]} ({a.ano or '?'}, {a.fonte}){risco}"
-        )
-    if len(avaliacoes) > limite:
-        linhas.append(f"... e mais {len(avaliacoes) - limite} no relatório HTML/CSV")
-    return "\n".join(linhas)
+    linhas = []
+    for faixa in (*FAIXAS, OUTROS):
+        grupo = [av for av in avaliacoes if (av.faixa or OUTROS) == faixa]
+        if not grupo:
+            continue
+        boas = sum(e_oportunidade(av) for av in grupo)
+        linhas += ["", f"== {NOMES_FAIXA[faixa].upper()} · {len(grupo)} anúncio(s), {boas} oportunidade(s) ==",
+                   cab, "-" * len(cab)]
+        for av in grupo[:limite_por_faixa]:
+            a = av.anuncio
+            risco = " ⚠" if av.risco_alto else ""
+            linhas.append(
+                f"{av.score:>4}  {av.veredito_revenda:<14} {av.veredito_uso:<14} {formatar_reais(a.preco):>13} "
+                f"{formatar_reais(av.fipe_ajustada):>13} {formatar_pct(av.desconto_fipe_pct):>7} "
+                f"{formatar_reais(av.lucro):>13}  {a.titulo[:60]} ({a.ano or '?'}, {a.fonte}){risco}"
+            )
+        if len(grupo) > limite_por_faixa:
+            linhas.append(f"      ... mais {len(grupo) - limite_por_faixa} no relatório HTML/CSV")
+    return "\n".join(linhas).lstrip("\n")
 
 
 def detalhe_terminal(av: Avaliacao) -> str:
@@ -82,7 +100,8 @@ def detalhe_terminal(av: Avaliacao) -> str:
     km = f"{a.km:,} km".replace(",", ".") if a.km is not None else "km não informado"
     linhas = [
         f"{a.titulo}",
-        f"  Categoria: {NOMES.get(av.categoria, av.categoria)} · Ano {a.ano or '?'} · {km}",
+        f"  Faixa: {NOMES_FAIXA.get(av.faixa or OUTROS)} · {NOMES.get(av.categoria, av.categoria)} · "
+        f"Ano {a.ano or '?'} · {km}",
         f"  Preço pedido:        {formatar_reais(a.preco)}",
     ]
     if av.fipe:
@@ -114,7 +133,7 @@ def detalhe_terminal(av: Avaliacao) -> str:
 def salvar_csv(avaliacoes: list[Avaliacao], caminho: str | Path) -> Path:
     caminho = Path(caminho)
     caminho.parent.mkdir(parents=True, exist_ok=True)
-    campos = ["score", "revenda", "uso", "categoria_nome", "titulo", "preco", "ano", "km", "cidade", "uf",
+    campos = ["faixa", "score", "revenda", "uso", "categoria_nome", "titulo", "preco", "ano", "km", "cidade", "uf",
               "fipe", "fipe_ajustada", "desconto_fipe", "mediana_mercado", "desconto_mercado",
               "preco_revenda", "custo_total", "lucro", "margem", "alertas", "sinais", "fonte", "url"]
     with caminho.open("w", newline="", encoding="utf-8-sig") as f:
@@ -122,6 +141,7 @@ def salvar_csv(avaliacoes: list[Avaliacao], caminho: str | Path) -> Path:
         w.writeheader()
         for av in avaliacoes:
             d = para_dict(av)
+            d["faixa"] = d["faixa_nome"]
             d["alertas"] = " | ".join(x["msg"] for x in d["alertas"])
             d["sinais"] = ", ".join(d["sinais"])
             for k in ("preco", "fipe", "fipe_ajustada", "mediana_mercado", "preco_revenda", "custo_total", "lucro"):

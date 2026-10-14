@@ -82,6 +82,7 @@ class Avaliacao:
     score: int
     veredito_revenda: str
     veredito_uso: str
+    faixa: str = ""  # pesados, populares, premium ou outros
     novo: bool = True
     queda_preco: float = 0.0
     extras: dict = field(default_factory=dict)

@@ -13,9 +13,21 @@ do mesmo modelo/ano**, desconta os custos de revenda e diz se é oportunidade:
   (leilão, sinistro/monta, enchente, ágio/financiamento, motor fundido, documento,
   preço baixo demais = possível golpe). Entende negação: "nunca batido, sem leilão" não gera alerta.
 
-O resultado sai no terminal, numa planilha CSV e numa página HTML com filtros
-(revenda × uso próprio, carro/caminhão/cavalo, busca por texto), e as melhores
-oportunidades novas podem ir para o **Telegram**. Um histórico local marca anúncios
+A análise é separada em **3 faixas**, cada uma com poucas buscas e custos próprios:
+
+| Faixa | O que entra | Buscas (padrão) |
+|---|---|---|
+| **Pesados** | caminhões e cavalos mecânicos | 1 por termo: "cavalo mecânico", "caminhão truck", "caminhão toco" |
+| **Populares** | carros de marcas nacionais (VW, Chevrolet, Fiat, Ford, Renault, Hyundai, Toyota, Honda, Nissan, Peugeot, Citroën) até R$ 90 mil | 1 por modelo: Onix, HB20, Gol, Polo, Argo, Mobi, Strada, Kwid, Sandero, Ka |
+| **Premium** | BMW, Audi e Mercedes-Benz (carros; caminhão Mercedes vai para pesados) | 1 por marca, ou por modelo se você listar |
+
+Com o arquivo de exemplo são 16 buscas (no máximo ~60 páginas consultadas). Tudo
+isso se ajusta em `[faixas.pesados]`, `[faixas.populares]` e `[faixas.premium]` no
+`buscas.toml`; `ativa = false` desliga uma faixa.
+
+O resultado sai no terminal (os 5 melhores de cada faixa), numa planilha CSV e numa
+página HTML com filtros (faixa, revenda × uso próprio, busca por texto), e as
+melhores oportunidades novas podem ir para o **Telegram** (até 3 por faixa). Um histórico local marca anúncios
 **novos** e **quedas de preço** (bom sinal para negociar).
 
 ### Instalação
@@ -34,9 +46,10 @@ cp buscas.exemplo.toml buscas.toml   # e edite suas buscas e custos
 python -m buscador_auto importar exemplos/anuncios_exemplo.csv --sem-fipe
 #    -> abre saida/ultimo.html no navegador
 
-# 2) Rodar as buscas do buscas.toml (OLX, Mercado Livre, Webmotors) e avisar no Telegram
+# 2) Rodar as 3 faixas do buscas.toml (OLX, Mercado Livre, Webmotors) e avisar no Telegram
 python -m buscador_auto buscar --notificar
-python -m buscador_auto buscar --so "cavalo"          # só as buscas com "cavalo" no nome
+python -m buscador_auto buscar --faixa premium        # só uma faixa
+python -m buscador_auto buscar --so "Onix"            # só as buscas com "Onix" no nome
 
 # 3) Avaliar uma planilha de leilão, Marketplace, grupo de WhatsApp...
 python -m buscador_auto importar lotes_leilao.xlsx --categoria cavalo
@@ -70,6 +83,8 @@ fipe, fonte, id`. Também aceita sinônimos como `Lance`, `Valor`, `Veículo`,
 `Ano/Modelo`, `Lote`, `Valor FIPE`, `Observações`. Se a coluna `fipe` vier
 preenchida, a consulta à FIPE é dispensada. Use `vendedor = leilao` para lotes de
 leilão (o programa já desconta a desvalorização típica de veículo de leilão).
+Cada linha é encaixada numa faixa pela marca/categoria; o que não for pesado,
+popular nacional nem BMW/Audi/Mercedes aparece como "Outros".
 
 ### Como a conta é feita
 
@@ -88,9 +103,13 @@ leilão (o programa já desconta a desvalorização típica de veículo de leil�
 6. **Uso próprio** usa o menor desconto entre FIPE e mercado (FIPE de caminhão
    costuma ficar acima do que se pratica).
 
-Todos os custos e metas ficam em `buscas.toml` (`[custos.carro]`,
-`[custos.caminhao]`, `[custos.cavalo]`). Os padrões são pontos de partida:
-ajuste com os valores do seu despachante, da sua preparação e da sua região.
+Cada faixa tem custos e metas próprios em `buscas.toml` (`[custos.populares]`,
+`[custos.premium]`, `[custos.caminhao]`, `[custos.cavalo]`). O premium, por padrão,
+considera preparação mais cara (pneus, freios), revenda a 92% da FIPE (gira mais
+devagar), mais perda por km rodado e lucro mínimo de R$ 10 mil; para uso próprio
+só é "boa compra" a partir de 8% abaixo da referência. Carro blindado recebe aviso,
+porque a FIPE não inclui a blindagem. Os padrões são pontos de partida: ajuste com
+os valores do seu despachante, da sua preparação e da sua região.
 
 > As estimativas servem para **triagem**: separar os anúncios que valem uma
 > ligação. Antes de fechar negócio, confira procedência e débitos no Detran,
@@ -105,7 +124,8 @@ ajuste com os valores do seu despachante, da sua preparação e da sua região.
    `TELEGRAM_BOT_TOKEN` e `TELEGRAM_CHAT_ID`.
 
 Só são avisados anúncios com nota ≥ `score_minimo_alerta`, sem risco alto, ainda
-não avisados — ou que baixaram de preço desde o último aviso.
+não avisados — ou que baixaram de preço desde o último aviso —, no máximo
+`max_alertas_por_faixa` por faixa a cada execução.
 
 ### Rodar sozinho (VPS)
 

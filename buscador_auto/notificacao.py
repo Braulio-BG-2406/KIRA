@@ -8,6 +8,7 @@ import logging
 import requests
 
 from .categorias import NOMES
+from .faixas import NOMES_FAIXA, PESADOS
 from .modelos import Avaliacao
 from .texto import formatar_pct, formatar_reais
 
@@ -17,9 +18,12 @@ log = logging.getLogger(__name__)
 def mensagem(av: Avaliacao) -> str:
     a = av.anuncio
     e = html.escape
+    tipo = NOMES_FAIXA.get(av.faixa, av.faixa)
+    if av.faixa == PESADOS:
+        tipo += f" ({NOMES.get(av.categoria, av.categoria)})"
     linhas = [
         f"<b>{e(a.titulo)}</b>",
-        f"{NOMES.get(av.categoria, av.categoria)} · {a.ano or '?'} · "
+        f"{tipo} · {a.ano or '?'} · "
         f"{f'{a.km:,} km'.replace(',', '.') if a.km is not None else 'km ?'} · {e(a.cidade)} {e(a.uf)}".strip(),
         f"💰 Preço: <b>{formatar_reais(a.preco)}</b>"
         + (f" (baixou {formatar_reais(av.queda_preco)})" if av.queda_preco else ""),

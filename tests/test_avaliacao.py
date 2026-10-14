@@ -1,4 +1,4 @@
-from buscador_auto.avaliacao import ajuste_por_km, avaliar, avaliar_lote, custos_categoria, detectar_alertas
+from buscador_auto.avaliacao import ajuste_por_km, avaliar, avaliar_lote, custos_perfil, detectar_alertas
 from buscador_auto.modelos import Anuncio, ResultadoFipe
 
 
@@ -34,7 +34,7 @@ def test_vendedor_leilao_vira_alerta():
 
 
 def test_ajuste_por_km():
-    cfg = custos_categoria("carro")
+    cfg = custos_perfil("populares")
     assert ajuste_por_km(None, 2020, 2026, cfg) == 0
     assert ajuste_por_km(97500, 2020, 2026, cfg) == 0  # exatamente o esperado (6,5 anos x 15 mil)
     assert ajuste_por_km(197500, 2020, 2026, cfg) == -0.15

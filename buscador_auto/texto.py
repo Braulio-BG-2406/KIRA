@@ -85,6 +85,36 @@ def contem(texto_normalizado: str, padrao: str) -> bool:
     return re.search(padrao, texto_normalizado) is not None
 
 
+# Grafias da mesma marca em anúncios.
+EQUIVALENTES_MARCA = [
+    {"volkswagen", "vw", "volks"},
+    {"chevrolet", "gm", "chevy"},
+    {"mercedes", "mercedes benz", "benz", "mb"},
+]
+
+
+def _palavras(texto) -> str:
+    t = re.sub(r"[^a-z0-9.]+", " ", normalizar(texto))
+    return re.sub(r"\.(?!\d)|(?<!\d)\.", " ", t)
+
+
+def menciona(texto, termo) -> bool:
+    """True se `termo` aparece como palavra inteira no texto.
+
+    "Gol" não casa com "Golf" nem "Ka" com "Kardian"; VW = Volkswagen,
+    GM = Chevrolet, Mercedes = Mercedes-Benz.
+    """
+    alvo = " ".join(_palavras(termo).split())
+    if not alvo:
+        return True
+    opcoes = {alvo}
+    for grupo in EQUIVALENTES_MARCA:
+        if alvo in grupo or alvo.split()[0] in grupo:
+            opcoes |= grupo
+    t = f" {' '.join(_palavras(texto).split())} "
+    return any(f" {o} " in t for o in opcoes)
+
+
 def formatar_reais(valor) -> str:
     if valor is None:
         return "-"

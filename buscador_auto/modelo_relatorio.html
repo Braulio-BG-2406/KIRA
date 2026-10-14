@@ -34,7 +34,12 @@ header p { margin: 0; color: var(--muted); }
 .aviso { margin-top: 12px; padding: 10px 12px; border-radius: 8px; background: var(--ok-bg); color: var(--ok); }
 .aviso:empty { display: none; }
 .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin: 20px 0; }
-.kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; box-shadow: var(--shadow); }
+.kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px;
+  box-shadow: var(--shadow); text-align: left; font: inherit; color: var(--text); }
+button.kpi { cursor: pointer; }
+button.kpi:hover { border-color: var(--accent); }
+.kpi[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.kpi h2 { margin: 0 0 2px; font-size: .8rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
 .kpi b { display: block; font-size: 1.6rem; font-variant-numeric: tabular-nums; }
 .kpi span { color: var(--muted); font-size: .85rem; }
 .toolbar { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; margin-bottom: 18px; }
@@ -112,12 +117,7 @@ footer { margin-top: 28px; color: var(--muted); font-size: .8rem; }
       <button data-v="revenda" aria-pressed="true">Revenda</button>
       <button data-v="uso" aria-pressed="false">Uso próprio</button>
     </div>
-    <div class="seg" id="categoria" role="group" aria-label="Categoria">
-      <button data-v="" aria-pressed="true">Todos</button>
-      <button data-v="carro" aria-pressed="false">Carro</button>
-      <button data-v="caminhao" aria-pressed="false">Caminhão</button>
-      <button data-v="cavalo" aria-pressed="false">Cavalo mecânico</button>
-    </div>
+    <div class="seg" id="faixa" role="group" aria-label="Faixa"></div>
     <input type="search" id="texto" placeholder="Filtrar por modelo, cidade, fonte..." aria-label="Filtrar">
     <select id="ordem" aria-label="Ordenar">
       <option value="score">Maior nota</option>
@@ -136,7 +136,11 @@ footer { margin-top: 28px; color: var(--muted); font-size: .8rem; }
 <script id="dados" type="application/json">{{DADOS}}</script>
 <script>
 const DADOS = JSON.parse(document.getElementById("dados").textContent);
-const estado = { objetivo: "revenda", categoria: "", texto: "", ordem: "score", semRisco: true };
+const estado = { objetivo: "revenda", faixa: "", texto: "", ordem: "score", semRisco: true };
+const FAIXAS = [["pesados", "Pesados"], ["populares", "Populares"], ["premium", "Premium"]];
+if (DADOS.some(d => d.faixa === "outros")) FAIXAS.push(["outros", "Outros"]);
+const boa = v => ["ÓTIMA", "BOA"].includes(v);
+const oportunidade = d => !riscoAlto(d) && (boa(d.revenda) || boa(d.uso));
 
 const brl = v => v == null ? "–" : (v < 0 ? "-" : "") + "R$ " + Math.round(Math.abs(v)).toLocaleString("pt-BR");
 const pct = v => v == null ? "–" : (v * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1, minimumFractionDigits: 1 }) + "%";
@@ -148,11 +152,29 @@ const classeVeredito = v => ["ÓTIMA", "BOA"].includes(v) ? "bom" : ["MARGEM BAI
 const urlSegura = u => /^https?:\/\//i.test(u || "") ? u : "";
 
 function kpis() {
-  const boaRev = DADOS.filter(d => ["ÓTIMA", "BOA"].includes(d.revenda)).length;
-  const boaUso = DADOS.filter(d => ["ÓTIMA", "BOA"].includes(d.uso)).length;
+  const cards = FAIXAS.map(([f, nome]) => {
+    const grupo = DADOS.filter(d => d.faixa === f);
+    const n = grupo.filter(oportunidade).length;
+    const melhor = grupo.length ? Math.max(...grupo.map(d => d.score)) : null;
+    const sub = grupo.length ? `de ${grupo.length} anúncio${grupo.length > 1 ? "s" : ""} · melhor nota ${melhor}` : "nenhum anúncio";
+    return `<button class="kpi" data-faixa="${f}" aria-pressed="${estado.faixa === f}"><h2>${nome}</h2>` +
+      `<b>${n}</b><span>${n === 1 ? "oportunidade" : "oportunidades"} ${sub}</span></button>`;
+  });
   const risco = DADOS.filter(riscoAlto).length;
-  const itens = [[DADOS.length, "anúncios avaliados"], [boaRev, "boas para revenda"], [boaUso, "boas para uso próprio"], [risco, "com risco alto"]];
-  document.getElementById("kpis").innerHTML = itens.map(([n, t]) => `<div class="kpi"><b>${n}</b><span>${t}</span></div>`).join("");
+  cards.push(`<div class="kpi"><h2>Risco alto</h2><b>${risco}</b><span>ocultos por padrão</span></div>`);
+  document.getElementById("kpis").innerHTML = cards.join("");
+}
+
+function botoesFaixa() {
+  document.getElementById("faixa").innerHTML = [["", "Todas"], ...FAIXAS]
+    .map(([f, nome]) => `<button data-v="${f}" aria-pressed="${estado.faixa === f}">${nome}</button>`).join("");
+}
+
+function escolherFaixa(f) {
+  estado.faixa = f;
+  botoesFaixa();
+  kpis();
+  render();
 }
 
 function card(d) {
@@ -163,7 +185,9 @@ function card(d) {
   const meta = [d.ano || "ano ?", d.km != null ? num(d.km) + " km" : "km ?", local, d.vendedor].filter(Boolean).map(esc).join(" · ");
   const ref = d.fipe_ajustada ?? d.mediana_mercado;
   const desc = d.desconto_fipe ?? d.desconto_mercado;
-  const tags = [`<span class="tag">${esc(d.categoria_nome)}</span>`, `<span class="tag">${esc(d.fonte)}</span>`];
+  const tags = [`<span class="tag">${esc(d.faixa_nome)}</span>`];
+  if (d.faixa === "pesados") tags.push(`<span class="tag">${esc(d.categoria_nome)}</span>`);
+  tags.push(`<span class="tag">${esc(d.fonte)}</span>`);
   if (d.novo) tags.push(`<span class="tag novo">novo</span>`);
   if (d.queda > 0) tags.push(`<span class="tag queda">baixou ${brl(d.queda)}</span>`);
   const focoRev = estado.objetivo === "revenda" ? " foco" : "";
@@ -209,9 +233,9 @@ function render() {
     desconto: d => -((d.desconto_fipe ?? d.desconto_mercado) ?? -1e9), preco: d => d.preco,
   }[estado.ordem];
   const lista = DADOS
-    .filter(d => !estado.categoria || d.categoria === estado.categoria)
+    .filter(d => !estado.faixa || d.faixa === estado.faixa)
     .filter(d => !estado.semRisco || !riscoAlto(d))
-    .filter(d => !t || [d.titulo, d.cidade, d.uf, d.fonte, d.busca, d.categoria_nome].join(" ").toLowerCase().includes(t))
+    .filter(d => !t || [d.titulo, d.cidade, d.uf, d.fonte, d.busca, d.categoria_nome, d.faixa_nome].join(" ").toLowerCase().includes(t))
     .sort((a, b) => chave(a) - chave(b));
   document.getElementById("lista").innerHTML = lista.length ? lista.map(card).join("")
     : `<div class="vazio">Nenhum anúncio com esses filtros.</div>`;
@@ -232,10 +256,18 @@ grupo("objetivo", "objetivo", () => {
   const ordem = document.getElementById("ordem");
   ordem.value = estado.ordem = estado.objetivo === "uso" ? "desconto" : "score";
 });
-grupo("categoria", "categoria");
+document.getElementById("faixa").addEventListener("click", e => {
+  const b = e.target.closest("button");
+  if (b) escolherFaixa(b.dataset.v);
+});
+document.getElementById("kpis").addEventListener("click", e => {
+  const b = e.target.closest("button.kpi");
+  if (b) escolherFaixa(estado.faixa === b.dataset.faixa ? "" : b.dataset.faixa);
+});
 document.getElementById("texto").addEventListener("input", e => { estado.texto = e.target.value; render(); });
 document.getElementById("ordem").addEventListener("change", e => { estado.ordem = e.target.value; render(); });
 document.getElementById("semRisco").addEventListener("change", e => { estado.semRisco = e.target.checked; render(); });
+botoesFaixa();
 kpis();
 render();
 </script>

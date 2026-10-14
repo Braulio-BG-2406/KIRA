@@ -10,6 +10,7 @@ try:
 except ModuleNotFoundError:  # Python < 3.11
     import tomli as tomllib  # type: ignore[no-redef]
 
+from .faixas import buscas_das_faixas
 from .fontes.base import Busca
 
 PADRAO = {
@@ -18,12 +19,14 @@ PADRAO = {
         "banco": "dados/buscador_auto.db",
         "pausa_entre_requisicoes": 1.5,
         "score_minimo_alerta": 70,
-        "limite_terminal": 20,
+        "max_alertas_por_faixa": 3,
+        "limite_por_faixa": 5,
     },
     "fipe": {"versao": 1, "token": "", "cache": "dados/cache_fipe.db"},
     "telegram": {"token": "", "chat_id": ""},
     "mercadolivre": {"token": ""},
     "custos": {},
+    "faixas": {},
     "buscas": [],
 }
 
@@ -47,4 +50,5 @@ def carregar(caminho: str | Path | None) -> dict:
 
 
 def buscas(config: dict) -> list[Busca]:
-    return [Busca.de_dict(b) for b in config.get("buscas", [])]
+    """Buscas das faixas + buscas avulsas ([[buscas]]), se houver."""
+    return buscas_das_faixas(config) + [Busca.de_dict(b) for b in config.get("buscas", [])]

@@ -59,8 +59,8 @@ def test_html_seguro_e_com_dados(tmp_path):
 def test_csv(tmp_path):
     caminho = salvar_csv([avaliacao()], tmp_path / "r.csv")
     linhas = caminho.read_text(encoding="utf-8-sig").splitlines()
-    assert linhas[0].startswith("score;revenda;uso;")
-    assert ";52000,00;" in linhas[1]
+    assert linhas[0].startswith("faixa;score;revenda;uso;")
+    assert linhas[1].startswith("Populares;") and ";52000,00;" in linhas[1]
 
 
 def test_cli_importar_exemplo(tmp_path, monkeypatch, capsys):
@@ -69,12 +69,14 @@ def test_cli_importar_exemplo(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
     assert main(["importar", "anuncios.csv", "--sem-fipe"]) == 0
     saida = capsys.readouterr().out
-    assert "20 anúncios lidos" in saida
+    assert "26 anúncios lidos" in saida
     html = (tmp_path / "relatorios" / "ultimo.html").read_text(encoding="utf-8")
     dados = json.loads(re.search(r'<script id="dados" type="application/json">(.*?)</script>', html, re.S).group(1))
-    assert len(dados) == 20
+    assert len(dados) == 26
     por_titulo = {d["titulo"]: d for d in dados}
     assert {d["categoria"] for d in dados} == {"carro", "caminhao", "cavalo"}
+    assert {d["faixa"] for d in dados} == {"pesados", "populares", "premium"}
+    assert por_titulo["BMW 320i GP 2.0 Turbo 2019"]["faixa"] == "premium"
     assert por_titulo["Fiat Strada Freedom 1.3 2021"]["revenda"] == "RISCO"
     assert por_titulo["Scania R 450 A 6x2 cavalo mecânico 2019"]["categoria"] == "cavalo"
     assert por_titulo["VW Constellation 24.280 6x2 baú 2016"]["categoria"] == "caminhao"

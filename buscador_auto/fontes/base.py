@@ -8,9 +8,8 @@ from dataclasses import dataclass, field
 
 import requests
 
-from ..fipe import ALIAS_MARCA
 from ..modelos import Anuncio
-from ..texto import normalizar
+from ..texto import menciona
 
 log = logging.getLogger(__name__)
 
@@ -23,6 +22,7 @@ NAVEGADOR = (
 @dataclass
 class Busca:
     nome: str
+    faixa: str = ""  # pesados, populares ou premium (vazio = qualquer)
     categoria: str = "carro"  # carro, caminhao ou cavalo
     termo: str = ""
     marca: str = ""
@@ -35,7 +35,6 @@ class Busca:
     ufs: list[str] = field(default_factory=list)
     fontes: list[str] = field(default_factory=lambda: ["olx", "mercadolivre", "webmotors"])
     paginas: int = 2
-    objetivo: str = "ambos"  # revenda, uso ou ambos
 
     @classmethod
     def de_dict(cls, d: dict) -> "Busca":
@@ -64,12 +63,8 @@ class Busca:
             return False
         if self.ufs and a.uf and a.uf.upper() not in self.ufs:
             return False
-        texto = normalizar(a.texto_completo)
-        for parte in (self.marca, self.modelo):
-            parte = normalizar(parte)
-            if parte and parte not in texto and ALIAS_MARCA.get(parte, "\0") not in texto.replace("-", " "):
-                return False
-        return True
+        texto = a.texto_completo
+        return all(menciona(texto, parte) for parte in (self.marca, self.modelo) if parte)
 
 
 def criar_sessao() -> requests.Session:

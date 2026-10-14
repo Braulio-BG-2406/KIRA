@@ -8,15 +8,17 @@ import re
 import statistics
 from collections import defaultdict
 
-from .categorias import CARRO, TIPO_FIPE, detectar_categoria
+from .categorias import TIPO_FIPE, detectar_categoria
+from .faixas import POPULARES, faixa_do_anuncio, perfil_custos
 from .modelos import Alerta, Anuncio, Avaliacao, ResultadoFipe
 from .texto import normalizar, tokens
 
 log = logging.getLogger(__name__)
 
-# Valores de partida; ajuste em buscas.toml ([custos.carro], [custos.caminhao], [custos.cavalo]).
+# Valores de partida; ajuste em buscas.toml ([custos.populares], [custos.premium],
+# [custos.caminhao], [custos.cavalo]).
 CUSTOS_PADRAO = {
-    "carro": {
+    "populares": {
         "transferencia": 1200.0,  # Detran, vistoria de transferência, despachante
         "vistoria_cautelar": 350.0,
         "preparacao_pct": 0.02,  # estética, polimento, pequenos reparos
@@ -29,6 +31,20 @@ CUSTOS_PADRAO = {
         "margem_min_pct": 0.10,
         "lucro_min": 4000.0,
         "desconto_uso_bom": 0.05,  # abaixo da FIPE para ser "boa compra" de uso
+    },
+    "premium": {
+        "transferencia": 1500.0,
+        "vistoria_cautelar": 450.0,
+        "preparacao_pct": 0.03,  # pneus, freios e estética custam mais
+        "preparacao_min": 2500.0,
+        "comissao_pct": 0.0,
+        "outros": 0.0,
+        "fator_revenda": 0.92,  # premium usado gira devagar e negocia abaixo da FIPE
+        "km_ano": 15000,
+        "ajuste_km_10mil": 0.02,  # quem compra premium paga mais por km baixa
+        "margem_min_pct": 0.10,
+        "lucro_min": 10000.0,
+        "desconto_uso_bom": 0.08,
     },
     "caminhao": {
         "transferencia": 2500.0,
@@ -81,10 +97,13 @@ ALERTAS_TEXTO = [
     ("pecas", r"\b(sucata|retirada de pecas|para pecas|so pecas|desmanche|sem motor)", "alta",
      "Vendido para peças/sucata", 0.60),
     ("mecanica", r"\b(motor fundido|motor batendo|precisa de motor|cambio quebrado|cambio com defeito|"
-     r"motor (com )?defeito|retifica(r)? (o )?motor|funde|vazamento de oleo|fumacando)", "media",
+     r"motor (com )?defeito|retifica(r)? (o )?motor|funde|vazamento de oleo|fumacando|"
+     r"tranco no cambio|cambio (dando |com )?tranco|cambio patinando|mecatronica (com )?defeito)", "media",
      "Defeito mecânico declarado: orce o conserto antes", 0.15),
     ("batido", r"\b(batid[oa]|colisao|amassad[oa]s? grande|precisa de funilaria|lataria ruim)", "media",
      "Avaria de lataria/colisão declarada", 0.10),
+    ("blindado", r"\bblindad", "info",
+     "Blindado: a FIPE não inclui a blindagem e a revenda é mais lenta; avalie à parte", 0.0),
 ]
 
 SINAIS_POSITIVOS = [
@@ -100,9 +119,10 @@ SINAIS_POSITIVOS = [
 ]
 
 
-def custos_categoria(categoria: str, config: dict | None = None) -> dict:
-    base = dict(CUSTOS_PADRAO.get(categoria, CUSTOS_PADRAO[CARRO]))
-    base.update(((config or {}).get("custos") or {}).get(categoria, {}))
+def custos_perfil(perfil: str, config: dict | None = None) -> dict:
+    """Custos e metas de um perfil (populares, premium, caminhao, cavalo) com o que vier do buscas.toml."""
+    base = dict(CUSTOS_PADRAO.get(perfil, CUSTOS_PADRAO[POPULARES]))
+    base.update(((config or {}).get("custos") or {}).get(perfil, {}))
     return base
 
 
@@ -172,9 +192,11 @@ def avaliar(
     comparaveis: int,
     config: dict | None = None,
     ano_atual: int | None = None,
+    faixa: str = "",
 ) -> Avaliacao:
     ano_atual = ano_atual or dt.date.today().year
-    cfg = custos_categoria(categoria, config)
+    faixa = faixa or faixa_do_anuncio(anuncio, categoria, config)
+    cfg = custos_perfil(perfil_custos(categoria, faixa), config)
     alertas, sinais = detectar_alertas(anuncio)
     preco = anuncio.preco
 
@@ -279,6 +301,7 @@ def avaliar(
         score=score,
         veredito_revenda=veredito_revenda,
         veredito_uso=veredito_uso,
+        faixa=faixa,
     )
 
 

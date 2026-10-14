@@ -27,37 +27,38 @@ export default async function LayoutLoja({ children, params }: Props) {
     "--cor-destaque": corValida(loja.corDestaque, "#b08d57"),
   } as React.CSSProperties;
   const instagram = loja.instagram?.replace(/^@/, "");
+  const moderno = loja.tema === "moderno";
 
   return (
-    <div style={estilo} className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-20 border-b border-stone-200 bg-white/95 backdrop-blur">
+    <div style={estilo} data-tema={loja.tema} className="flex min-h-screen flex-col">
+      <header className={`sticky top-0 z-20 border-b backdrop-blur ${moderno ? "border-white/10 bg-marca text-white" : "border-stone-200 bg-white/95"}`}>
         <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-3">
           <Link href={base || "/"} className="shrink-0">
             {loja.logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={loja.logoUrl} alt={loja.nome} className="h-10 w-auto" />
             ) : (
-              <span className="font-titulo text-2xl tracking-wide text-marca">{loja.nome}</span>
+              <span className={`font-titulo text-2xl tracking-wide ${moderno ? "text-white" : "text-marca"}`}>{loja.nome}</span>
             )}
           </Link>
           <form action={`${base}/busca`} className="ml-auto hidden max-w-xs flex-1 sm:block">
-            <input name="q" placeholder="Buscar produtos" className="campo" aria-label="Buscar produtos" />
+            <input name="q" placeholder="Buscar produtos" className="campo text-stone-900" aria-label="Buscar produtos" />
           </form>
           <div className="ml-auto sm:ml-0">
             <IconeCarrinho slug={slug} base={base} />
           </div>
         </div>
         {cats.length > 0 && (
-          <nav className="mx-auto flex max-w-6xl gap-5 overflow-x-auto px-4 pb-3 text-sm text-stone-600">
+          <nav className={`mx-auto flex max-w-6xl gap-5 overflow-x-auto px-4 pb-3 text-sm ${moderno ? "text-white/70" : "text-stone-600"}`}>
             {cats.map((c) => (
-              <Link key={c.id} href={`${base}/categoria/${c.slug}`} className="whitespace-nowrap hover:text-marca">
+              <Link key={c.id} href={`${base}/categoria/${c.slug}`} className={`whitespace-nowrap ${moderno ? "hover:text-destaque" : "hover:text-marca"}`}>
                 {c.nome}
               </Link>
             ))}
           </nav>
         )}
         <form action={`${base}/busca`} className="px-4 pb-3 sm:hidden">
-          <input name="q" placeholder="Buscar produtos" className="campo" aria-label="Buscar produtos" />
+          <input name="q" placeholder="Buscar produtos" className="campo text-stone-900" aria-label="Buscar produtos" />
         </form>
       </header>
 

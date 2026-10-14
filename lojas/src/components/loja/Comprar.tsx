@@ -3,11 +3,24 @@
 import { useState } from "react";
 import Link from "next/link";
 import { formatarReais } from "@/lib/dinheiro";
+import { parcela, precoNoPix } from "@/lib/precos";
 import { adicionarAoCarrinho, useCarrinho } from "./carrinho";
 
 type V = { id: number; nome: string; precoCentavos: number; precoDeCentavos: number | null; estoque: number };
 
-export function Comprar({ slug, base, variantes }: { slug: string; base: string; variantes: V[] }) {
+export function Comprar({
+  slug,
+  base,
+  variantes,
+  descontoPixPct = 0,
+  parcelasSemJuros = 1,
+}: {
+  slug: string;
+  base: string;
+  variantes: V[];
+  descontoPixPct?: number;
+  parcelasSemJuros?: number;
+}) {
   const primeiraDisponivel = variantes.find((v) => v.estoque > 0) ?? variantes[0];
   const [varianteId, setVarianteId] = useState(primeiraDisponivel.id);
   const [quantidade, setQuantidade] = useState(1);
@@ -32,6 +45,19 @@ export function Comprar({ slug, base, variantes }: { slug: string; base: string;
         )}
         <span className="text-3xl font-semibold text-marca">{formatarReais(v.precoCentavos)}</span>
       </div>
+      {(descontoPixPct > 0 || parcela(v.precoCentavos, parcelasSemJuros)) && (
+        <div className="-mt-3 space-y-0.5 text-sm">
+          {descontoPixPct > 0 && (
+            <p className="text-green-700">
+              <strong>{formatarReais(precoNoPix(v.precoCentavos, descontoPixPct))}</strong> no Pix ({descontoPixPct}% de desconto)
+            </p>
+          )}
+          {(() => {
+            const parc = parcela(v.precoCentavos, parcelasSemJuros);
+            return parc && <p className="text-stone-600">ou {parc.vezes}x de {formatarReais(parc.valor)} sem juros no cartão</p>;
+          })()}
+        </div>
+      )}
 
       {!unicaPadrao && (
         <fieldset>

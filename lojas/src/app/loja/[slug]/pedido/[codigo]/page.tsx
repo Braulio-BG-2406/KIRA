@@ -131,6 +131,9 @@ export default async function PaginaPedido({
           {pedido.descontoCentavos > 0 && (
             <div className="flex justify-between text-green-700"><dt>Desconto{pedido.cupomCodigo ? ` (${pedido.cupomCodigo})` : ""}</dt><dd>− {formatarReais(pedido.descontoCentavos)}</dd></div>
           )}
+          {pedido.descontoPixCentavos > 0 && (
+            <div className="flex justify-between text-green-700"><dt>Desconto no Pix</dt><dd className="tabular-nums">− {formatarReais(pedido.descontoPixCentavos)}</dd></div>
+          )}
           <div className="flex justify-between"><dt>{pedido.entrega.descricao}</dt><dd>{pedido.freteCentavos ? formatarReais(pedido.freteCentavos) : "Grátis"}</dd></div>
           <div className="flex justify-between text-base font-semibold"><dt>Total</dt><dd>{formatarReais(pedido.totalCentavos)}</dd></div>
         </dl>

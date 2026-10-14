@@ -26,7 +26,7 @@ export async function relatorioDeVendas(lojaId: number, p: Periodo) {
         pedidos: sql<number>`count(*)::int`,
         total: soma(pedidos.totalCentavos),
         subtotal: soma(pedidos.subtotalCentavos),
-        descontos: soma(pedidos.descontoCentavos),
+        descontos: sql<number>`coalesce(sum(${pedidos.descontoCentavos} + ${pedidos.descontoPixCentavos}), 0)::int`,
         frete: soma(pedidos.freteCentavos),
       })
       .from(pedidos)
@@ -100,7 +100,7 @@ export async function linhasItensCsv(lojaId: number, p: Periodo) {
 
 export async function linhasEstoqueCsv(lojaId: number) {
   return db
-    .select({ v: variantes, produto: produtos.nome, ativo: produtos.ativo })
+    .select({ v: variantes, produto: produtos.nome, marca: produtos.marca, ativo: produtos.ativo })
     .from(variantes)
     .innerJoin(produtos, eq(produtos.id, variantes.produtoId))
     .where(eq(produtos.lojaId, lojaId))

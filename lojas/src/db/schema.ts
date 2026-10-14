@@ -51,6 +51,11 @@ export type Entrega = {
 
 const criadoEm = () => timestamp("criado_em", { withTimezone: true }).notNull().defaultNow();
 
+/** visual da vitrine: "elegante" (serifada, clara) ou "moderno" (sem serifa, cabeçalho escuro) */
+export type TemaLoja = "elegante" | "moderno";
+
+export type Especificacao = { nome: string; valor: string };
+
 export const lojas = pgTable("lojas", {
   id: serial("id").primaryKey(),
   slug: text("slug").notNull().unique(),
@@ -66,7 +71,12 @@ export const lojas = pgTable("lojas", {
   pixChave: text("pix_chave"),
   pixNome: text("pix_nome"),
   pixCidade: text("pix_cidade"),
+  tema: text("tema").$type<TemaLoja>().notNull().default("elegante"),
   frete: jsonb("frete").$type<ConfigFrete>().notNull().default(FRETE_PADRAO),
+  /** desconto em % para quem paga com o Pix direto da loja */
+  descontoPixPct: integer("desconto_pix_pct").notNull().default(0),
+  /** parcelas sem juros mostradas na vitrine (pagas pelo Mercado Pago); 1 = não mostra */
+  parcelasSemJuros: integer("parcelas_sem_juros").notNull().default(1),
   estoqueMinimo: integer("estoque_minimo").notNull().default(3),
   /** horas até um pedido não pago ser cancelado e o estoque voltar */
   horasReserva: integer("horas_reserva").notNull().default(48),
@@ -95,6 +105,11 @@ export const produtos = pgTable(
     nome: text("nome").notNull(),
     slug: text("slug").notNull(),
     descricao: text("descricao").notNull().default(""),
+    marca: text("marca"),
+    /** ficha técnica: caixa, pulseira, mecanismo, resistência à água... */
+    especificacoes: jsonb("especificacoes").$type<Especificacao[]>().notNull().default([]),
+    garantia: text("garantia"),
+    itensInclusos: text("itens_inclusos"),
     ativo: boolean("ativo").notNull().default(true),
     destaque: boolean("destaque").notNull().default(false),
     criadoEm: criadoEm(),
@@ -117,6 +132,7 @@ export const variantes = pgTable(
     produtoId: integer("produto_id").notNull().references(() => produtos.id, { onDelete: "cascade" }),
     nome: text("nome").notNull().default("Padrão"),
     sku: text("sku"),
+    codigoBarras: text("codigo_barras"),
     precoCentavos: integer("preco_centavos").notNull(),
     /** preço "de" riscado na vitrine */
     precoDeCentavos: integer("preco_de_centavos"),
@@ -166,6 +182,7 @@ export const pedidos = pgTable(
     subtotalCentavos: integer("subtotal_centavos").notNull(),
     freteCentavos: integer("frete_centavos").notNull().default(0),
     descontoCentavos: integer("desconto_centavos").notNull().default(0),
+    descontoPixCentavos: integer("desconto_pix_centavos").notNull().default(0),
     totalCentavos: integer("total_centavos").notNull(),
     cupomCodigo: text("cupom_codigo"),
     entrega: jsonb("entrega").$type<Entrega>().notNull(),

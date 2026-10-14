@@ -157,6 +157,11 @@ export async function criarPedido(p: NovoPedido): Promise<Pedido> {
       await tx.update(cupons).set({ usos: sql`${cupons.usos} + 1` }).where(eq(cupons.id, cupom.id));
     }
     desconto = Math.min(desconto, subtotal);
+    // desconto do Pix vale só no site e sobre os produtos (sem o frete)
+    const descontoPix =
+      p.canal === "site" && p.formaPagamento === "pix" && loja.descontoPixPct > 0
+        ? Math.round(((subtotal - desconto) * loja.descontoPixPct) / 100)
+        : 0;
 
     let entrega = p.entrega;
     let frete: number;
@@ -192,7 +197,8 @@ export async function criarPedido(p: NovoPedido): Promise<Pedido> {
         subtotalCentavos: subtotal,
         freteCentavos: frete,
         descontoCentavos: desconto,
-        totalCentavos: Math.max(0, subtotal - desconto + frete),
+        descontoPixCentavos: descontoPix,
+        totalCentavos: Math.max(0, subtotal - desconto - descontoPix + frete),
         cupomCodigo,
         entrega,
         observacoes: p.observacoes?.trim() || null,

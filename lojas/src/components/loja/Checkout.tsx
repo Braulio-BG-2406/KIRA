@@ -13,7 +13,7 @@ export type OpcaoPagamento = { id: "pix" | "mercadopago" | "whatsapp"; nome: str
 
 const enderecoVazio = { cep: "", logradouro: "", numero: "", complemento: "", bairro: "", cidade: "", uf: "" };
 
-export function Checkout({ slug, base, pagamentos }: { slug: string; base: string; pagamentos: OpcaoPagamento[] }) {
+export function Checkout({ slug, base, pagamentos, descontoPixPct = 0 }: { slug: string; base: string; pagamentos: OpcaoPagamento[]; descontoPixPct?: number }) {
   const router = useRouter();
   const { validas, subtotal, carregando, vazio } = useItensDoCarrinho(slug);
   const [cliente, setCliente] = useState({ nome: "", email: "", telefone: "", documento: "" });
@@ -88,7 +88,9 @@ export function Checkout({ slug, base, pagamentos }: { slug: string; base: strin
 
   const opcaoFrete = opcoes.find((o) => o.metodo === metodo);
   const frete = opcaoFrete?.valorCentavos ?? 0;
-  const total = Math.max(0, subtotal - (desconto?.valor ?? 0) + frete);
+  // mesma conta do servidor: o desconto do Pix vale sobre os produtos, depois do cupom
+  const descontoPix = pagamento === "pix" && descontoPixPct > 0 ? Math.round(((subtotal - Math.min(desconto?.valor ?? 0, subtotal)) * descontoPixPct) / 100) : 0;
+  const total = Math.max(0, subtotal - (desconto?.valor ?? 0) - descontoPix + frete);
 
   async function finalizar(e: React.FormEvent) {
     e.preventDefault();
@@ -261,6 +263,12 @@ export function Checkout({ slug, base, pagamentos }: { slug: string; base: strin
             <div className="flex justify-between text-green-700">
               <dt>Cupom {desconto.codigo}</dt>
               <dd>− {formatarReais(desconto.valor)}</dd>
+            </div>
+          )}
+          {descontoPix > 0 && (
+            <div className="flex justify-between text-green-700">
+              <dt>Desconto no Pix ({descontoPixPct}%)</dt>
+              <dd>− {formatarReais(descontoPix)}</dd>
             </div>
           )}
           <div className="flex justify-between">

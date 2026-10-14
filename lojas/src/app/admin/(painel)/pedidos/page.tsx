@@ -53,10 +53,7 @@ export default async function Pedidos({ searchParams }: { searchParams: Promise<
 
   return (
     <>
-      <Cabecalho titulo="Pedidos">
-        <Link href="/admin/relatorios" className="botao-secundario">Exportar</Link>
-        <Link href="/admin/pedidos/novo" className="botao-primario">Nova venda</Link>
-      </Cabecalho>
+      <Cabecalho titulo="Pedidos" />
       <Aviso ok={sp.ok} erro={sp.erro} />
       <div className="mb-4 flex gap-2 overflow-x-auto pb-1 text-sm">
         <Link href={link({ status: null, pagina: null })} className={`whitespace-nowrap rounded-full px-3 py-1 ${!status ? "bg-stone-900 text-white" : "bg-white text-stone-600"}`}>

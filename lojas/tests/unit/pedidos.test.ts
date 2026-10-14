@@ -1,7 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { db, fecharDb } from "@/db";
-import { cupons, lancamentos, movimentosEstoque, pedidos, variantes, clientes, pedidoHistorico } from "@/db/schema";
+import { cupons, lancamentos, lojas, movimentosEstoque, pedidos, variantes, clientes, pedidoHistorico } from "@/db/schema";
 import { avancarStatus, cancelarPedido, cancelarPedidosVencidos, criarPedido, marcarComoPago, ErroNegocio, type NovoPedido } from "@/lib/pedidos";
 import { ajustarEstoque } from "@/lib/estoque";
 import { criarCompra, receberCompra } from "@/lib/compras";
@@ -197,5 +197,30 @@ describe("estoque, compras e financeiro", () => {
     await criarLancamento({ lojaId: loja.id, tipo: "despesa", categoria: "Aluguel", descricao: "Aluguel", valorCentavos: 3000, vencimento: hoje, pago: true });
     await criarLancamento({ lojaId: loja.id, tipo: "despesa", categoria: "Luz", descricao: "Luz", valorCentavos: 500, vencimento: hoje, pago: false });
     expect(await resumoDoMes(loja.id, hoje.slice(0, 7))).toEqual({ recebido: 10000, aReceber: 0, pago: 3000, aPagar: 500, saldo: 7000 });
+  });
+});
+
+describe("desconto no Pix", () => {
+  it("dá o desconto da loja só no Pix do site, sem mexer no frete", async () => {
+    const loja = await criarLoja();
+    await db.update(lojas).set({ descontoPixPct: 5 }).where(eq(lojas.id, loja.id));
+    const { variante } = await criarProduto(loja.id, "Relógio", 40000, 10);
+    const pix = await criarPedido(pedidoSite(loja.id, [{ varianteId: variante.id, quantidade: 1 }], { cupomCodigo: undefined }));
+    // frete grátis acima de 300,00 na loja de teste
+    expect(pix).toMatchObject({ subtotalCentavos: 40000, descontoPixCentavos: 2000, freteCentavos: 0, totalCentavos: 38000 });
+    const mp = await criarPedido(pedidoSite(loja.id, [{ varianteId: variante.id, quantidade: 1 }], { formaPagamento: "whatsapp" }));
+    expect(mp).toMatchObject({ descontoPixCentavos: 0, totalCentavos: 40000 });
+    const balcao = await criarPedido({ ...pedidoSite(loja.id, [{ varianteId: variante.id, quantidade: 1 }]), canal: "loja_fisica", freteManualCentavos: 0 });
+    expect(balcao.descontoPixCentavos).toBe(0);
+  });
+
+  it("aplica depois do cupom", async () => {
+    const loja = await criarLoja();
+    await db.update(lojas).set({ descontoPixPct: 10 }).where(eq(lojas.id, loja.id));
+    const { variante } = await criarProduto(loja.id, "Pulseira", 10000, 10);
+    await db.insert(cupons).values({ lojaId: loja.id, codigo: "VINTE", tipo: "fixo", valor: 2000 });
+    const p = await criarPedido(pedidoSite(loja.id, [{ varianteId: variante.id, quantidade: 1 }], { cupomCodigo: "VINTE" }));
+    // (100 − 20) × 10% = 8; frete SP 10
+    expect(p).toMatchObject({ descontoCentavos: 2000, descontoPixCentavos: 800, freteCentavos: 1000, totalCentavos: 8200 });
   });
 });

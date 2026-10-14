@@ -7,7 +7,7 @@ import { lerReais } from "./dinheiro";
 import { criarSlug } from "./texto";
 import { ErroNegocio } from "./erros";
 
-export const COLUNAS_IMPORTACAO = ["nome", "categoria", "variacao", "sku", "preco", "preco_de", "custo", "estoque", "descricao", "ativo"];
+export const COLUNAS_IMPORTACAO = ["nome", "marca", "categoria", "variacao", "sku", "codigo_barras", "preco", "preco_de", "custo", "estoque", "descricao", "ativo"];
 
 /**
  * Importa produtos de uma planilha. Linha com SKU que já existe atualiza a variação;
@@ -38,6 +38,7 @@ export async function importarProdutos(lojaId: number, texto: string) {
         continue;
       }
       const campos = {
+        ...(l.codigo_barras ? { codigoBarras: l.codigo_barras.replace(/\s/g, "") } : {}),
         precoCentavos: preco,
         precoDeCentavos: lerReais(l.preco_de),
         ...(l.custo ? { custoCentavos: lerReais(l.custo) ?? 0 } : {}),
@@ -77,7 +78,7 @@ export async function importarProdutos(lojaId: number, texto: string) {
       if (!produto) {
         [produto] = await tx
           .insert(produtos)
-          .values({ lojaId, nome, slug, categoriaId, descricao: l.descricao ?? "", ativo: !/^(n|nao|0|false)$/i.test(l.ativo ?? "") })
+          .values({ lojaId, nome, slug, categoriaId, marca: l.marca || null, descricao: l.descricao ?? "", ativo: !/^(n|nao|0|false)$/i.test(l.ativo ?? "") })
           .returning();
       }
       const [v] = await tx

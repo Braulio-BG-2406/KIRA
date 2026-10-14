@@ -24,7 +24,6 @@ export default async function Compras({ searchParams }: { searchParams: Promise<
   return (
     <>
       <Cabecalho titulo="Compras de mercadoria">
-        <Link href="/admin/fornecedores" className="botao-secundario">Fornecedores</Link>
         <Link href="/admin/compras/nova" className="botao-primario">Nova compra</Link>
       </Cabecalho>
       <Aviso ok={sp.ok} erro={sp.erro} />

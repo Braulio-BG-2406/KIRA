@@ -7,6 +7,7 @@ import { criarSlug } from "@/lib/texto";
 import { inicioDoDiaSP, hojeSP } from "@/lib/datas";
 import { FRETE_PADRAO, type Cupom } from "@/db/schema";
 import { lerCsv, csvParaObjetos, gerarCsv } from "@/lib/csv";
+import { parcela, precoNoPix } from "@/lib/precos";
 
 describe("pix", () => {
   it("usa o CRC16-CCITT-FALSE", () => {
@@ -102,5 +103,19 @@ describe("csv", () => {
   it("gera CSV que volta igual", () => {
     const linhas = [["a;b", 'diz "oi"', 3]];
     expect(lerCsv(gerarCsv(linhas))).toEqual([["a;b", 'diz "oi"', "3"]]);
+  });
+});
+
+
+describe("preços na vitrine", () => {
+  it("calcula o preço no Pix", () => {
+    expect(precoNoPix(39990, 5)).toBe(37990);
+    expect(precoNoPix(39990, 0)).toBe(39990);
+  });
+  it("parcela sem juros respeitando a parcela mínima", () => {
+    expect(parcela(39990, 6)).toEqual({ vezes: 6, valor: 6665 });
+    expect(parcela(5000, 10)).toEqual({ vezes: 2, valor: 2500 });
+    expect(parcela(3000, 10)).toBeNull();
+    expect(parcela(39990, 1)).toBeNull();
   });
 });

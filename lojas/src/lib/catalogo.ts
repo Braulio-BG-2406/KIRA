@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, desc, eq, ilike, inArray, or, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, inArray, isNotNull, or, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { categorias, produtoImagens, produtos, variantes, type Produto, type Variante } from "@/db/schema";
 
@@ -37,13 +37,14 @@ async function completar(lista: Produto[]): Promise<ProdutoVitrine[]> {
     .filter((p) => p.variantes.length > 0);
 }
 
-export async function listarVitrine(p: { lojaId: number; categoriaId?: number; busca?: string; destaque?: boolean; limite?: number }) {
+export async function listarVitrine(p: { lojaId: number; categoriaId?: number; busca?: string; destaque?: boolean; marca?: string; limite?: number }) {
   const filtros: SQL[] = [eq(produtos.lojaId, p.lojaId), eq(produtos.ativo, true)];
   if (p.categoriaId) filtros.push(eq(produtos.categoriaId, p.categoriaId));
   if (p.destaque) filtros.push(eq(produtos.destaque, true));
+  if (p.marca) filtros.push(eq(produtos.marca, p.marca));
   if (p.busca?.trim()) {
     const termo = `%${p.busca.trim().replace(/[%_\\]/g, "\\$&")}%`;
-    filtros.push(or(ilike(produtos.nome, termo), ilike(produtos.descricao, termo))!);
+    filtros.push(or(ilike(produtos.nome, termo), ilike(produtos.descricao, termo), ilike(produtos.marca, termo))!);
   }
   const lista = await db
     .select()
@@ -67,4 +68,18 @@ export async function produtoPorSlug(lojaId: number, slug: string) {
 
 export async function categoriasDaLoja(lojaId: number) {
   return db.select().from(categorias).where(eq(categorias.lojaId, lojaId)).orderBy(asc(categorias.ordem), asc(categorias.nome));
+}
+
+/** marcas que aparecem nos produtos à venda (para o filtro da vitrine) */
+export async function marcasDaLoja(lojaId: number, categoriaId?: number) {
+  const filtros = [eq(produtos.lojaId, lojaId), eq(produtos.ativo, true), isNotNull(produtos.marca)];
+  if (categoriaId) filtros.push(eq(produtos.categoriaId, categoriaId));
+  const linhas = await db.selectDistinct({ marca: produtos.marca }).from(produtos).where(and(...filtros)).orderBy(asc(produtos.marca));
+  return linhas.map((l) => l.marca!).filter(Boolean);
+}
+
+/** todas as marcas já usadas na loja (sugestões no cadastro) */
+export async function todasAsMarcas(lojaId: number) {
+  const linhas = await db.selectDistinct({ marca: produtos.marca }).from(produtos).where(and(eq(produtos.lojaId, lojaId), isNotNull(produtos.marca))).orderBy(asc(produtos.marca));
+  return linhas.map((l) => l.marca!).filter(Boolean);
 }

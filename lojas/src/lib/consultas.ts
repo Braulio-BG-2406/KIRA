@@ -13,7 +13,7 @@ export async function totaisDeVendas(lojaId: number, desde: Date, ate?: Date) {
     .select({
       pedidos: sql<number>`count(*)::int`,
       total: sql<number>`coalesce(sum(${pedidos.totalCentavos}), 0)::int`,
-      descontos: sql<number>`coalesce(sum(${pedidos.descontoCentavos}), 0)::int`,
+      descontos: sql<number>`coalesce(sum(${pedidos.descontoCentavos} + ${pedidos.descontoPixCentavos}), 0)::int`,
     })
     .from(pedidos)
     .where(and(...filtros));

@@ -59,11 +59,14 @@ export default async function Pedido({ params, searchParams }: { params: Promise
               {pedido.descontoCentavos > 0 && (
                 <div className="flex justify-between text-green-700"><dt>Desconto {pedido.cupomCodigo && `(${pedido.cupomCodigo})`}</dt><dd className="tabular-nums">− {formatarReais(pedido.descontoCentavos)}</dd></div>
               )}
-              <div className="flex justify-between"><dt>Frete</dt><dd className="tabular-nums">{formatarReais(pedido.freteCentavos)}</dd></div>
+              {pedido.descontoPixCentavos > 0 && (
+            <div className="flex justify-between text-green-700"><dt>Desconto no Pix</dt><dd className="tabular-nums">− {formatarReais(pedido.descontoPixCentavos)}</dd></div>
+          )}
+          <div className="flex justify-between"><dt>Frete</dt><dd className="tabular-nums">{formatarReais(pedido.freteCentavos)}</dd></div>
               <div className="flex justify-between text-base font-semibold"><dt>Total</dt><dd className="tabular-nums">{formatarReais(pedido.totalCentavos)}</dd></div>
               <div className="flex justify-between text-xs text-stone-500 print:hidden">
                 <dt>Lucro bruto (sem frete)</dt>
-                <dd className="tabular-nums">{formatarReais(pedido.subtotalCentavos - pedido.descontoCentavos - custo)}</dd>
+                <dd className="tabular-nums">{formatarReais(pedido.subtotalCentavos - pedido.descontoCentavos - pedido.descontoPixCentavos - custo)}</dd>
               </div>
             </dl>
           </Cartao>

@@ -5,13 +5,13 @@ import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { produtoImagens, produtos, variantes } from "@/db/schema";
 import { contexto } from "@/lib/painel";
-import { categoriasDaLoja } from "@/lib/catalogo";
+import { categoriasDaLoja, todasAsMarcas } from "@/lib/catalogo";
 import { reaisParaCampo } from "@/lib/dinheiro";
 import { urlDaLoja } from "@/lib/dominios";
 import { Aviso, Cabecalho, Cartao } from "@/components/admin/ui";
-import { Confirmar, Enviar } from "@/components/admin/Botoes";
+import { Confirmar } from "@/components/admin/Botoes";
 import { ProdutoForm } from "@/components/admin/ProdutoForm";
-import { acaoEnviarFotos, acaoExcluirProduto, acaoFotoPrincipal, acaoRemoverFoto, acaoSalvarProduto } from "../acoes";
+import { acaoExcluirProduto, acaoFotoPrincipal, acaoRemoverFoto, acaoSalvarProduto } from "../acoes";
 
 export default async function EditarProduto({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ ok?: string; erro?: string }> }) {
   const { loja } = await contexto();
@@ -19,10 +19,11 @@ export default async function EditarProduto({ params, searchParams }: { params: 
   if (!Number.isInteger(id)) notFound();
   const [p] = await db.select().from(produtos).where(and(eq(produtos.id, id), eq(produtos.lojaId, loja.id)));
   if (!p) notFound();
-  const [vs, imgs, cats] = await Promise.all([
+  const [vs, imgs, cats, marcas] = await Promise.all([
     db.select().from(variantes).where(eq(variantes.produtoId, id)).orderBy(asc(variantes.ordem), asc(variantes.id)),
     db.select().from(produtoImagens).where(eq(produtoImagens.produtoId, id)).orderBy(asc(produtoImagens.ordem), asc(produtoImagens.id)),
     categoriasDaLoja(loja.id),
+    todasAsMarcas(loja.id),
   ]);
   const sp = await searchParams;
   return (
@@ -36,18 +37,18 @@ export default async function EditarProduto({ params, searchParams }: { params: 
       </Cabecalho>
       <Aviso ok={sp.ok} erro={sp.erro} />
       <div className="space-y-6">
-        <Cartao titulo="Fotos">
-          {imgs.length > 0 && (
-            <ul className="mb-4 flex flex-wrap gap-3">
+        {imgs.length > 0 && (
+          <Cartao titulo="Fotos">
+            <ul className="flex flex-wrap gap-3">
               {imgs.map((img, i) => (
-                <li key={img.id} className="w-28 text-center text-xs">
-                  <img src={img.url} alt="" className={`h-28 w-28 rounded-md object-cover ${i === 0 ? "ring-2 ring-stone-900" : ""}`} />
+                <li key={img.id} className="w-24 text-center text-xs">
+                  <img src={img.url} alt="" className={`h-24 w-24 rounded-md object-cover ${i === 0 ? "ring-2 ring-stone-900" : ""}`} />
                   <div className="mt-1 flex justify-center gap-2">
                     {i > 0 && (
                       <form action={acaoFotoPrincipal}>
                         <input type="hidden" name="produtoId" value={p.id} />
                         <input type="hidden" name="imagemId" value={img.id} />
-                        <button className="underline">principal</button>
+                        <button className="underline">capa</button>
                       </form>
                     )}
                     <form action={acaoRemoverFoto}>
@@ -59,23 +60,19 @@ export default async function EditarProduto({ params, searchParams }: { params: 
                 </li>
               ))}
             </ul>
-          )}
-          <form action={acaoEnviarFotos} className="flex flex-wrap items-center gap-3">
-            <input type="hidden" name="id" value={p.id} />
-            <input type="file" name="fotos" accept="image/jpeg,image/png,image/webp,image/gif" multiple className="text-sm" />
-            <Enviar className="botao-secundario" pendente="Enviando…">Enviar fotos</Enviar>
-          </form>
-          <p className="mt-2 text-xs text-stone-500">JPG, PNG ou WEBP até 8 MB. Fotos quadradas ficam melhores na vitrine.</p>
-        </Cartao>
+          </Cartao>
+        )}
 
         <ProdutoForm
           acao={acaoSalvarProduto}
           categorias={cats}
+          marcas={marcas}
           produto={p}
           variantes={vs.map((v) => ({
             id: v.id,
             nome: v.nome,
             sku: v.sku ?? "",
+            codigoBarras: v.codigoBarras ?? "",
             preco: reaisParaCampo(v.precoCentavos),
             precoDe: reaisParaCampo(v.precoDeCentavos),
             custo: reaisParaCampo(v.custoCentavos),

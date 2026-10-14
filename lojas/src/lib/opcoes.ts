@@ -18,6 +18,7 @@ export async function opcoesDeVariantes(lojaId: number, incluirInativos = false)
     id: v.id,
     nome: v.nome === "Padrão" ? produto : `${produto} · ${v.nome}`,
     sku: v.sku,
+    codigoBarras: v.codigoBarras,
     precoCentavos: v.precoCentavos,
     custoCentavos: v.custoCentavos,
     estoque: v.estoque,

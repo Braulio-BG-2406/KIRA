@@ -35,7 +35,6 @@ export default async function Produtos({ searchParams }: { searchParams: Promise
   return (
     <>
       <Cabecalho titulo="Produtos">
-        <Link href="/admin/produtos/importar" className="botao-secundario">Importar planilha</Link>
         <Link href="/admin/produtos/novo" className="botao-primario">Novo produto</Link>
       </Cabecalho>
       <Aviso ok={sp.ok} erro={sp.erro} />

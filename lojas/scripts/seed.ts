@@ -14,18 +14,36 @@ const LOJAS = [
     sobre: "Semijoias banhadas a ouro 18k e ródio, com garantia e acabamento feito para durar.",
     corPrimaria: "#2b2320",
     corDestaque: "#b08d57",
+    tema: "elegante" as const,
+    categorias: ["Brincos", "Colares", "Anéis", "Pulseiras", "Conjuntos"],
   },
   {
     slug: "bg-imports",
     nome: "BG Imports",
-    slogan: "Importados selecionados",
-    sobre: "Produtos importados com procedência, envio rápido e atendimento de verdade.",
-    corPrimaria: "#0f2a44",
-    corDestaque: "#d99a1e",
+    slogan: "Relógios e acessórios masculinos",
+    sobre: "Relógios e acessórios masculinos importados, com garantia, nota e envio rápido para todo o Brasil.",
+    corPrimaria: "#141414",
+    corDestaque: "#c9a45c",
+    tema: "moderno" as const,
+    categorias: ["Relógios", "Pulseiras", "Carteiras", "Cintos", "Óculos", "Correntes", "Kits presente"],
   },
 ];
 
-type Demo = { categoria: string; nome: string; descricao: string; variantes: [string, number, number, number][]; precoDe?: number; destaque?: boolean };
+type Demo = {
+  categoria: string;
+  nome: string;
+  descricao: string;
+  variantes: [string, number, number, number][];
+  precoDe?: number;
+  destaque?: boolean;
+  marca?: string;
+  especificacoes?: [string, string][];
+  garantia?: string;
+  itensInclusos?: string;
+};
+
+const GARANTIA_RELOGIO = "12 meses contra defeito de fabricação";
+const ESTOJO = "Estojo, manual e certificado de garantia";
 
 // [nome da variação, preço, custo, estoque] em centavos
 const DEMO: Record<string, Demo[]> = {
@@ -47,21 +65,67 @@ const DEMO: Record<string, Demo[]> = {
       variantes: [["Dourado", 17990, 5400, 5]] },
   ],
   "bg-imports": [
-    { categoria: "Eletrônicos", nome: "Fone Bluetooth TWS", descricao: "Fone sem fio com estojo carregador e até 20 h de bateria.", destaque: true,
-      variantes: [["Preto", 12990, 5200, 15], ["Branco", 12990, 5200, 10]] },
-    { categoria: "Eletrônicos", nome: "Caixa de Som Portátil", descricao: "Caixa bluetooth resistente a respingos, 10 W.", variantes: [["Padrão", 15990, 7000, 8]] },
-    { categoria: "Eletrônicos", nome: "Carregador Turbo 20W USB-C", descricao: "Carregador rápido com cabo USB-C de 1 m.", variantes: [["Padrão", 5990, 1900, 30]] },
-    { categoria: "Acessórios", nome: "Smartwatch Esportivo", descricao: "Monitor cardíaco, notificações e 7 dias de bateria.", precoDe: 29990, destaque: true,
-      variantes: [["Preto", 24990, 11000, 6]] },
-    { categoria: "Acessórios", nome: "Mochila Antifurto", descricao: "Zíper oculto, entrada USB e compartimento para notebook 15,6\".", variantes: [["Cinza", 18990, 8000, 7]] },
-    { categoria: "Casa", nome: "Garrafa Térmica 1 L", descricao: "Aço inox, mantém gelado por 24 h e quente por 12 h.", destaque: true, variantes: [["Preta", 8990, 3200, 12], ["Branca", 8990, 3200, 9]] },
+    { categoria: "Relógios", nome: "Relógio Cronógrafo Aço Preto", marca: "BG Collection", destaque: true, precoDe: 45990,
+      descricao: "Cronógrafo de caixa robusta em aço com acabamento preto fosco. Funciona com três subdiscos e data.",
+      variantes: [["Padrão", 38990, 16000, 6]],
+      especificacoes: [["Caixa", "44 mm, aço inoxidável"], ["Pulseira", "Aço inoxidável com fecho dobrável"], ["Mecanismo", "Quartzo, cronógrafo"], ["Resistência à água", "5 ATM (respingos e lavar as mãos)"], ["Vidro", "Mineral"]],
+      garantia: GARANTIA_RELOGIO, itensInclusos: ESTOJO },
+    { categoria: "Relógios", nome: "Relógio Minimalista Couro", marca: "BG Collection", destaque: true,
+      descricao: "Mostrador limpo e caixa fina para o dia a dia e para o trabalho.",
+      variantes: [["Pulseira marrom", 24990, 9500, 8], ["Pulseira preta", 24990, 9500, 5]],
+      especificacoes: [["Caixa", "40 mm, aço inoxidável"], ["Pulseira", "Couro legítimo, 20 mm"], ["Mecanismo", "Quartzo"], ["Resistência à água", "3 ATM"]],
+      garantia: GARANTIA_RELOGIO, itensInclusos: ESTOJO },
+    { categoria: "Relógios", nome: "Relógio Automático Skeleton", marca: "BG Collection", destaque: true,
+      descricao: "Mostrador vazado que deixa ver a máquina funcionando. Não usa bateria: dá corda com o movimento do pulso.",
+      variantes: [["Padrão", 69990, 30000, 3]],
+      especificacoes: [["Caixa", "42 mm, aço inoxidável"], ["Pulseira", "Couro legítimo"], ["Mecanismo", "Automático, reserva de 36 h"], ["Resistência à água", "5 ATM"], ["Fundo", "Transparente"]],
+      garantia: GARANTIA_RELOGIO, itensInclusos: ESTOJO },
+    { categoria: "Relógios", nome: "Relógio Mergulhador Azul", marca: "Linha Sport",
+      descricao: "Inspirado nos relógios de mergulho, com bisel giratório e ponteiros luminosos.",
+      variantes: [["Padrão", 45990, 19000, 4]],
+      especificacoes: [["Caixa", "43 mm, aço inoxidável"], ["Bisel", "Giratório unidirecional"], ["Mecanismo", "Quartzo"], ["Resistência à água", "20 ATM (natação e mergulho raso)"], ["Ponteiros", "Luminosos"]],
+      garantia: GARANTIA_RELOGIO, itensInclusos: ESTOJO },
+    { categoria: "Relógios", nome: "Relógio Digital Esportivo", marca: "Linha Sport",
+      descricao: "Leve e resistente, com cronômetro, alarme e luz de fundo.",
+      variantes: [["Preto", 15990, 5500, 15], ["Verde militar", 15990, 5500, 7]],
+      especificacoes: [["Caixa", "46 mm, resina"], ["Funções", "Cronômetro, alarme, timer, luz"], ["Resistência à água", "10 ATM"], ["Bateria", "Até 3 anos"]],
+      garantia: GARANTIA_RELOGIO, itensInclusos: "Caixa e manual" },
+    { categoria: "Carteiras", nome: "Carteira Slim Couro", marca: "BG Collection", destaque: true,
+      descricao: "Fina, com 6 divisórias para cartões e espaço para notas. Proteção RFID.",
+      variantes: [["Preta", 8990, 2800, 12], ["Café", 8990, 2800, 9]],
+      especificacoes: [["Material", "Couro legítimo"], ["Medidas", "11 × 8,5 cm"], ["Divisórias", "6 para cartões + 1 para notas"]],
+      garantia: "3 meses" },
+    { categoria: "Cintos", nome: "Cinto Couro Reversível", marca: "BG Collection",
+      descricao: "Um lado preto e outro marrom, fivela giratória em metal escovado.",
+      variantes: [["100 cm", 11990, 4000, 5], ["110 cm", 11990, 4000, 6], ["120 cm", 11990, 4000, 3]],
+      especificacoes: [["Material", "Couro legítimo"], ["Largura", "3,5 cm"], ["Fivela", "Giratória, metal escovado"]],
+      garantia: "3 meses" },
+    { categoria: "Pulseiras", nome: "Pulseira Aço e Couro Trançado", marca: "Linha Sport",
+      descricao: "Couro trançado com fecho magnético em aço inoxidável.",
+      variantes: [["Preta", 6990, 2000, 14], ["Marrom", 6990, 2000, 10]],
+      especificacoes: [["Material", "Couro trançado e aço inoxidável"], ["Comprimento", "21 cm"], ["Fecho", "Magnético"]] },
+    { categoria: "Óculos", nome: "Óculos de Sol Aviador", marca: "Linha Sport",
+      descricao: "Clássico aviador com proteção UV400.",
+      variantes: [["Dourado / lente verde", 14990, 4500, 8], ["Preto / lente cinza", 14990, 4500, 6]],
+      especificacoes: [["Proteção", "UV400"], ["Armação", "Metal"], ["Lente", "Policarbonato"]],
+      garantia: "3 meses", itensInclusos: "Estojo e flanela" },
+    { categoria: "Correntes", nome: "Corrente Grumet Aço 60 cm", marca: "BG Collection",
+      descricao: "Corrente grumet em aço inoxidável que não escurece.",
+      variantes: [["Prata", 9990, 3000, 10], ["Dourada", 10990, 3400, 6]],
+      especificacoes: [["Material", "Aço inoxidável 316L"], ["Comprimento", "60 cm"], ["Espessura", "5 mm"]],
+      garantia: "6 meses" },
+    { categoria: "Kits presente", nome: "Kit Presente Relógio + Carteira", marca: "BG Collection", destaque: true, precoDe: 33980,
+      descricao: "Relógio minimalista com pulseira de couro e carteira slim, na caixa de presente.",
+      variantes: [["Marrom", 29990, 12300, 4]],
+      garantia: GARANTIA_RELOGIO, itensInclusos: "Relógio, carteira e caixa de presente" },
   ],
 };
 
-async function garantirLoja(dados: (typeof LOJAS)[number]): Promise<Loja> {
+async function garantirLoja({ categorias: cats, ...dados }: (typeof LOJAS)[number]): Promise<Loja> {
   const [existente] = await db.select().from(lojas).where(eq(lojas.slug, dados.slug));
   if (existente) return existente;
   const [nova] = await db.insert(lojas).values({ ...dados, frete: FRETE_PADRAO }).returning();
+  await db.insert(categorias).values(cats.map((nome, ordem) => ({ lojaId: nova.id, nome, slug: criarSlug(nome), ordem })));
   console.log(`Loja criada: ${nova.nome} (/loja/${nova.slug})`);
   return nova;
 }
@@ -70,15 +134,27 @@ async function catalogoDemo(loja: Loja) {
   const ja = await db.select({ id: produtos.id }).from(produtos).where(eq(produtos.lojaId, loja.id)).limit(1);
   if (ja.length) return console.log(`${loja.nome}: já tem produtos, catálogo de exemplo ignorado.`);
   const itens = DEMO[loja.slug] ?? [];
-  const cats = new Map<string, number>();
-  for (const nome of [...new Set(itens.map((i) => i.categoria))]) {
+  const cats = new Map((await db.select().from(categorias).where(eq(categorias.lojaId, loja.id))).map((c) => [c.nome, c.id]));
+  for (const nome of new Set(itens.map((i) => i.categoria))) {
+    if (cats.has(nome)) continue;
     const [c] = await db.insert(categorias).values({ lojaId: loja.id, nome, slug: criarSlug(nome), ordem: cats.size }).returning();
     cats.set(nome, c.id);
   }
   for (const item of itens) {
     const [p] = await db
       .insert(produtos)
-      .values({ lojaId: loja.id, categoriaId: cats.get(item.categoria), nome: item.nome, slug: criarSlug(item.nome), descricao: item.descricao, destaque: !!item.destaque })
+      .values({
+        lojaId: loja.id,
+        categoriaId: cats.get(item.categoria),
+        nome: item.nome,
+        slug: criarSlug(item.nome),
+        descricao: item.descricao,
+        destaque: !!item.destaque,
+        marca: item.marca ?? null,
+        especificacoes: (item.especificacoes ?? []).map(([nome, valor]) => ({ nome, valor })),
+        garantia: item.garantia ?? null,
+        itensInclusos: item.itensInclusos ?? null,
+      })
       .returning();
     for (const [ordem, [nome, preco, custo, estoque]] of item.variantes.entries()) {
       const [v] = await db
@@ -96,6 +172,8 @@ async function catalogoDemo(loja: Loja) {
       pixNome: loja.nome,
       pixCidade: "Sao Paulo",
       frete: { ...FRETE_PADRAO, entrega: { ...FRETE_PADRAO.entrega, valorPadraoCentavos: 2490, porUF: { SP: 1490 }, gratisAcimaCentavos: 29900 } },
+      // a BG mostra preço no Pix e parcelamento, que pesam em produto de valor mais alto
+      ...(loja.slug === "bg-imports" ? { descontoPixPct: 5, parcelasSemJuros: 6 } : {}),
     })
     .where(eq(lojas.id, loja.id));
   await db.insert(cupons).values({ lojaId: loja.id, codigo: "BEMVINDO10", tipo: "percentual", valor: 10 }).onConflictDoNothing();

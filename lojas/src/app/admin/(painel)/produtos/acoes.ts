@@ -3,13 +3,13 @@
 import { and, asc, eq, inArray, max, ne, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { categorias, compraItens, movimentosEstoque, pedidoItens, produtoImagens, produtos, variantes } from "@/db/schema";
-import { contexto, executar, inteiro, marcado, texto } from "@/lib/painel";
+import { contexto, executar, inteiro, marcado, texto, textoOuNulo } from "@/lib/painel";
 import { ErroNegocio } from "@/lib/erros";
 import { lerReais } from "@/lib/dinheiro";
 import { criarSlug } from "@/lib/texto";
 import { apagarImagem, salvarImagem } from "@/lib/uploads";
 
-type VarianteForm = { id?: number; nome: string; sku: string; preco: string; precoDe: string; custo: string; estoque: string; ativo: boolean };
+type VarianteForm = { id?: number; nome: string; sku: string; codigoBarras: string; preco: string; precoDe: string; custo: string; estoque: string; ativo: boolean };
 
 function lerVariantes(fd: FormData) {
   let lista: VarianteForm[];
@@ -28,6 +28,7 @@ function lerVariantes(fd: FormData) {
       id: v.id ? Number(v.id) : undefined,
       nome: String(v.nome ?? "").trim() || "Padrão",
       sku: String(v.sku ?? "").trim() || null,
+      codigoBarras: String(v.codigoBarras ?? "").replace(/\s/g, "") || null,
       precoCentavos: preco,
       precoDeCentavos: lerReais(v.precoDe),
       custoCentavos: lerReais(v.custo) ?? 0,
@@ -56,16 +57,30 @@ export async function acaoSalvarProduto(fd: FormData) {
       const [c] = await db.select().from(categorias).where(and(eq(categorias.id, categoriaId), eq(categorias.lojaId, loja.id)));
       if (!c) throw new ErroNegocio("Categoria inválida.");
     }
+    let especificacoes: { nome: string; valor: string }[] = [];
+    try {
+      especificacoes = (JSON.parse(texto(fd, "especificacoes") || "[]") as { nome: string; valor: string }[])
+        .map((e) => ({ nome: String(e.nome).trim().slice(0, 60), valor: String(e.valor).trim().slice(0, 200) }))
+        .filter((e) => e.nome && e.valor)
+        .slice(0, 30);
+    } catch {
+      throw new ErroNegocio("Ficha técnica inválida.");
+    }
+    const fotos = fd.getAll("fotos").filter((f): f is File => f instanceof File && f.size > 0);
     const dados = {
       nome,
       categoriaId,
       descricao: texto(fd, "descricao"),
+      marca: textoOuNulo(fd, "marca"),
+      especificacoes,
+      garantia: textoOuNulo(fd, "garantia"),
+      itensInclusos: textoOuNulo(fd, "itensInclusos"),
       ativo: marcado(fd, "ativo"),
       destaque: marcado(fd, "destaque"),
       atualizadoEm: new Date(),
     };
 
-    return db.transaction(async (tx) => {
+    const salvo = await db.transaction(async (tx) => {
       // endereço da página: o nome em minúsculas, com número no fim se já existir
       const base = criarSlug(texto(fd, "slug") || nome);
       let slug = base;
@@ -121,25 +136,21 @@ export async function acaoSalvarProduto(fd: FormData) {
         if (apagar.length) await tx.delete(variantes).where(inArray(variantes.id, apagar));
         if (desativar.length) await tx.update(variantes).set({ ativo: false }).where(inArray(variantes.id, desativar));
       }
-      return `/admin/produtos/${produtoId}`;
+      return produtoId;
     });
+    await guardarFotos(salvo, fotos);
+    return `/admin/produtos/${salvo}`;
   }, "Produto salvo.");
 }
 
-export async function acaoEnviarFotos(fd: FormData) {
-  const { loja } = await contexto();
-  const id = inteiro(fd, "id");
-  await executar(`/admin/produtos/${id}`, async () => {
-    await produtoDaLoja(id, loja.id);
-    const arquivos = fd.getAll("fotos").filter((f): f is File => f instanceof File && f.size > 0);
-    if (arquivos.length === 0) throw new ErroNegocio("Escolha pelo menos uma foto.");
-    const [{ ultima }] = await db.select({ ultima: max(produtoImagens.ordem) }).from(produtoImagens).where(eq(produtoImagens.produtoId, id));
-    let ordem = (ultima ?? -1) + 1;
-    for (const arquivo of arquivos.slice(0, 12)) {
-      const url = await salvarImagem(arquivo);
-      await db.insert(produtoImagens).values({ produtoId: id, url, ordem: ordem++ });
-    }
-  }, "Fotos enviadas.");
+async function guardarFotos(produtoId: number, arquivos: File[]) {
+  if (arquivos.length === 0) return;
+  const [{ ultima }] = await db.select({ ultima: max(produtoImagens.ordem) }).from(produtoImagens).where(eq(produtoImagens.produtoId, produtoId));
+  let ordem = (ultima ?? -1) + 1;
+  for (const arquivo of arquivos.slice(0, 12)) {
+    const url = await salvarImagem(arquivo);
+    await db.insert(produtoImagens).values({ produtoId, url, ordem: ordem++ });
+  }
 }
 
 async function imagemDaLoja(imagemId: number, lojaId: number) {

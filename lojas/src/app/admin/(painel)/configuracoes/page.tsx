@@ -28,6 +28,12 @@ export default async function Configuracoes({ searchParams }: { searchParams: Pr
               <label className="block"><span className="rotulo">Nome</span><input name="nome" defaultValue={loja.nome} className="campo" required /></label>
               <label className="block"><span className="rotulo">Frase de destaque</span><input name="slogan" defaultValue={loja.slogan ?? ""} className="campo" /></label>
               <label className="block sm:col-span-2"><span className="rotulo">Sobre a loja (aparece na vitrine e no rodapé)</span><textarea name="sobre" rows={2} defaultValue={loja.sobre ?? ""} className="campo" /></label>
+              <label className="block sm:col-span-2"><span className="rotulo">Estilo da vitrine</span>
+                <select name="tema" defaultValue={loja.tema} className="campo">
+                  <option value="elegante">Elegante: títulos com serifa e cabeçalho claro</option>
+                  <option value="moderno">Moderno: títulos em caixa alta e cabeçalho escuro</option>
+                </select>
+              </label>
               <label className="block"><span className="rotulo">Cor principal</span><input type="color" name="corPrimaria" defaultValue={loja.corPrimaria} className="h-10 w-full cursor-pointer rounded-md border border-stone-300" /></label>
               <label className="block"><span className="rotulo">Cor de destaque</span><input type="color" name="corDestaque" defaultValue={loja.corDestaque} className="h-10 w-full cursor-pointer rounded-md border border-stone-300" /></label>
               <label className="block"><span className="rotulo">WhatsApp (com DDD)</span><input name="whatsapp" defaultValue={loja.whatsapp ?? ""} className="campo" inputMode="tel" /></label>
@@ -43,6 +49,11 @@ export default async function Configuracoes({ searchParams }: { searchParams: Pr
               <label className="block sm:col-span-2"><span className="rotulo">Nome do recebedor</span><input name="pixNome" defaultValue={loja.pixNome ?? ""} className="campo" /></label>
               <label className="block"><span className="rotulo">Cidade</span><input name="pixCidade" defaultValue={loja.pixCidade ?? ""} className="campo" /></label>
             </div>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <label className="block"><span className="rotulo">Desconto no Pix (%)</span><input name="descontoPixPct" type="number" min={0} max={30} defaultValue={loja.descontoPixPct} className="campo" /></label>
+              <label className="block"><span className="rotulo">Parcelas sem juros (mostradas na vitrine)</span><input name="parcelasSemJuros" type="number" min={1} max={12} defaultValue={loja.parcelasSemJuros} className="campo" /></label>
+            </div>
+            <p className="mt-2 text-xs text-stone-500">As parcelas sem juros precisam estar ligadas também na sua conta do Mercado Pago (você assume os juros).</p>
             <p className="mt-3 text-xs text-stone-500">
               Mercado Pago: {tokenMercadoPago(loja.slug) ? <span className="text-green-700">ligado</span> : <>desligado. Para ligar, coloque o Access Token na variável <code>{mpVar}</code> do servidor.</>}
             </p>

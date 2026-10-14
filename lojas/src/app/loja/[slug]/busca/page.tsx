@@ -15,7 +15,7 @@ export default async function Busca({ params, searchParams }: { params: Promise<
     <div className="mx-auto max-w-6xl px-4 py-10">
       <h1 className="mb-2 font-titulo text-3xl text-marca">Busca</h1>
       <p className="mb-8 text-sm text-stone-500">{q ? `${produtos.length} resultado(s) para "${q}"` : "Digite o que você procura."}</p>
-      {q && <GradeProdutos produtos={produtos} base={base} />}
+      {q && <GradeProdutos produtos={produtos} base={base} condicoes={loja} />}
     </div>
   );
 }

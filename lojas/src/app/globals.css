@@ -3,11 +3,21 @@
 @theme inline {
   --color-marca: var(--cor-primaria, #1f2937);
   --color-destaque: var(--cor-destaque, #b08d57);
-  --font-titulo: Georgia, "Times New Roman", serif;
+  --font-titulo: var(--fonte-titulo, Georgia, "Times New Roman", serif);
 }
 
 html {
   -webkit-text-size-adjust: 100%;
+}
+
+/* tema "moderno" (BG Imports): títulos sem serifa, em caixa alta */
+[data-tema="moderno"] {
+  --fonte-titulo: ui-sans-serif, system-ui, "Helvetica Neue", Arial, sans-serif;
+}
+[data-tema="moderno"] .font-titulo {
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 body {

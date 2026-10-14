@@ -28,17 +28,15 @@ export default async function Inicio() {
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Indicador rotulo="Vendas hoje" valor={formatarReais(r.hoje.totalCentavos)} detalhe={`${r.hoje.pedidos} pedido(s)`} />
-        <Indicador rotulo="Vendas no mês" valor={formatarReais(r.mes.totalCentavos)} detalhe={`${r.mes.pedidos} pedido(s)`} />
-        <Indicador rotulo="Ticket médio (mês)" valor={formatarReais(r.ticketMedioMesCentavos)} />
-        <Indicador rotulo="Lucro bruto (mês)" valor={formatarReais(r.mes.lucroBrutoCentavos)} detalhe="vendas menos custo dos produtos" />
+        <Indicador rotulo="Vendas no mês" valor={formatarReais(r.mes.totalCentavos)} detalhe={`ticket médio ${formatarReais(r.ticketMedioMesCentavos)}`} />
+        <Indicador rotulo="Lucro bruto no mês" valor={formatarReais(r.mes.lucroBrutoCentavos)} detalhe="vendas menos o custo das peças" />
+        <Indicador rotulo="Para enviar" valor={String(r.aEnviar)} detalhe={r.aguardandoPagamento ? `+ ${r.aguardandoPagamento} aguardando pagamento` : "nenhum aguardando pagamento"} />
       </div>
-
-      <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Indicador rotulo="Aguardando pagamento" valor={String(r.aguardandoPagamento)} />
-        <Indicador rotulo="Para enviar" valor={String(r.aEnviar)} />
-        <Indicador rotulo="A receber (mês)" valor={formatarReais(fin.aReceber)} />
-        <Indicador rotulo="A pagar (mês)" valor={formatarReais(fin.aPagar)} />
-      </div>
+      {fin.aPagar > 0 && (
+        <Link href="/admin/financeiro" className="mt-3 block rounded-md bg-amber-50 px-4 py-2 text-sm text-amber-800 hover:bg-amber-100">
+          {formatarReais(fin.aPagar)} em contas a pagar neste mês →
+        </Link>
+      )}
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_340px]">
         <Cartao titulo="Pedidos que pedem atenção">

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { formatarReais } from "@/lib/dinheiro";
 import { semAcentos } from "@/lib/texto";
 
-export type OpcaoVariante = { id: number; nome: string; sku: string | null; precoCentavos: number; custoCentavos: number; estoque: number };
+export type OpcaoVariante = { id: number; nome: string; sku: string | null; codigoBarras: string | null; precoCentavos: number; custoCentavos: number; estoque: number };
 
 const normal = (s: string) => semAcentos(s).toLowerCase();
 
@@ -13,14 +13,30 @@ export function EscolherProduto({ opcoes, aoEscolher, mostrarSemEstoque = false 
   const [busca, setBusca] = useState("");
   const termo = normal(busca.trim());
   const achados = termo
-    ? opcoes.filter((o) => normal(`${o.nome} ${o.sku ?? ""}`).includes(termo) && (mostrarSemEstoque || o.estoque > 0)).slice(0, 8)
+    ? opcoes.filter((o) => normal(`${o.nome} ${o.sku ?? ""} ${o.codigoBarras ?? ""}`).includes(termo) && (mostrarSemEstoque || o.estoque > 0)).slice(0, 8)
     : [];
+
+  function escolher(o: OpcaoVariante) {
+    aoEscolher(o);
+    setBusca("");
+  }
+
+  // leitor de código de barras digita o código e aperta Enter
+  function aoTeclar(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    const codigo = busca.trim().toLowerCase();
+    const exato = opcoes.find((o) => o.codigoBarras?.toLowerCase() === codigo || o.sku?.toLowerCase() === codigo);
+    if (exato) escolher(exato);
+    else if (achados.length === 1) escolher(achados[0]);
+  }
   return (
     <div className="relative">
       <input
         value={busca}
         onChange={(e) => setBusca(e.target.value)}
-        placeholder="Buscar produto por nome ou SKU"
+        onKeyDown={aoTeclar}
+        placeholder="Nome, SKU ou código de barras (pode usar o leitor)"
         className="campo"
         aria-label="Buscar produto"
       />
@@ -31,10 +47,7 @@ export function EscolherProduto({ opcoes, aoEscolher, mostrarSemEstoque = false 
               <button
                 type="button"
                 className="flex w-full justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-stone-50"
-                onClick={() => {
-                  aoEscolher(o);
-                  setBusca("");
-                }}
+                onClick={() => escolher(o)}
               >
                 <span>
                   {o.nome}

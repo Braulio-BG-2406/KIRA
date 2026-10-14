@@ -24,8 +24,8 @@ export async function GET(req: Request) {
     const dados = await linhasEstoqueCsv(loja.id);
     // mesmo formato da importação: dá para editar no Excel e importar de volta
     linhas = [
-      ["nome", "categoria", "variacao", "sku", "preco", "preco_de", "custo", "estoque", "descricao", "ativo"],
-      ...dados.map(({ v, produto, ativo }) => [produto, "", v.nome, v.sku, r(v.precoCentavos), r(v.precoDeCentavos), r(v.custoCentavos), v.estoque, "", ativo && v.ativo ? "sim" : "nao"]),
+      ["nome", "marca", "categoria", "variacao", "sku", "codigo_barras", "preco", "preco_de", "custo", "estoque", "descricao", "ativo"],
+      ...dados.map(({ v, produto, marca, ativo }) => [produto, marca, "", v.nome, v.sku, v.codigoBarras, r(v.precoCentavos), r(v.precoDeCentavos), r(v.custoCentavos), v.estoque, "", ativo && v.ativo ? "sim" : "nao"]),
     ];
   } else {
     const dados = await linhasPedidosCsv(loja.id, periodo);

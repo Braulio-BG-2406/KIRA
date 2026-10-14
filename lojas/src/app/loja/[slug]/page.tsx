@@ -49,13 +49,13 @@ export default async function VitrineInicio({ params }: { params: Promise<{ slug
         {destaques.length > 0 && (
           <section className="mt-12">
             <h2 className="mb-6 font-titulo text-3xl text-marca">Destaques</h2>
-            <GradeProdutos produtos={destaques} base={base} />
+            <GradeProdutos produtos={destaques} base={base} condicoes={loja} />
           </section>
         )}
 
         <section id="produtos" className="mt-16 scroll-mt-28">
           <h2 className="mb-6 font-titulo text-3xl text-marca">Todos os produtos</h2>
-          <GradeProdutos produtos={todos} base={base} />
+          <GradeProdutos produtos={todos} base={base} condicoes={loja} />
         </section>
       </div>
     </>

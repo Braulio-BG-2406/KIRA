@@ -33,12 +33,12 @@ export default async function Importar({ searchParams }: { searchParams: Promise
   const sp = await searchParams;
   const exemplo = [
     COLUNAS_IMPORTACAO.join(";"),
-    "Anel Solitário;Anéis;Aro 16;ANEL-SOL-16;79,90;;24,00;5;Zircônia 6 mm;sim",
-    "Anel Solitário;Anéis;Aro 18;ANEL-SOL-18;79,90;;24,00;3;;sim",
+    "Relógio Cronógrafo;BG Collection;Relógios;Pulseira aço;REL-CRO-01;7891234567895;389,90;459,90;160,00;4;Caixa 44 mm;sim",
+    "Relógio Cronógrafo;BG Collection;Relógios;Pulseira couro;REL-CRO-02;;389,90;;160,00;2;;sim",
   ].join("\n");
   return (
     <>
-      <Cabecalho titulo="Importar produtos" voltar="/admin/produtos" />
+      <Cabecalho titulo="Importar produtos" />
       <Aviso ok={sp.ok} erro={sp.erro} />
       <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
         <Cartao>

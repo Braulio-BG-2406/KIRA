@@ -14,3 +14,9 @@ export function urlDaLoja(slug: string): string {
   if (dominio) return `https://${dominio}`;
   return `${(process.env.APP_URL ?? "http://localhost:3000").replace(/\/$/, "")}/loja/${slug}`;
 }
+
+/** caminho do site ("/uploads/x.jpg") vira endereço completo, para Google, Meta e marketplaces */
+export function absoluta(caminho: string): string {
+  if (/^https?:\/\//.test(caminho)) return caminho;
+  return `${(process.env.APP_URL ?? "http://localhost:3000").replace(/\/$/, "")}${caminho.startsWith("/") ? "" : "/"}${caminho}`;
+}

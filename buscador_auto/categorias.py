@@ -63,6 +63,12 @@ _MODELOS_CARRO = (
 )
 
 
+# Marcas que no Brasil só vendem carro/utilitário leve.
+_MARCAS_SO_CARRO = (
+    r"\b(bmw|audi|porsche|land rover|jaguar|mini cooper|jeep|honda|nissan|peugeot|citroen|kia|chery|byd|gwm)\b"
+)
+
+
 def detectar_categoria(texto: str, dica: str = "") -> str:
     """Devolve "carro", "caminhao" ou "cavalo".
 
@@ -85,6 +91,9 @@ def detectar_categoria(texto: str, dica: str = "") -> str:
     )
 
     if dica == CARRO and not contem(t, _PALAVRAS_CAMINHAO) and not contem(t, _MARCAS_SO_CAMINHAO):
+        return CARRO
+    # Carro evidente achado numa busca de caminhão continua sendo carro.
+    if not sinais_caminhao and (contem(t, _MARCAS_SO_CARRO) or contem(t, _MODELOS_CARRO)):
         return CARRO
     if sinais_cavalo and (sinais_caminhao or dica in (CAMINHAO, CAVALO)):
         return CAVALO

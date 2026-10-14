@@ -3,7 +3,8 @@ from pathlib import Path
 import pytest
 
 from buscador_auto import config as cfg_mod
-from buscador_auto.__main__ import _da_faixa, main
+from buscador_auto.__main__ import main
+from buscador_auto.coleta import da_faixa
 from buscador_auto.avaliacao import avaliar
 from buscador_auto.faixas import buscas_das_faixas, faixa_do_anuncio, perfil_custos
 from buscador_auto.fontes.base import Busca, Fonte
@@ -80,8 +81,8 @@ def test_busca_de_modelo_nao_pega_parecido():
 
 def test_anuncio_de_outra_faixa_fica_de_fora():
     premium = Busca("Premium · Mercedes-Benz", faixa="premium", marca="Mercedes-Benz")
-    assert _da_faixa(Anuncio("t", "1", "Mercedes-Benz C 180", 110000, marca="Mercedes-Benz"), premium, {})
-    assert not _da_faixa(Anuncio("t", "2", "Mercedes-Benz Accelo 1016 baú", 180000, marca="Mercedes-Benz"),
+    assert da_faixa(Anuncio("t", "1", "Mercedes-Benz C 180", 110000, marca="Mercedes-Benz"), premium, {})
+    assert not da_faixa(Anuncio("t", "2", "Mercedes-Benz Accelo 1016 baú", 180000, marca="Mercedes-Benz"),
                          premium, {})
 
 

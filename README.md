@@ -127,6 +127,40 @@ Só são avisados anúncios com nota ≥ `score_minimo_alerta`, sem risco alto, 
 não avisados — ou que baixaram de preço desde o último aviso —, no máximo
 `max_alertas_por_faixa` por faixa a cada execução.
 
+### Site (Vercel ou no seu computador)
+
+O mesmo buscador tem uma versão web: botões para pesquisar cada faixa, formulário
+para avaliar um anúncio, importação de planilha e botão para baixar o CSV.
+
+```bash
+python -m buscador_auto servir            # abre em http://127.0.0.1:8000
+python -m buscador_auto servir --host 0.0.0.0   # acessível pelo celular na mesma rede
+```
+
+**Publicar na Vercel** (uma vez só):
+
+1. Em [vercel.com/new](https://vercel.com/new), importe o repositório `KIRA` do GitHub.
+   Framework: **Other**; não precisa mudar build nem pasta (o `vercel.json` já define).
+2. Em *Settings → Environment Variables*, crie (todas opcionais, mas a senha é recomendada,
+   porque o site fica público):
+   - `SENHA_ACESSO` – senha pedida na primeira pesquisa (fica salva no navegador);
+   - `ML_ACCESS_TOKEN` – token do Mercado Livre;
+   - `FIPE_TOKEN` e `FIPE_VERSAO=2` – se tiver token da FIPE (limite maior de consultas).
+3. Cada `git push` publica de novo sozinho. A branch principal vira o endereço oficial;
+   outras branches geram links de prévia.
+
+Como funciona lá: a página fica em `public/index.html` e as funções em `api/`
+(`/api/buscas`, `/api/buscar`, `/api/avaliar`, `/api/importar`). Cada busca roda numa
+chamada separada (até 60 s), então a faixa inteira não estoura o tempo limite. As
+buscas e custos vêm do `buscas.toml` (se estiver no repositório) ou do
+`buscas.exemplo.toml`. O histórico de quedas de preço e o Telegram continuam sendo
+coisa da versão de terminal/VPS, porque a Vercel não guarda arquivos entre chamadas.
+OLX e Webmotors podem bloquear os servidores da Vercel; quando isso acontece, a
+página mostra "falhou" naquela fonte e segue com as outras.
+
+Se mudar o visual do relatório (`buscador_auto/modelo_relatorio.html`), rode
+`python -m buscador_auto gerar-site` para atualizar `public/index.html`.
+
 ### Rodar sozinho (VPS)
 
 ```cron

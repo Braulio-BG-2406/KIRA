@@ -76,6 +76,8 @@ def test_formatar_reais():
     ("Volvo 2015 6x2", "cavalo", "cavalo"),
     ("Volvo 2015 6x2 baú", "cavalo", "caminhao"),
     ("Scania R 450", "carro", "cavalo"),  # dica errada não transforma caminhão em carro
+    ("BMW 320i GP 2019", "cavalo", "carro"),  # nem carro em caminhão
+    ("VW Gol 1.0 2018", "caminhao", "carro"),
 ])
 def test_detectar_categoria(texto, dica, esperado):
     assert detectar_categoria(texto, dica) == esperado

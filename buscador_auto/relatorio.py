@@ -164,6 +164,7 @@ def salvar_html(avaliacoes: list[Avaliacao], caminho: str | Path, titulo: str = 
             .replace("{{TITULO}}", html_lib.escape(titulo))
             .replace("{{GERADO}}", gerado)
             .replace("{{AVISO}}", html_lib.escape(aviso))
+            .replace("{{MODO}}", "relatorio")
             .replace("{{DADOS}}", dados))
     caminho.write_text(html, encoding="utf-8")
     return caminho

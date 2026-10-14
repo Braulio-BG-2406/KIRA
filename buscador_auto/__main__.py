@@ -18,9 +18,10 @@ from pathlib import Path
 from . import config as cfg_mod
 from .avaliacao import avaliar_lote
 from .categorias import NOMES, TIPO_FIPE, detectar_categoria
-from .faixas import FAIXAS, OUTROS, faixa_do_anuncio
+from .coleta import coletar, montar_fontes
+from .faixas import FAIXAS, OUTROS
 from .fipe import ClienteFipe
-from .fontes import FONTES, MercadoLivre, criar_sessao, ler_planilha
+from .fontes import FONTES, ler_planilha
 from .historico import Historico
 from .modelos import Anuncio
 from .notificacao import enviar_telegram, mensagem
@@ -76,14 +77,6 @@ def _processar(anuncios: list[Anuncio], config: dict, args, titulo: str, aviso: 
     return 0
 
 
-def _da_faixa(a: Anuncio, busca, config: dict) -> bool:
-    """Um caminhão Mercedes achado na busca premium não entra como premium (e vice-versa)."""
-    if not busca.faixa:
-        return True
-    categoria = detectar_categoria(a.texto_completo, a.categoria or busca.categoria)
-    return faixa_do_anuncio(a, categoria, config) == busca.faixa
-
-
 def cmd_buscar(args) -> int:
     config = cfg_mod.carregar(args.config)
     buscas = cfg_mod.buscas(config)
@@ -94,34 +87,17 @@ def cmd_buscar(args) -> int:
     if not buscas:
         print("Nenhuma busca configurada. Copie buscas.exemplo.toml para buscas.toml e ajuste.", file=sys.stderr)
         return 2
-    sessao = criar_sessao()
-    pausa = float(config["geral"]["pausa_entre_requisicoes"])
-    fontes = {}
-    for nome, classe in FONTES.items():
-        if classe is MercadoLivre:
-            ml = config.get("mercadolivre", {})
-            fontes[nome] = classe(sessao, pausa=pausa, token=ml.get("token") or None, categorias=ml.get("categorias"))
-        else:
-            fontes[nome] = classe(sessao, pausa=pausa)
-
+    fontes = montar_fontes(config, FONTES)
     vistos: dict[str, Anuncio] = {}
     for busca in buscas:
-        for nome in busca.fontes:
-            fonte = fontes.get(nome)
-            if not fonte:
-                log.warning("Fonte desconhecida: %s (use %s)", nome, ", ".join(FONTES))
-                continue
-            try:
-                achados = fonte.buscar(busca)
-            except Exception as erro:  # uma fonte fora do ar não derruba as outras
-                log.warning("[%s] %s: %s", busca.nome, nome, erro)
-                continue
-            aceitos = [a for a in achados if busca.aceita(a) and _da_faixa(a, busca, config)]
-            for a in aceitos:
-                a.busca = busca.nome
-                a.categoria = a.categoria or busca.categoria
-                vistos.setdefault(a.chave, a)
-            print(f"[{busca.nome}] {nome}: {len(achados)} anúncios, {len(aceitos)} dentro dos filtros")
+        aceitos, resumo = coletar(busca, fontes, config)
+        for a in aceitos:
+            vistos.setdefault(a.chave, a)
+        for r in resumo:
+            if "erro" in r:
+                print(f"[{busca.nome}] {r['fonte']}: falhou ({r['erro']})")
+            else:
+                print(f"[{busca.nome}] {r['fonte']}: {r['achados']} anúncios, {r['aceitos']} dentro dos filtros")
     return _processar(list(vistos.values()), config, args, "Oportunidades automotivas")
 
 
@@ -184,6 +160,18 @@ def cmd_fipe(args) -> int:
     return 0
 
 
+def cmd_servir(args) -> int:
+    from .web import servir
+    servir(args.porta, args.host)
+    return 0
+
+
+def cmd_gerar_site(args) -> int:
+    from .web import gerar_pagina
+    print(f"Página gerada: {gerar_pagina()}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="buscador_auto", description="Buscador de oportunidades: carro, caminhão e cavalo mecânico.")
     p.add_argument("-v", "--verboso", action="store_true", help="mostra detalhes de cada consulta")
@@ -233,9 +221,17 @@ def main(argv: list[str] | None = None) -> int:
     f.add_argument("--ano", type=int, required=True)
     f.set_defaults(func=cmd_fipe)
 
+    sv = sub.add_parser("servir", help="abre o site do buscador no navegador (http://127.0.0.1:8000)")
+    sv.add_argument("--porta", type=int, default=8000)
+    sv.add_argument("--host", default="127.0.0.1", help="use 0.0.0.0 para acessar de outro aparelho")
+    sv.set_defaults(func=cmd_servir)
+
+    g = sub.add_parser("gerar-site", help="atualiza public/index.html a partir do modelo do relatório")
+    g.set_defaults(func=cmd_gerar_site)
+
     args = p.parse_args(argv)
     logging.basicConfig(level=logging.INFO if args.verboso else logging.WARNING, format="%(levelname)s %(message)s")
-    if args.config is None and Path("buscas.toml").exists():
+    if getattr(args, "config", "") is None and Path("buscas.toml").exists():
         args.config = "buscas.toml"  # usa os custos personalizados, se houver
     if args.comando == "buscar" and not Path(args.config).exists():
         print(f"Arquivo {args.config} não existe. Copie buscas.exemplo.toml para buscas.toml.", file=sys.stderr)

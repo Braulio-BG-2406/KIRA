@@ -100,15 +100,84 @@ details td { padding: 3px 0; border-bottom: 1px solid var(--border); }
 details td:last-child { text-align: right; color: var(--text); font-variant-numeric: tabular-nums; }
 .vazio { padding: 40px; text-align: center; color: var(--muted); border: 1px dashed var(--border); border-radius: 12px; }
 footer { margin-top: 28px; color: var(--muted); font-size: .8rem; }
+[hidden] { display: none !important; }
+.card.destaque { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn { font: inherit; font-weight: 600; border: 1px solid var(--accent); background: var(--accent); color: var(--on-accent);
+  padding: 8px 14px; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.btn.sec { background: transparent; color: var(--accent); }
+.btn:disabled { opacity: .55; cursor: progress; }
+.painel { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 4px 14px 14px;
+  margin-top: 18px; box-shadow: var(--shadow); }
+.abas { display: flex; gap: 2px; border-bottom: 1px solid var(--border); margin: 0 -14px 14px; padding: 0 10px; overflow-x: auto; }
+.abas button { border: 0; background: none; font: inherit; color: var(--muted); padding: 10px 10px 8px; cursor: pointer;
+  border-bottom: 2px solid transparent; white-space: nowrap; }
+.abas button[aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
+@media (max-width: 420px) { .abas button { padding: 10px 6px 8px; font-size: .9rem; } }
+.dica { margin: 0 0 12px; color: var(--muted); font-size: .9rem; }
+.acoes { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.progresso { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 4px; font-size: .85rem; }
+.progresso:empty { display: none; }
+.progresso li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 12px; padding: 5px 9px;
+  border-radius: 6px; background: var(--surface-2); }
+.progresso .st { color: var(--muted); }
+.progresso .st.ok { color: var(--good); }
+.progresso .st.erro { color: var(--bad); }
+.progresso small { flex-basis: 100%; color: var(--muted); overflow-wrap: anywhere; }
+form.aba { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+form.aba label { display: flex; flex-direction: column; gap: 4px; font-size: .8rem; color: var(--muted); min-width: 0; }
+form.aba .largo { grid-column: 1 / -1; }
+form.aba input, form.aba select, form.aba textarea { font: inherit; color: var(--text); background: var(--bg);
+  border: 1px solid var(--border); border-radius: 8px; padding: 7px 9px; min-width: 0; width: 100%; }
+#kpis[hidden] + .toolbar { margin-top: 18px; }
+.status { font-size: .88rem; color: var(--muted); }
+.status.erro { color: var(--bad); }
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
     <h1>{{TITULO}}</h1>
-    <p>Gerado em {{GERADO}} · valores de revenda, custos e margens são estimativas para triagem, não laudo.</p>
-    <div class="aviso">{{AVISO}}</div>
+    <p id="sub">Gerado em {{GERADO}} · valores de revenda, custos e margens são estimativas para triagem, não laudo.</p>
+    <div class="aviso" id="aviso">{{AVISO}}</div>
   </header>
+
+  <section class="painel" id="painel" hidden>
+    <div class="abas" role="tablist" aria-label="O que fazer">
+      <button role="tab" aria-selected="true" data-aba="aba-buscar">Pesquisar</button>
+      <button role="tab" aria-selected="false" data-aba="aba-avaliar">Avaliar anúncio</button>
+      <button role="tab" aria-selected="false" data-aba="aba-importar">Importar planilha</button>
+    </div>
+    <div class="aba" id="aba-buscar" role="tabpanel">
+      <p class="dica">Pesquisa na OLX, no Mercado Livre e na Webmotors e compara com a FIPE. Cada faixa roda poucas buscas.</p>
+      <div class="acoes">
+        <button class="btn" data-buscar="pesados">Pesados</button>
+        <button class="btn" data-buscar="populares">Populares</button>
+        <button class="btn" data-buscar="premium">Premium</button>
+        <button class="btn sec" data-buscar="">Todas as faixas</button>
+      </div>
+      <ul class="progresso" id="progresso"></ul>
+    </div>
+    <form class="aba" id="aba-avaliar" role="tabpanel" hidden autocomplete="off">
+      <label class="largo">Veículo (marca, modelo e versão) *<input name="titulo" required placeholder="Ex.: Scania R 450 A 6x2"></label>
+      <label>Preço pedido (R$) *<input name="preco" required inputmode="decimal" placeholder="410.000"></label>
+      <label>Ano modelo<input name="ano" inputmode="numeric" placeholder="2019"></label>
+      <label>Km<input name="km" inputmode="numeric" placeholder="520.000"></label>
+      <label>FIPE (se já souber)<input name="fipe" inputmode="decimal" placeholder="opcional"></label>
+      <label>UF<input name="uf" maxlength="2" placeholder="PR"></label>
+      <label>Vendedor<select name="vendedor"><option value="particular">Particular</option><option value="loja">Loja</option><option value="leilao">Leilão</option></select></label>
+      <label class="largo">Link do anúncio<input name="url" type="url" placeholder="https://..."></label>
+      <label class="largo">Texto do anúncio (para achar alertas)<textarea name="descricao" rows="3" placeholder="Único dono, aceito proposta..."></textarea></label>
+      <div class="acoes largo"><button class="btn" type="submit">Avaliar</button><span class="status" id="status-avaliar" role="status"></span></div>
+    </form>
+    <div class="aba" id="aba-importar" role="tabpanel" hidden>
+      <p class="dica">CSV ou Excel com as colunas <b>titulo</b> e <b>preco</b> (opcionais: marca, modelo, ano, km, uf, fipe, vendedor, descricao, url). Serve para leilões, Marketplace e listas de lojistas.</p>
+      <div class="acoes">
+        <label class="btn"><input type="file" id="arquivo" accept=".csv,.xlsx,.xlsm" hidden>Escolher planilha</label>
+        <button class="btn sec" id="exemplo" type="button">Ver exemplo (dados fictícios)</button>
+        <span class="status" id="status-importar" role="status"></span>
+      </div>
+    </div>
+  </section>
 
   <section class="kpis" id="kpis"></section>
 
@@ -127,6 +196,7 @@ footer { margin-top: 28px; color: var(--muted); font-size: .8rem; }
       <option value="preco">Menor preço</option>
     </select>
     <label class="chk"><input type="checkbox" id="semRisco" checked> Ocultar risco alto</label>
+    <button class="btn sec" id="baixar" type="button">Baixar CSV</button>
   </section>
 
   <section class="grid" id="lista" aria-live="polite"></section>
@@ -135,10 +205,18 @@ footer { margin-top: 28px; color: var(--muted); font-size: .8rem; }
 
 <script id="dados" type="application/json">{{DADOS}}</script>
 <script>
-const DADOS = JSON.parse(document.getElementById("dados").textContent);
+const MODO = "{{MODO}}";
+let DADOS = JSON.parse(document.getElementById("dados").textContent);
 const estado = { objetivo: "revenda", faixa: "", texto: "", ordem: "score", semRisco: true };
 const FAIXAS = [["pesados", "Pesados"], ["populares", "Populares"], ["premium", "Premium"]];
-if (DADOS.some(d => d.faixa === "outros")) FAIXAS.push(["outros", "Outros"]);
+let destaque = "";      // anúncio recém-avaliado: aparece mesmo com filtros
+let ultimaLista = [];   // o que está na tela (para o CSV)
+let usado = false;      // já pesquisou/importou/avaliou nesta visita
+
+function atualizarFaixas() {
+  if (DADOS.some(d => d.faixa === "outros") && !FAIXAS.some(f => f[0] === "outros")) FAIXAS.push(["outros", "Outros"]);
+}
+atualizarFaixas();
 const boa = v => ["ÓTIMA", "BOA"].includes(v);
 const oportunidade = d => !riscoAlto(d) && (boa(d.revenda) || boa(d.uso));
 
@@ -161,6 +239,7 @@ function kpis() {
       `<b>${n}</b><span>${n === 1 ? "oportunidade" : "oportunidades"} ${sub}</span></button>`;
   });
   const risco = DADOS.filter(riscoAlto).length;
+  document.getElementById("kpis").hidden = MODO === "app" && !DADOS.length;
   cards.push(`<div class="kpi"><h2>Risco alto</h2><b>${risco}</b><span>ocultos por padrão</span></div>`);
   document.getElementById("kpis").innerHTML = cards.join("");
 }
@@ -211,7 +290,7 @@ function card(d) {
       ${custos}
       <tr><td>Busca</td><td>${esc(d.busca || "–")}</td></tr>
     </table></details>`;
-  return `<article class="card">
+  return `<article class="card${d.chave === destaque ? " destaque" : ""}" data-chave="${esc(d.chave)}">
     <div class="top"><div class="score ${nota}" title="Nota da oportunidade (0 a 100)">${d.score}</div><div class="tags">${tags.join("")}</div></div>
     <h3>${titulo}</h3>
     <p class="meta">${meta}</p>
@@ -234,11 +313,47 @@ function render() {
   }[estado.ordem];
   const lista = DADOS
     .filter(d => !estado.faixa || d.faixa === estado.faixa)
-    .filter(d => !estado.semRisco || !riscoAlto(d))
+    .filter(d => !estado.semRisco || !riscoAlto(d) || d.chave === destaque)
     .filter(d => !t || [d.titulo, d.cidade, d.uf, d.fonte, d.busca, d.categoria_nome, d.faixa_nome].join(" ").toLowerCase().includes(t))
     .sort((a, b) => chave(a) - chave(b));
-  document.getElementById("lista").innerHTML = lista.length ? lista.map(card).join("")
-    : `<div class="vazio">Nenhum anúncio com esses filtros.</div>`;
+  ultimaLista = lista;
+  document.getElementById("baixar").disabled = !lista.length;
+  const vazio = !DADOS.length && MODO === "app" && !usado
+    ? "Escolha uma faixa em <b>Pesquisar</b>, avalie um anúncio ou importe uma planilha."
+    : "Nenhum anúncio com esses filtros.";
+  document.getElementById("lista").innerHTML = lista.length ? lista.map(card).join("") : `<div class="vazio">${vazio}</div>`;
+}
+
+function atualizar() {
+  atualizarFaixas();
+  botoesFaixa();
+  kpis();
+  render();
+}
+
+function baixarCsv() {
+  const cols = [["faixa_nome", "Faixa"], ["score", "Nota"], ["revenda", "Revenda"], ["uso", "Uso próprio"],
+    ["titulo", "Veículo"], ["preco", "Preço"], ["ano", "Ano"], ["km", "Km"], ["cidade", "Cidade"], ["uf", "UF"],
+    ["fipe", "FIPE"], ["fipe_ajustada", "FIPE ajustada"], ["mediana_mercado", "Mercado"], ["lucro", "Lucro"],
+    ["margem", "Margem %"], ["alertas", "Alertas"], ["fonte", "Fonte"], ["url", "Link"]];
+  const cel = (k, d) => {
+    let v = d[k];
+    if (k === "margem" && v != null) v = v * 100;
+    if (k === "alertas") v = v.map(a => a.msg).join(" | ");
+    if (v == null) return "";
+    if (typeof v === "number") return String(Math.round(v * 100) / 100).replace(".", ",");
+    let s = String(v);
+    if (/^[=+\-@]/.test(s)) s = "'" + s;  // evita fórmula ao abrir no Excel
+    return /[;"\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const linhas = [cols.map(c => c[1]).join(";"), ...ultimaLista.map(d => cols.map(([k]) => cel(k, d)).join(";"))];
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob(["\ufeff" + linhas.join("\r\n")], { type: "text/csv;charset=utf-8" }));
+  a.download = `oportunidades-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }
 
 function grupo(id, campo, aoMudar) {
@@ -267,9 +382,155 @@ document.getElementById("kpis").addEventListener("click", e => {
 document.getElementById("texto").addEventListener("input", e => { estado.texto = e.target.value; render(); });
 document.getElementById("ordem").addEventListener("change", e => { estado.ordem = e.target.value; render(); });
 document.getElementById("semRisco").addEventListener("change", e => { estado.semRisco = e.target.checked; render(); });
-botoesFaixa();
-kpis();
-render();
+document.getElementById("baixar").addEventListener("click", baixarCsv);
+
+// ------------------------------------------------------------ modo app (site)
+const CHAVE_SENHA = "buscador_auto_senha";
+let senhaMemoria = "";
+function lerSenha() { try { return localStorage.getItem(CHAVE_SENHA) || ""; } catch (e) { return ""; } }
+function guardarSenha(s) { senhaMemoria = s; try { localStorage.setItem(CHAVE_SENHA, s); } catch (e) { /* sem armazenamento */ } }
+
+async function api(caminho, opcoes = {}, tentativa = 0) {
+  const headers = { ...(opcoes.headers || {}) };
+  const senha = senhaMemoria || lerSenha();
+  if (senha) headers["X-Senha"] = senha;
+  let r;
+  try { r = await fetch(caminho, { ...opcoes, headers }); } catch (e) { throw new Error("Sem conexão com o servidor."); }
+  if (r.status === 401 && tentativa < 2) {
+    const s = prompt("Senha de acesso ao buscador:");
+    if (s) { guardarSenha(s); return api(caminho, opcoes, tentativa + 1); }
+  }
+  const corpo = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(corpo.erro || (r.status === 504 ? "A busca demorou demais; tente de novo." : `Erro ${r.status}`));
+  return corpo;
+}
+
+function juntar(lista) {
+  const chaves = new Set(DADOS.map(d => d.chave));
+  for (const d of lista) if (!chaves.has(d.chave)) { DADOS.push(d); chaves.add(d.chave); }
+}
+
+function mostrarAviso(texto) { document.getElementById("aviso").textContent = texto; }
+
+async function pesquisar(faixa) {
+  const botoes = document.querySelectorAll("[data-buscar]");
+  const prog = document.getElementById("progresso");
+  botoes.forEach(b => { b.disabled = true; });
+  try {
+    const { buscas } = await api("/api/buscas");
+    const alvo = buscas.filter(b => !faixa || b.faixa === faixa);
+    prog.innerHTML = alvo.map((b, i) => `<li id="p${i}"><span>${esc(b.nome)}</span><span class="st">na fila</span></li>`).join("");
+    DADOS = DADOS.filter(d => d.fonte === "manual");
+    usado = true;
+    mostrarAviso("");
+    estado.faixa = faixa;
+    atualizar();
+    let proxima = 0;
+    const trabalhador = async () => {
+      while (proxima < alvo.length) {
+        const i = proxima++;
+        const li = document.getElementById("p" + i);
+        const st = li.querySelector(".st");
+        st.textContent = "pesquisando…";
+        try {
+          const r = await api("/api/buscar?busca=" + encodeURIComponent(alvo[i].nome));
+          juntar(r.resultados);
+          const erros = r.fontes.filter(f => f.erro);
+          st.textContent = `${r.resultados.length} anúncio(s) · ` +
+            r.fontes.map(f => f.erro ? `${f.fonte}: falhou` : `${f.fonte}: ${f.aceitos}`).join(" · ");
+          st.className = "st " + (erros.length === r.fontes.length ? "erro" : "ok");
+          if (erros.length) li.insertAdjacentHTML("beforeend", `<small>${erros.map(f => esc(`${f.fonte}: ${f.erro}`)).join("<br>")}</small>`);
+        } catch (e) {
+          st.textContent = e.message;
+          st.className = "st erro";
+        }
+        atualizar();
+      }
+    };
+    await Promise.all([trabalhador(), trabalhador(), trabalhador()]);
+  } catch (e) {
+    prog.innerHTML = `<li><span class="st erro">${esc(e.message)}</span></li>`;
+  } finally {
+    botoes.forEach(b => { b.disabled = false; });
+  }
+}
+
+function focar(chave) {
+  const el = [...document.querySelectorAll("article.card")].find(a => a.dataset.chave === chave);
+  if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+async function importar(corpo, nome, exemplo) {
+  const st = document.getElementById("status-importar");
+  st.textContent = "Avaliando a planilha…";
+  st.className = "status";
+  try {
+    const caminho = exemplo ? "/api/importar?exemplo=1" : "/api/importar";
+    const r = await api(caminho, { method: "POST", body: corpo, headers: { "X-Arquivo": encodeURIComponent(nome) } });
+    DADOS = DADOS.filter(d => d.fonte === "manual");
+    usado = true;
+    juntar(r.resultados);
+    mostrarAviso(exemplo ? "Dados de exemplo fictícios — só para mostrar o funcionamento." : "");
+    estado.faixa = "";
+    atualizar();
+    st.textContent = `${r.resultados.length} anúncio(s) avaliado(s) de ${nome}.`;
+  } catch (e) {
+    st.textContent = e.message;
+    st.className = "status erro";
+  }
+}
+
+function iniciarApp() {
+  document.getElementById("painel").hidden = false;
+  document.getElementById("sub").textContent =
+    "Pesquise por faixa, avalie um anúncio ou importe uma planilha. Revenda, custos e margens são estimativas para triagem, não laudo.";
+  const abas = document.querySelectorAll(".abas button");
+  abas.forEach(b => b.addEventListener("click", () => {
+    abas.forEach(x => {
+      x.setAttribute("aria-selected", x === b);
+      document.getElementById(x.dataset.aba).hidden = x !== b;
+    });
+  }));
+  document.querySelectorAll("[data-buscar]").forEach(b => b.addEventListener("click", () => pesquisar(b.dataset.buscar)));
+
+  const form = document.getElementById("aba-avaliar");
+  form.addEventListener("submit", async e => {
+    e.preventDefault();
+    const st = document.getElementById("status-avaliar");
+    const botao = form.querySelector("button[type=submit]");
+    st.textContent = "Avaliando…";
+    st.className = "status";
+    botao.disabled = true;
+    try {
+      const dados = Object.fromEntries(new FormData(form));
+      const { resultados } = await api("/api/avaliar", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(dados),
+      });
+      const d = resultados[0];
+      DADOS = [d, ...DADOS.filter(x => x.chave !== d.chave)];
+      destaque = d.chave;
+      estado.faixa = "";
+      atualizar();
+      focar(d.chave);
+      st.textContent = `Nota ${d.score} · Revenda: ${d.revenda} · Uso: ${d.uso} · ${d.faixa_nome}`;
+    } catch (erro) {
+      st.textContent = erro.message;
+      st.className = "status erro";
+    } finally {
+      botao.disabled = false;
+    }
+  });
+
+  document.getElementById("arquivo").addEventListener("change", async e => {
+    const arq = e.target.files[0];
+    if (arq) await importar(await arq.arrayBuffer(), arq.name, false);
+    e.target.value = "";
+  });
+  document.getElementById("exemplo").addEventListener("click", () => importar(null, "planilha de exemplo", true));
+}
+
+if (MODO === "app") iniciarApp();
+atualizar();
 </script>
 </body>
 </html>

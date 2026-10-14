@@ -45,6 +45,8 @@ export type Entrega = {
   descricao: string;
   prazo?: string;
   endereco?: Endereco;
+  /** endereço digitado à mão numa venda do painel */
+  enderecoTexto?: string;
 };
 
 const criadoEm = () => timestamp("criado_em", { withTimezone: true }).notNull().defaultNow();

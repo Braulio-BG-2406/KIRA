@@ -1,0 +1,36 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-marca: var(--cor-primaria, #1f2937);
+  --color-destaque: var(--cor-destaque, #b08d57);
+  --font-titulo: Georgia, "Times New Roman", serif;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: #fff;
+  color: #1c1917;
+}
+
+/* campos padrão do painel e do checkout */
+@utility campo {
+  @apply w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm outline-none focus:border-stone-500 focus:ring-2 focus:ring-stone-200;
+}
+@utility rotulo {
+  @apply mb-1 block text-xs font-medium text-stone-600;
+}
+@utility botao {
+  @apply inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50;
+}
+@utility botao-primario {
+  @apply botao bg-stone-900 text-white hover:bg-stone-700;
+}
+@utility botao-secundario {
+  @apply botao border border-stone-300 bg-white text-stone-800 hover:bg-stone-50;
+}
+@utility botao-perigo {
+  @apply botao border border-red-200 bg-white text-red-700 hover:bg-red-50;
+}

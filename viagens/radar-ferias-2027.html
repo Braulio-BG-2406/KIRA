@@ -2,172 +2,301 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=JetBrains+Mono:wght@500;700&family=Source+Sans+3:wght@400;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Instrument+Sans:wght@400;600;700&family=JetBrains+Mono:wght@500;700&display=swap">
 <style>
-/* Layout: one column of stacked "gates" (sections) under a departure-board header; tools first, reference last. */
+/* Layout: noite de voo. Hero com globo e cartão de embarque; cartões-postais; depois as ferramentas em painéis de vidro sobre um céu estrelado. Tema único escuro, escolhido de propósito. */
 :root {
-  --bg: #F1F4F6;
-  --surface: #FFFFFF;
-  --ink: #14222E;
-  --muted: #5A6A77;
-  --line: #D5DDE3;
-  --accent: #0D6A62;
-  --accent-ink: #FFFFFF;
-  --accent-soft: #E1F0EE;
-  --board: #14222E;
-  --board-fg: #F3B53A;
-  --board-muted: #9FB0BD;
-  --signal-soft: #FFF2D4;
-  --danger: #B3261E;
-  --ok: #1E7A3B;
-  --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
-  --font-body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --night: #060918;
+  --night-2: #0C122B;
+  --glass: rgba(18, 26, 60, .62);
+  --glass-hi: rgba(30, 42, 92, .55);
+  --line: rgba(150, 175, 255, .16);
+  --line-hi: rgba(150, 175, 255, .32);
+  --ink: #EEF1FF;
+  --muted: #9CA6CC;
+  --sun: #FFB547;
+  --coral: #FF6E5B;
+  --sky: #63E3FF;
+  --accent: #FFB547;
+  --ok: #5BE39B;
+  --danger: #FF8A80;
+  --font-display: "Unbounded", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Instrument Sans", "Segoe UI", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
-  --r: 10px;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #0D141A; --surface: #15202A; --ink: #E5ECF1; --muted: #93A4B1; --line: #26343F;
-    --accent: #45B9AD; --accent-ink: #052421; --accent-soft: #123430;
-    --board: #080D11; --board-fg: #F5BC4A; --board-muted: #7F909C;
-    --signal-soft: #3A2D11; --danger: #F08680; --ok: #73CF90;
-    color-scheme: dark;
-  }
-}
-:root[data-theme="dark"] {
-  --bg: #0D141A; --surface: #15202A; --ink: #E5ECF1; --muted: #93A4B1; --line: #26343F;
-  --accent: #45B9AD; --accent-ink: #052421; --accent-soft: #123430;
-  --board: #080D11; --board-fg: #F5BC4A; --board-muted: #7F909C;
-  --signal-soft: #3A2D11; --danger: #F08680; --ok: #73CF90;
+  --r: 18px;
   color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
-body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 16px; line-height: 1.5; }
-.wrap { max-width: 980px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body {
+  background: var(--night);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.55;
+  position: relative;
+  overflow-x: hidden;
+}
+/* céu: estrelas + brilho do horizonte */
+body::before {
+  content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(1px 1px at 12% 18%, rgba(255,255,255,.7), transparent 60%),
+    radial-gradient(1px 1px at 72% 9%, rgba(255,255,255,.6), transparent 60%),
+    radial-gradient(1.5px 1.5px at 38% 62%, rgba(255,255,255,.45), transparent 60%),
+    radial-gradient(1px 1px at 88% 44%, rgba(255,255,255,.55), transparent 60%),
+    radial-gradient(1px 1px at 22% 84%, rgba(255,255,255,.4), transparent 60%),
+    radial-gradient(1.5px 1.5px at 56% 30%, rgba(99,227,255,.5), transparent 60%),
+    radial-gradient(1px 1px at 94% 78%, rgba(255,181,71,.5), transparent 60%),
+    radial-gradient(900px 520px at 85% -10%, rgba(255,110,91,.20), transparent 70%),
+    radial-gradient(800px 600px at -10% 30%, rgba(99,227,255,.10), transparent 70%),
+    var(--night);
+  background-size: 260px 260px, 310px 310px, 420px 420px, 380px 380px, 290px 290px, 520px 520px, 470px 470px, 100% 100%, 100% 100%, 100% 100%;
+}
 
-/* Board header */
-.board { background: var(--board); color: var(--board-muted); }
-.board .wrap { padding-block: 28px 24px; display: grid; gap: 14px; }
-.board h1 { margin: 0; font-family: var(--font-display); font-weight: 700; font-size: clamp(1.9rem, 5vw, 2.8rem); line-height: 1.05; color: #F4F6F8; text-wrap: balance; }
-.board .who { font-size: 1rem; }
-.route { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px 18px; font-family: var(--font-mono); color: var(--board-fg); }
-.route .code { font-size: clamp(1.8rem, 6vw, 2.6rem); font-weight: 700; letter-spacing: .06em; }
-.route .arrow { font-size: 1.4rem; color: var(--board-muted); }
-.route .meta { font-size: .9rem; color: var(--board-muted); letter-spacing: .04em; text-transform: uppercase; }
-
-main.wrap { padding-block: 28px 64px; display: grid; gap: 28px; }
-section.gate { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 22px clamp(16px, 3vw, 28px); display: grid; gap: 18px; min-width: 0; }
-.gate-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 16px; }
-.gate h2 { margin: 0; font-family: var(--font-display); font-weight: 700; font-size: 1.45rem; text-wrap: balance; }
-.gate .lede { margin: 0; color: var(--muted); max-width: 62ch; }
-.eyebrow { font-family: var(--font-mono); font-size: .72rem; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
-
-/* Forms */
-.grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
-.grid.wide { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
-label.f { display: grid; gap: 4px; font-size: .85rem; font-weight: 600; color: var(--muted); min-width: 0; }
-input, select, textarea { font: inherit; font-size: 1rem; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; width: 100%; min-width: 0; }
-textarea { resize: vertical; min-height: 64px; }
-input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.span-2 { grid-column: span 2; }
-@media (max-width: 520px) { .span-2 { grid-column: auto; } }
-
-button, .btn { font: inherit; font-weight: 600; font-size: .95rem; border-radius: 8px; border: 1px solid transparent; padding: 9px 16px; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; }
-.btn-primary { background: var(--accent); color: var(--accent-ink); }
-.btn-primary:hover { filter: brightness(1.08); }
-.btn-ghost { background: transparent; color: var(--ink); border-color: var(--line); }
-.btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
-button:disabled { opacity: .55; cursor: not-allowed; }
-.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-
-/* Search results */
-.legs { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
-.leg { display: grid; gap: 10px; align-content: start; min-width: 0; }
-.leg h3 { margin: 0; font-size: 1rem; font-weight: 700; display: flex; gap: 8px; align-items: baseline; }
-.leg h3 .eyebrow { font-weight: 500; }
-.sites { display: grid; gap: 8px; }
-a.site { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); text-decoration: none; background: var(--bg); min-width: 0; }
-a.site:hover { border-color: var(--accent); }
-a.site strong { font-weight: 700; }
-a.site span { color: var(--muted); font-size: .85rem; text-align: right; }
-a.site::after { content: "↗"; color: var(--accent); font-weight: 700; }
-.note { background: var(--signal-soft); border-radius: 8px; padding: 10px 14px; font-size: .92rem; }
-.note b { font-weight: 700; }
+.wrap { max-width: 1120px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.eyebrow { font-family: var(--font-mono); font-size: .72rem; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
 .muted { color: var(--muted); }
 .small { font-size: .86rem; }
 .err { color: var(--danger); font-weight: 600; }
+a { color: var(--sky); }
 
-/* Holidays */
-.hols { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
-button.hol { text-align: left; display: grid; gap: 2px; padding: 12px 14px; background: var(--bg); border: 1px solid var(--line); color: var(--ink); font-weight: 400; border-radius: 8px; }
-button.hol:hover { border-color: var(--accent); }
-.hol .date { font-family: var(--font-mono); font-size: .8rem; color: var(--accent); font-weight: 700; letter-spacing: .03em; }
-.hol .name { font-weight: 700; font-size: 1rem; }
-.hol .gain { font-size: .86rem; color: var(--muted); }
-.pill { display: inline-block; font-family: var(--font-mono); font-size: .72rem; padding: 2px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-weight: 700; letter-spacing: .03em; }
+/* ---------- HERO ---------- */
+.hero .wrap { padding-block: 44px 28px; display: grid; gap: 28px; grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr); align-items: center; }
+@media (max-width: 860px) { .hero .wrap { grid-template-columns: minmax(0, 1fr); padding-block: 28px 12px; } }
+.hero-copy { display: grid; gap: 20px; min-width: 0; }
+.hero h1 {
+  margin: 0; font-family: var(--font-display); font-weight: 700;
+  font-size: clamp(2.3rem, 6.4vw, 4.4rem); line-height: 1.02; letter-spacing: -.02em; text-wrap: balance;
+}
+.hero h1 em {
+  font-style: normal;
+  background: linear-gradient(92deg, var(--sun) 10%, var(--coral) 90%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.hero-sub { margin: 0; font-size: clamp(1.05rem, 2.2vw, 1.25rem); color: var(--muted); max-width: 46ch; }
+.rot { color: var(--ink); font-weight: 700; display: inline-block; border-bottom: 2px solid var(--sun); }
+.rot.swap { animation: rot-in .5s ease; }
+@keyframes rot-in { from { transform: translateY(.35em); filter: blur(3px); } to { transform: none; filter: none; } }
 
-/* Kira suggestions */
-.ideas { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
-.idea { border: 1px solid var(--line); border-radius: 8px; padding: 14px; display: grid; gap: 8px; align-content: start; background: var(--bg); min-width: 0; }
-.idea h3 { margin: 0; font-family: var(--font-display); font-size: 1.2rem; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
-.idea h3 .code { font-family: var(--font-mono); font-size: .85rem; color: var(--accent); }
+.hero-globe { position: relative; min-width: 0; aspect-ratio: 1 / 1; max-width: 100%; width: 100%; }
+@media (max-width: 860px) { .hero-globe { max-width: 420px; margin: -8px auto 0; } }
+#globe { width: 100%; height: 100%; display: block; }
+.globe-legend { position: absolute; left: 0; right: 0; bottom: 4%; display: flex; justify-content: center; gap: 16px; flex-wrap: wrap; font-family: var(--font-mono); font-size: .68rem; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.globe-legend i { display: inline-block; width: 14px; height: 2px; vertical-align: middle; margin-right: 6px; border-radius: 2px; }
+
+/* cartão de embarque */
+.pass {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto;
+  background: linear-gradient(135deg, rgba(255,181,71,.10), rgba(99,227,255,.06) 60%), var(--glass);
+  border: 1px solid var(--line-hi); border-radius: var(--r);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  overflow: hidden;
+}
+.pass-main { padding: 16px 18px; display: grid; gap: 10px; min-width: 0; }
+.pass-top { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.route { display: grid; grid-template-columns: auto minmax(40px, 1fr) auto; align-items: center; gap: 12px; }
+.route .end { display: grid; min-width: 0; }
+.route .end:last-child { text-align: right; }
+.route .code { font-family: var(--font-mono); font-weight: 700; font-size: clamp(1.8rem, 5vw, 2.4rem); letter-spacing: .04em; line-height: 1; color: var(--ink); }
+.route .city { font-size: .82rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.route .path { position: relative; height: 24px; }
+.route .path::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; border-top: 1.5px dashed var(--line-hi); }
+.route .path svg { position: absolute; top: 50%; left: 0; width: 20px; height: 20px; margin-top: -10px; fill: var(--sun); }
+@media (prefers-reduced-motion: no-preference) { .route .path svg { animation: fly 5s ease-in-out infinite; } }
+@keyframes fly { 0% { left: 0; } 50% { left: calc(100% - 20px); } 100% { left: 0; } }
+.pass-meta { display: flex; justify-content: space-between; gap: 6px 14px; flex-wrap: wrap; font-family: var(--font-mono); font-size: .78rem; color: var(--muted); letter-spacing: .04em; text-transform: uppercase; }
+.pass-stub {
+  display: grid; place-content: center; text-align: center; gap: 2px; padding: 14px 18px;
+  border-left: 1.5px dashed var(--line-hi); min-width: 96px;
+  background: rgba(255,181,71,.08);
+}
+.pass-stub .count { font-family: var(--font-display); font-weight: 700; font-size: 2.2rem; line-height: 1; color: var(--sun); font-variant-numeric: tabular-nums; }
+
+/* ---------- BOTÕES / FORM ---------- */
+button, .btn { font: inherit; font-weight: 600; font-size: .95rem; border-radius: 999px; border: 1px solid transparent; padding: 10px 18px; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 8px; color: var(--ink); background: transparent; }
+.btn-primary { background: linear-gradient(92deg, var(--sun), var(--coral)); color: #1A0E05; box-shadow: 0 8px 28px -10px rgba(255,110,91,.7); }
+.btn-primary:hover { filter: brightness(1.08); }
+.btn-ghost { border-color: var(--line-hi); color: var(--ink); background: rgba(255,255,255,.02); }
+.btn-ghost:hover { border-color: var(--sun); color: var(--sun); }
+button:disabled { opacity: .5; cursor: not-allowed; }
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+:focus-visible { outline: 2px solid var(--sky); outline-offset: 3px; }
+
+.grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+.grid.wide { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+label.f { display: grid; gap: 6px; font-size: .78rem; font-weight: 600; color: var(--muted); min-width: 0; font-family: var(--font-mono); letter-spacing: .06em; text-transform: uppercase; }
+label.f .small { text-transform: none; letter-spacing: 0; font-family: var(--font-body); }
+input, select, textarea { font: inherit; font-family: var(--font-body); font-size: 1rem; letter-spacing: 0; text-transform: none; color: var(--ink); background: rgba(6, 9, 24, .7); border: 1px solid var(--line); border-radius: 12px; padding: 11px 13px; width: 100%; min-width: 0; }
+input:hover, select:hover { border-color: var(--line-hi); }
+input:focus, select:focus { border-color: var(--sky); outline: none; box-shadow: 0 0 0 3px rgba(99,227,255,.15); }
+.span-2 { grid-column: span 2; }
+@media (max-width: 520px) { .span-2 { grid-column: auto; } }
+
+/* ---------- PAINÉIS ---------- */
+main.wrap { padding-block: 12px 72px; display: grid; gap: 30px; }
+.panel {
+  background: var(--glass); border: 1px solid var(--line); border-radius: var(--r);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  padding: clamp(18px, 3vw, 30px); display: grid; gap: 20px; min-width: 0;
+}
+.plain { display: grid; gap: 20px; min-width: 0; }
+.head { display: grid; gap: 6px; }
+.head h2 { margin: 0; font-family: var(--font-display); font-weight: 700; font-size: clamp(1.4rem, 3.4vw, 2rem); letter-spacing: -.01em; text-wrap: balance; }
+.head p { margin: 0; color: var(--muted); max-width: 64ch; }
+.head .eyebrow { color: var(--sun); }
+
+/* cartões-postais */
+.cards { display: grid; gap: 14px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 980px) { .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) {
+  .cards { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 8px; margin-right: calc(-1 * max(16px, env(safe-area-inset-right, 0px))); padding-right: 16px; }
+  .cards > .card { flex: 0 0 78%; scroll-snap-align: start; }
+}
+.card {
+  display: grid; grid-template-rows: auto 1fr; padding: 0; text-align: left; overflow: hidden; border-radius: var(--r);
+  background: var(--night-2); border: 1px solid var(--line); color: var(--ink); font-weight: 400;
+}
+.card svg { display: block; width: 100%; height: auto; aspect-ratio: 16 / 10; max-width: 100%; }
+.card-body { padding: 14px 16px 16px; display: grid; gap: 6px; align-content: start; }
+.card-body h3 { margin: 0; font-family: var(--font-display); font-size: 1.05rem; font-weight: 700; line-height: 1.2; }
+.card-body p { margin: 0; font-size: .9rem; color: var(--muted); }
+.card .meta { display: flex; justify-content: space-between; gap: 8px; font-family: var(--font-mono); font-size: .7rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.card .meta b { color: var(--sky); font-weight: 700; }
+.card .go { font-family: var(--font-mono); font-size: .72rem; letter-spacing: .1em; text-transform: uppercase; color: var(--sun); margin-top: 4px; }
+@media (prefers-reduced-motion: no-preference) {
+  .card { transition: transform .25s ease, border-color .25s ease, box-shadow .25s ease; }
+  .card svg { transition: transform .6s ease; }
+  .card:hover { transform: translateY(-4px); }
+  .card:hover svg { transform: scale(1.04); }
+}
+.card:hover { border-color: var(--sun); box-shadow: 0 18px 40px -20px rgba(255,181,71,.55); }
+
+/* resultados da busca */
+.legs { display: grid; gap: 22px; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); }
+.leg { display: grid; gap: 10px; align-content: start; min-width: 0; }
+.leg h3 { margin: 0; font-family: var(--font-display); font-size: 1rem; font-weight: 700; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.sites { display: grid; gap: 8px; }
+a.site { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 16px; border: 1px solid var(--line); border-radius: 12px; color: var(--ink); text-decoration: none; background: rgba(6,9,24,.55); min-width: 0; }
+a.site:hover { border-color: var(--sky); background: rgba(99,227,255,.06); }
+a.site strong { font-weight: 700; }
+a.site span { color: var(--muted); font-size: .84rem; text-align: right; margin-left: auto; }
+a.site::after { content: "↗"; color: var(--sky); font-weight: 700; }
+.note { border: 1px solid rgba(255,181,71,.35); background: rgba(255,181,71,.08); border-radius: 12px; padding: 12px 16px; font-size: .94rem; }
+.note b { color: var(--sun); }
+
+/* feriados */
+.hols { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+button.hol { text-align: left; display: grid; gap: 3px; padding: 14px 16px; background: rgba(6,9,24,.55); border: 1px solid var(--line); color: var(--ink); font-weight: 400; border-radius: 14px; justify-content: stretch; }
+button.hol:hover { border-color: var(--sun); }
+.hol .date { font-family: var(--font-mono); font-size: .74rem; color: var(--sky); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.hol .name { font-family: var(--font-display); font-weight: 700; font-size: 1rem; }
+.hol .gain { font-size: .88rem; color: var(--muted); }
+.pill { display: inline-block; margin-top: 4px; font-family: var(--font-mono); font-size: .72rem; padding: 3px 10px; border-radius: 999px; background: rgba(255,181,71,.12); color: var(--sun); font-weight: 700; letter-spacing: .03em; }
+
+/* Kira */
+.kira-head { display: flex; gap: 14px; align-items: center; }
+.orb { flex: 0 0 auto; width: 44px; height: 44px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff 0 8%, var(--sky) 30%, #3A4BFF 70%, transparent 72%); box-shadow: 0 0 24px rgba(99,227,255,.55); }
+@media (prefers-reduced-motion: no-preference) { .orb { animation: pulse 3.2s ease-in-out infinite; } }
+@keyframes pulse { 50% { box-shadow: 0 0 40px rgba(99,227,255,.85); transform: scale(1.05); } }
+.ideas { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.idea { border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: grid; gap: 8px; align-content: start; background: rgba(6,9,24,.55); min-width: 0; }
+.idea h3 { margin: 0; font-family: var(--font-display); font-size: 1.15rem; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.idea h3 .code { font-family: var(--font-mono); font-size: .85rem; color: var(--sky); }
 .idea p { margin: 0; font-size: .94rem; }
-.figures { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; font-size: .88rem; }
+.figures { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; font-size: .88rem; margin: 4px 0; }
 .figures dt { color: var(--muted); }
 .figures dd { margin: 0; font-variant-numeric: tabular-nums; text-align: right; font-weight: 600; }
-.figures .total { font-weight: 700; color: var(--accent); }
-.thinking { font-family: var(--font-mono); font-size: .85rem; color: var(--muted); }
+.figures .total { font-weight: 700; color: var(--sun); }
+.thinking { font-family: var(--font-mono); font-size: .85rem; color: var(--sky); }
 
-/* Shortlist */
-.sum { display: flex; flex-wrap: wrap; gap: 8px 22px; font-size: .92rem; }
-.sum b { font-variant-numeric: tabular-nums; }
+/* lista */
+.list-head { display: flex; justify-content: space-between; align-items: end; gap: 10px; flex-wrap: wrap; }
+.sum { display: flex; flex-wrap: wrap; gap: 8px 22px; font-size: .92rem; color: var(--muted); }
+.sum b { font-variant-numeric: tabular-nums; color: var(--ink); }
 .list { display: grid; gap: 10px; }
-.item { display: grid; grid-template-columns: 1fr auto; gap: 6px 14px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); min-width: 0; }
+.item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 14px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: rgba(6,9,24,.55); min-width: 0; }
 .item[data-status="reservado"] { border-color: var(--ok); }
-.item[data-status="favorita"] { border-color: var(--board-fg); }
+.item[data-status="favorita"] { border-color: var(--sun); }
 .item .t { font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
-.item .t a { color: var(--accent); }
-.item .p { font-variant-numeric: tabular-nums; font-weight: 700; text-align: right; white-space: nowrap; }
+.item .t a { color: var(--sky); }
+.item .p { font-variant-numeric: tabular-nums; font-weight: 700; text-align: right; white-space: nowrap; color: var(--sun); }
 .item .n { grid-column: 1 / -1; font-size: .92rem; color: var(--muted); overflow-wrap: anywhere; }
 .item .acts { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: .82rem; }
-.item .acts button { padding: 4px 10px; font-size: .82rem; }
-.status-btn[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-.tag { font-family: var(--font-mono); font-size: .7rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
-.empty { border: 1px dashed var(--line); border-radius: 8px; padding: 18px; color: var(--muted); }
+.item .acts button { padding: 5px 12px; font-size: .82rem; }
+.status-btn[aria-pressed="true"] { background: var(--sun); color: #1A0E05; border-color: var(--sun); }
+.tag { font-family: var(--font-mono); font-size: .7rem; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); }
+.empty { border: 1px dashed var(--line-hi); border-radius: 14px; padding: 20px; color: var(--muted); }
+details > summary { list-style: none; }
+details > summary::-webkit-details-marker { display: none; }
 
-/* Tips */
-.tips { margin: 0; padding: 0; list-style: none; display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
-.tips li { display: grid; gap: 2px; font-size: .95rem; }
-.tips li b { font-weight: 700; }
-.tips a { color: var(--accent); }
+/* manual de voo */
+.tips { margin: 0; padding: 0; list-style: none; display: grid; gap: 18px 26px; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); }
+.tips li { display: grid; gap: 4px; font-size: .95rem; color: var(--muted); padding-top: 12px; border-top: 1px solid var(--line); }
+.tips li b { font-family: var(--font-display); font-weight: 700; color: var(--ink); font-size: .95rem; }
+
+footer .wrap { padding-block: 0 48px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
 
 @media (prefers-reduced-motion: no-preference) {
-  a.site, button { transition: border-color .15s, background-color .15s, filter .15s; }
+  .hero-copy > * { animation: rise .8s cubic-bezier(.2,.7,.2,1) both; }
+  .hero-copy > *:nth-child(2) { animation-delay: .08s; }
+  .hero-copy > *:nth-child(3) { animation-delay: .16s; }
+  .hero-copy > *:nth-child(4) { animation-delay: .24s; }
+  .hero-copy > *:nth-child(5) { animation-delay: .32s; }
+  a.site, button { transition: border-color .15s, background-color .15s, filter .15s, color .15s; }
 }
+@keyframes rise { from { transform: translateY(14px); } to { transform: none; } }
 </style>
 
-<header class="board">
+<header class="hero">
   <div class="wrap">
-    <span class="eyebrow" style="color:var(--board-muted)">Painel de partidas · férias 2027</span>
-    <h1>Radar de Férias 2027</h1>
-    <div class="who">Braulio &amp; Janaina · saindo de Juatuba (MG) por Confins · 2 adultos · preços em reais</div>
-    <div class="route" aria-live="polite">
-      <span class="code" id="b-orig">CNF</span><span class="arrow">✈</span><span class="code" id="b-dest">LIS</span>
-      <span class="meta" id="b-meta">17 abr → 25 abr · 8 noites</span>
+    <div class="hero-copy">
+      <span class="eyebrow">Juatuba, MG · CNF 19°38′S 43°58′W · férias 2027</span>
+      <h1>O mundo começa em <em>Confins.</em></h1>
+      <p class="hero-sub">Braulio &amp; Janaina, 2027 é o ano de ir longe. Próximo pouso: <span class="rot" id="rot">Lisboa</span></p>
+      <div class="row">
+        <a class="btn btn-primary" href="#busca">Montar a viagem</a>
+        <a class="btn btn-ghost" href="#kira">Me inspira, Kira</a>
+      </div>
+      <div class="pass" aria-live="polite">
+        <div class="pass-main">
+          <div class="pass-top"><span class="eyebrow">Cartão de embarque</span><span class="eyebrow">Braulio &amp; Janaina</span></div>
+          <div class="route">
+            <div class="end"><span class="code" id="b-orig">CNF</span><span class="city" id="b-orig-name">Confins</span></div>
+            <div class="path"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 16v-2l-8-5V3.5A1.5 1.5 0 0 0 11.5 2 1.5 1.5 0 0 0 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z" transform="rotate(90 12 12)"/></svg></div>
+            <div class="end"><span class="code" id="b-dest">LIS</span><span class="city" id="b-dest-name">Lisboa</span></div>
+          </div>
+          <div class="pass-meta"><span id="b-meta">17 abr → 25 abr · 8 noites</span><span id="b-dist">7.880 km</span></div>
+        </div>
+        <div class="pass-stub"><span class="eyebrow">Faltam</span><span class="count" id="b-count">185</span><span class="eyebrow">dias</span></div>
+      </div>
+    </div>
+    <div class="hero-globe">
+      <canvas id="globe" role="img" aria-label="Globo girando com rotas de avião saindo de Confins"></canvas>
+      <div class="globe-legend"><span><i style="background:var(--sun)"></i>sua rota</span><span><i style="background:var(--sky)"></i>destinos dos sonhos</span></div>
     </div>
   </div>
 </header>
 
 <main class="wrap">
 
-  <!-- 1. Busca -->
-  <section class="gate" id="busca">
-    <div class="gate-head">
-      <h2>Buscar voos e hospedagem</h2>
-      <span class="eyebrow">Compara em 9 sites</span>
+  <section class="plain" id="postais">
+    <div class="head">
+      <span class="eyebrow">Inspiração</span>
+      <h2>Para onde a gente vai?</h2>
+      <p>Toque num cartão-postal e a busca já fica pronta com o destino.</p>
     </div>
-    <p class="lede">Preencha uma vez e abra a mesma busca em cada site. A origem já é Confins (CNF). O destino começa com um exemplo (Lisboa no feriado de Tiradentes); troque pelo que quiserem.</p>
+    <div class="cards" id="cards"></div>
+  </section>
+
+  <section class="panel" id="busca">
+    <div class="head">
+      <span class="eyebrow">Rota · compara em 9 sites</span>
+      <h2>Montar a viagem</h2>
+      <p>Preencha uma vez e abra a mesma busca em cada site. A origem já é Confins (CNF).</p>
+    </div>
     <form id="f-busca" class="grid" autocomplete="off">
       <label class="f">Saindo de
         <input id="orig" list="lugares" value="Belo Horizonte – Confins (CNF)" placeholder="Cidade (código)">
@@ -193,25 +322,26 @@ button.hol:hover { border-color: var(--accent); }
     <div id="busca-tempo" class="note"></div>
   </section>
 
-  <!-- 2. Feriados -->
-  <section class="gate" id="feriados">
-    <div class="gate-head">
-      <h2>Feriados de 2027 para emendar</h2>
-      <span class="eyebrow">Toque para usar as datas</span>
+  <section class="panel" id="feriados">
+    <div class="head">
+      <span class="eyebrow">Calendário 2027</span>
+      <h2>Feriados para emendar</h2>
+      <p>Janelas que rendem mais dias de viagem com poucos dias de folga. Toque para usar as datas na busca.</p>
     </div>
-    <p class="lede">Janelas que rendem mais dias de viagem com poucos dias de folga. Feriados estaduais e municipais da sua cidade podem render ainda mais.</p>
     <div class="hols" id="hols"></div>
   </section>
 
-  <!-- 3. Kira -->
-  <section class="gate" id="kira">
-    <div class="gate-head">
-      <h2>Pergunte à Kira</h2>
-      <span class="eyebrow">Sugestões pelo orçamento</span>
+  <section class="panel" id="kira">
+    <div class="kira-head">
+      <div class="orb" aria-hidden="true"></div>
+      <div class="head">
+        <span class="eyebrow">IA de bordo</span>
+        <h2>Pergunte à Kira</h2>
+      </div>
     </div>
-    <p class="lede">Diga quanto querem gastar e o que gostam. A Kira sugere destinos com faixas de preço estimadas. São estimativas, não cotações: confira o valor real com a busca acima.</p>
+    <p class="muted" style="margin:0;max-width:64ch">Diga quanto querem gastar e o que gostam. A Kira sugere destinos com faixas de preço estimadas. São estimativas, não cotações: confira o valor real na busca.</p>
     <form id="f-kira" class="grid wide">
-      <label class="f">Orçamento total do casal (R$)
+      <label class="f">Orçamento do casal (R$)
         <input id="k-orc" type="number" min="1000" step="500" value="15000" inputmode="numeric">
       </label>
       <label class="f">Quando
@@ -238,18 +368,19 @@ button.hol:hover { border-color: var(--accent); }
     <div id="k-out" class="ideas"></div>
   </section>
 
-  <!-- 4. Lista -->
-  <section class="gate" id="lista">
-    <div class="gate-head">
-      <h2>Nossa lista</h2>
-      <span class="eyebrow" id="l-mode">Carregando…</span>
+  <section class="panel" id="lista">
+    <div class="list-head">
+      <div class="head">
+        <span class="eyebrow" id="l-mode">Carregando…</span>
+        <h2>Diário de bordo</h2>
+        <p>Achou um preço bom? Guarde aqui com o link. Vocês dois veem a mesma lista e marcam o que gostaram e o que já reservaram.</p>
+      </div>
     </div>
-    <p class="lede">Achou um preço bom? Guarde aqui com o link. Vocês dois veem a mesma lista e marcam o que gostaram e o que já reservaram.</p>
     <div class="sum" id="l-sum"></div>
     <div class="list" id="l-items"><div class="empty">Carregando a lista…</div></div>
     <details id="l-add-box">
-      <summary class="btn btn-ghost" style="display:inline-flex">+ Guardar uma opção</summary>
-      <form id="f-add" class="grid wide" style="margin-top:14px">
+      <summary class="btn btn-ghost">+ Guardar uma opção</summary>
+      <form id="f-add" class="grid wide" style="margin-top:16px">
         <label class="f span-2">O que é
           <input id="a-titulo" required maxlength="140" placeholder="ex.: TAP CNF→LIS direto, 17 a 25/abr">
         </label>
@@ -273,9 +404,11 @@ button.hol:hover { border-color: var(--accent); }
     </details>
   </section>
 
-  <!-- 5. Dicas -->
-  <section class="gate" id="dicas">
-    <div class="gate-head"><h2>Como pagar menos</h2></div>
+  <section class="plain" id="dicas">
+    <div class="head">
+      <span class="eyebrow">Manual de voo</span>
+      <h2>Como pagar menos</h2>
+    </div>
     <ul class="tips">
       <li><b>Alerta de preço</b>No Google Voos, ative "Acompanhar preços" para a rota e as datas. Ele avisa por e-mail quando o preço cai.</li>
       <li><b>Antecedência</b>Voo nacional: compre de 1 a 3 meses antes. Internacional: de 2 a 6 meses. Julho, dezembro, janeiro e Carnaval enchem cedo.</li>
@@ -284,12 +417,19 @@ button.hol:hover { border-color: var(--accent); }
       <li><b>Promoções relâmpago</b>Acompanhe <a href="https://www.melhoresdestinos.com.br" target="_blank" rel="noopener">Melhores Destinos</a> e <a href="https://passagensimperdiveis.com.br" target="_blank" rel="noopener">Passagens Imperdíveis</a>. As melhores tarifas somem em horas.</li>
       <li><b>Hotel com cancelamento grátis</b>Reserve uma opção que pode cancelar e confira o preço de novo perto da viagem. Se cair, cancele e reserve outra vez.</li>
       <li><b>Viagem para fora</b>Some o IOF do cartão no orçamento. Para a Europa, o seguro-viagem é obrigatório; para os EUA, o visto precisa ser agendado com muita antecedência.</li>
-      <li><b>Saindo de Confins</b>Para fora do país, compare voo direto de CNF com conexão em Guarulhos, Campinas ou no Panamá. Às vezes compensa um voo nacional barato até São Paulo e outro bilhete de lá; nesse caso deixe folga de pelo menos 4 horas entre os voos.</li>
+      <li><b>Saindo de Confins</b>Para fora do país, compare voo direto de CNF com conexão em Guarulhos, Campinas ou no Panamá. Com bilhetes separados, deixe pelo menos 4 horas entre os voos.</li>
       <li><b>Baixa temporada</b>No Brasil: março a junho e agosto a novembro, fora dos feriados. Na Europa: abril, maio, setembro e outubro.</li>
     </ul>
   </section>
 
 </main>
+
+<footer>
+  <div class="wrap">
+    <span class="eyebrow">Juatuba → o mundo</span>
+    <span class="eyebrow">Radar de Férias 2027 · Braulio &amp; Janaina</span>
+  </div>
+</footer>
 
 <script>
 (() => {
@@ -405,6 +545,7 @@ button.hol:hover { border-color: var(--accent); }
       meta += ` → ${fmtDay(s.volta)} · ${n} ${n === 1 ? "noite" : "noites"}`;
     } else if (s.ida) meta += " · só ida";
     $("#b-meta").textContent = meta;
+    document.dispatchEvent(new CustomEvent("rota", { detail: s }));
 
     if (!s.o.city || !s.d.city || !s.ida) {
       when.innerHTML = "<b>Faltam dados.</b> Preencha origem, destino e a data de ida.";
@@ -713,5 +854,338 @@ voo_casal = passagens de ida e volta para os dois; hotel_noite = diária de um q
       }, () => useLocal("Não deu para carregar a lista compartilhada agora; usando a deste aparelho."));
     });
   }
+})();
+</script>
+<script>
+(() => {
+  const $ = (s) => document.querySelector(s);
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const rad = Math.PI / 180;
+  const nf = new Intl.NumberFormat("pt-BR");
+
+  /* Coordenadas aproximadas dos aeroportos (lat, lon) */
+  const COORD = {
+    GRU: [-23.43, -46.47], CGH: [-23.63, -46.66], VCP: [-23.01, -47.13], GIG: [-22.81, -43.25], SDU: [-22.91, -43.16],
+    CNF: [-19.63, -43.97], PLU: [-19.85, -43.95], BSB: [-15.87, -47.92], CWB: [-25.53, -49.18], POA: [-29.99, -51.17],
+    FLN: [-27.67, -48.55], IGU: [-25.6, -54.49], GYN: [-16.63, -49.22], VIX: [-20.26, -40.29], UDI: [-18.88, -48.23],
+    RAO: [-21.14, -47.78], SSA: [-12.91, -38.33], BPS: [-16.44, -39.08], REC: [-8.13, -34.92], FEN: [-3.85, -32.42],
+    MCZ: [-9.51, -35.79], JPA: [-7.15, -34.95], NAT: [-5.77, -35.37], FOR: [-3.78, -38.53], JJD: [-2.91, -40.36],
+    SLZ: [-2.59, -44.24], BEL: [-1.38, -48.48], MAO: [-3.04, -60.05], CGB: [-15.65, -56.12], BYO: [-21.25, -56.45],
+    CGR: [-20.47, -54.67], LEC: [-12.48, -41.28], IOS: [-14.82, -39.03], AJU: [-10.98, -37.07],
+    EZE: [-34.82, -58.54], BRC: [-41.15, -71.16], MDZ: [-32.83, -68.79], USH: [-54.84, -68.3], SCL: [-33.39, -70.79],
+    MVD: [-34.84, -56.03], PDP: [-34.86, -55.09], LIM: [-12.02, -77.11], CUZ: [-13.54, -71.94], CTG: [10.44, -75.51],
+    ADZ: [12.58, -81.71], BOG: [4.7, -74.15], CUN: [21.04, -86.87], PUJ: [18.57, -68.36], AUA: [12.5, -70.02],
+    CUR: [12.19, -68.96], PTY: [9.07, -79.38], MCO: [28.43, -81.31], MIA: [25.79, -80.29], JFK: [40.64, -73.78],
+    LAS: [36.08, -115.15], MEX: [19.44, -99.07], YYZ: [43.68, -79.63], LIS: [38.77, -9.13], OPO: [41.24, -8.68],
+    MAD: [40.47, -3.56], BCN: [41.3, 2.08], CDG: [49.01, 2.55], FCO: [41.8, 12.25], MXP: [45.63, 8.72],
+    VCE: [45.51, 12.35], LHR: [51.47, -0.45], AMS: [52.31, 4.76], FRA: [50.03, 8.56], ZRH: [47.46, 8.55],
+    ATH: [37.94, 23.94], IST: [41.26, 28.74], PRG: [50.1, 14.26], VIE: [48.11, 16.57], DXB: [25.25, 55.36],
+    CAI: [30.12, 31.41], RAK: [31.61, -8.04], CPT: [-33.97, 18.6], NRT: [35.77, 140.39], BKK: [13.69, 100.75],
+    DPS: [-8.75, 115.17], MLE: [4.19, 73.53], SYD: [-33.95, 151.18],
+  };
+  function km(a, b) {
+    const dLa = (b[0] - a[0]) * rad, dLo = (b[1] - a[1]) * rad;
+    const h = Math.sin(dLa / 2) ** 2 + Math.cos(a[0] * rad) * Math.cos(b[0] * rad) * Math.sin(dLo / 2) ** 2;
+    return 2 * 6371 * Math.asin(Math.sqrt(h));
+  }
+
+  /* ---------- cartões-postais ---------- */
+  const CARDS = [
+    { n: "Fernando de Noronha", short: "Noronha", code: "FEN", pais: "Brasil", scene: "beach", frase: "Mar tão transparente que dá para ver as tartarugas de cima do barco.",
+      pal: { top: "#123B66", bot: "#FF9C6B", sun: "#FFD27A", sea: "#0B7E8C", sand: "#F2C894", hill: "#1E4A3E" } },
+    { n: "Lisboa", short: "Lisboa", code: "LIS", pais: "Portugal", scene: "hills", frase: "Bonde amarelo, pastel de nata e pôr do sol no miradouro.",
+      pal: { top: "#2E2557", bot: "#FFAE7A", sun: "#FFDC8A", city: "#3B2E4F", roof: "#C96A4A", sea: "#3E6D9C" } },
+    { n: "Bariloche", short: "Bariloche", code: "BRC", pais: "Argentina", scene: "snow", frase: "Neve, lago azul e chocolate quente no fim do dia.",
+      pal: { top: "#0B2545", bot: "#8EC5EE", sun: "#F4F8FF", peak: "#2C4A6E", peak2: "#4C6F96", snow: "#F4F8FF", sea: "#1C5D8C" } },
+    { n: "Jericoacoara", short: "Jeri", code: "JJD", pais: "Brasil", scene: "dunes", frase: "Duna do pôr do sol, rede na lagoa e céu cheio de estrelas.",
+      pal: { top: "#2A1E50", bot: "#FFB066", sun: "#FFE08A", dune: "#E8A86C", dune2: "#C7834F", sea: "#2FB3A6" } },
+    { n: "Cancún", short: "Cancún", code: "CUN", pais: "México", scene: "beach", frase: "Caribe turquesa, cenotes e ruínas maias na mesma viagem.",
+      pal: { top: "#1C86B8", bot: "#BDEFFF", sun: "#FFF2B0", sea: "#16BFC6", sand: "#F7E6C4", hill: "#1B6E5A" } },
+    { n: "Cusco e Machu Picchu", short: "Machu Picchu", code: "CUZ", pais: "Peru", scene: "andes", frase: "A cidade perdida dos incas entre nuvens e montanhas.",
+      pal: { top: "#3A1F5C", bot: "#F28C5C", sun: "#FFD08A", peak: "#3D3550", peak2: "#5E4F6E", terrace: "#7FA36A" } },
+    { n: "Paris", short: "Paris", code: "CDG", pais: "França", scene: "paris", frase: "Croissant no café, Sena à noite e a torre piscando às 21h.",
+      pal: { top: "#1A1D4A", bot: "#E58FA6", sun: "#FFE3B0", city: "#241E3E", light: "#FFD37A" } },
+    { n: "Tóquio", short: "Tóquio", code: "NRT", pais: "Japão", scene: "tokyo", frase: "Neon, templos, ramen à meia-noite e o Monte Fuji ao fundo.",
+      pal: { top: "#0A0A26", bot: "#6A2C8F", sun: "#FF6E9A", city: "#120F2E", light: "#63E3FF", peak: "#2C2754", snow: "#E9E6FF" } },
+  ];
+
+  let seed = 7;
+  const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
+
+  function skyline(y0, color, light, count, maxH, x0 = 0, x1 = 320) {
+    let s = "", x = x0;
+    while (x < x1) {
+      const w = 10 + rnd() * 18, h = 14 + rnd() * maxH;
+      s += `<rect x="${x.toFixed(1)}" y="${(y0 - h).toFixed(1)}" width="${w.toFixed(1)}" height="${(h + 2).toFixed(1)}" fill="${color}"/>`;
+      for (let wy = y0 - h + 5; wy < y0 - 4; wy += 6) for (let wx = x + 3; wx < x + w - 3; wx += 5)
+        if (rnd() < 0.35) s += `<rect x="${wx.toFixed(1)}" y="${wy.toFixed(1)}" width="2" height="2.4" fill="${light}" opacity="${(0.5 + rnd() * 0.5).toFixed(2)}"/>`;
+      x += w + 1 + rnd() * 3;
+    }
+    return s;
+  }
+
+  function scene(c) {
+    const p = c.pal, id = "sky" + c.code;
+    seed = c.code.charCodeAt(0) * 31 + c.code.charCodeAt(2);
+    let s = `<svg viewBox="0 0 320 200" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${p.top}"/><stop offset="1" stop-color="${p.bot}"/></linearGradient></defs><rect width="320" height="200" fill="url(#${id})"/>`;
+    for (let i = 0; i < 14; i++) s += `<circle cx="${(rnd() * 320).toFixed(0)}" cy="${(rnd() * 70).toFixed(0)}" r="${(0.4 + rnd() * 0.8).toFixed(1)}" fill="#fff" opacity="${(0.3 + rnd() * 0.5).toFixed(2)}"/>`;
+    const sun = (cx, cy, r) => `<circle cx="${cx}" cy="${cy}" r="${r + 14}" fill="${p.sun}" opacity=".18"/><circle cx="${cx}" cy="${cy}" r="${r}" fill="${p.sun}"/>`;
+    switch (c.scene) {
+      case "beach":
+        s += sun(220, 104, 22);
+        s += `<path d="M18 124 Q40 62 64 124Z" fill="${p.hill}"/><path d="M54 124 Q78 78 104 124Z" fill="${p.hill}" opacity=".85"/>`;
+        s += `<rect y="122" width="320" height="80" fill="${p.sea}"/>`;
+        for (let i = 0; i < 6; i++) s += `<rect x="${200 - i * 3}" y="${128 + i * 6}" width="${40 + i * 6}" height="1.6" rx="1" fill="${p.sun}" opacity="${0.7 - i * 0.1}"/>`;
+        for (let i = 0; i < 5; i++) s += `<path d="M${-10 + i * 70} ${150 + (i % 2) * 8} q15 -5 30 0 t30 0" stroke="#fff" stroke-width="1.2" fill="none" opacity=".35"/>`;
+        s += `<path d="M0 176 Q110 154 210 172 T320 166 V200 H0Z" fill="${p.sand}"/>`;
+        s += `<path d="M262 176 q4 -26 -2 -46" stroke="#3A2A1E" stroke-width="3" fill="none"/><path d="M260 130 q-18 -4 -26 8 M260 130 q16 -8 28 2 M260 130 q-8 -14 -22 -14 M260 130 q10 -14 24 -10" stroke="#1E3B2C" stroke-width="5" stroke-linecap="round" fill="none"/>`;
+        break;
+      case "hills":
+        s += sun(70, 70, 20);
+        s += `<path d="M0 120 Q80 92 170 112 T320 100 V200 H0Z" fill="${p.city}"/>`;
+        seed += 3;
+        s += skyline(150, p.city, "#FFD58A", 0, 30, 0, 320);
+        for (let i = 0; i < 22; i++) { const x = rnd() * 300, y = 112 + rnd() * 40; s += `<path d="M${x.toFixed(0)} ${y.toFixed(0)} l7 -6 l7 6Z" fill="${p.roof}"/>`; }
+        s += `<rect y="160" width="320" height="40" fill="${p.sea}"/><path d="M40 168 h70 M150 176 h90" stroke="${p.sun}" stroke-width="1.4" opacity=".6"/>`;
+        s += `<rect x="190" y="146" width="34" height="14" rx="3" fill="#F2C230"/><rect x="194" y="149" width="6" height="5" fill="#FFF4C9"/><rect x="203" y="149" width="6" height="5" fill="#FFF4C9"/><rect x="212" y="149" width="6" height="5" fill="#FFF4C9"/>`;
+        break;
+      case "snow":
+        s += sun(250, 56, 14);
+        s += `<path d="M-10 150 L60 70 L110 130 L170 50 L240 140 L290 90 L340 150Z" fill="${p.peak2}"/>`;
+        s += `<path d="M60 70 L48 84 L58 82 L66 90 L72 84Z M170 50 L156 66 L166 64 L174 72 L184 64Z M290 90 L280 102 L290 100 L298 106Z" fill="${p.snow}"/>`;
+        s += `<path d="M-10 168 L40 112 L90 160 L150 100 L220 166 L270 120 L340 170Z" fill="${p.peak}"/>`;
+        s += `<path d="M150 100 L140 112 L150 110 L158 116 L164 110Z M40 112 L32 122 L42 120 L48 124Z" fill="${p.snow}" opacity=".9"/>`;
+        s += `<rect y="164" width="320" height="36" fill="${p.sea}"/>`;
+        for (let i = 0; i < 9; i++) { const x = 10 + i * 36; s += `<path d="M${x} 196 l7 -22 l7 22Z" fill="#163A2E"/>`; }
+        break;
+      case "dunes":
+        s += sun(160, 112, 26);
+        s += `<path d="M0 132 Q70 96 150 128 T320 118 V200 H0Z" fill="${p.dune2}"/>`;
+        s += `<path d="M0 154 Q90 118 190 150 T320 140 V200 H0Z" fill="${p.dune}"/>`;
+        s += `<ellipse cx="96" cy="182" rx="80" ry="12" fill="${p.sea}"/><path d="M48 182 h20 M110 186 h30" stroke="#fff" stroke-width="1" opacity=".5"/>`;
+        s += `<path d="M232 152 q-30 -6 -40 6" stroke="#5A3A22" stroke-width="2" fill="none"/>`;
+        break;
+      case "andes":
+        s += sun(254, 66, 18);
+        s += `<path d="M-10 150 L50 70 L100 110 L150 40 L210 120 L260 80 L340 150Z" fill="${p.peak2}"/>`;
+        s += `<path d="M120 200 L120 120 Q160 60 200 120 L200 200Z" fill="${p.peak}"/>`;
+        for (let i = 0; i < 6; i++) s += `<path d="M${130 + i * 2} ${130 + i * 10} H${190 - i * 2}" stroke="${p.terrace}" stroke-width="3" opacity=".9"/>`;
+        s += `<path d="M-10 200 L-10 150 Q40 120 90 160 L120 200Z M200 200 L230 150 Q280 120 330 160 L330 200Z" fill="#2A2238"/>`;
+        s += `<path d="M0 104 q30 -10 60 0 q30 -10 60 0" stroke="#fff" stroke-width="10" stroke-linecap="round" opacity=".12" fill="none"/>`;
+        break;
+      case "paris":
+        s += sun(70, 64, 16);
+        s += skyline(176, p.city, p.light, 0, 34, 0, 320);
+        s += `<path d="M196 176 L212 60 L214 52 L216 60 L232 176 L224 176 Q214 140 204 176Z" fill="${p.city}"/><path d="M202 132 H226 M206 104 H222 M209 82 H219" stroke="${p.city}" stroke-width="3"/>`;
+        s += `<circle cx="214" cy="52" r="2.5" fill="${p.light}"/><circle cx="214" cy="52" r="9" fill="${p.light}" opacity=".25"/>`;
+        s += `<rect y="176" width="320" height="24" fill="#1A1838"/><path d="M20 186 h60 M120 192 h70 M230 184 h50" stroke="${p.light}" stroke-width="1.2" opacity=".55"/>`;
+        break;
+      case "tokyo":
+        s += sun(250, 60, 18);
+        s += `<path d="M60 150 L130 70 L200 150Z" fill="${p.peak}"/><path d="M130 70 L114 88 L124 86 L130 94 L136 86 L146 88Z" fill="${p.snow}"/>`;
+        s += skyline(186, p.city, p.light, 0, 70, 0, 320);
+        s += `<rect x="40" y="136" width="4" height="22" fill="#FF6E9A"/><rect x="250" y="120" width="5" height="30" fill="${p.light}"/><rect x="150" y="150" width="26" height="4" fill="#FF6E9A"/>`;
+        s += `<rect y="184" width="320" height="16" fill="#0A0820"/>`;
+        break;
+    }
+    return s + "</svg>";
+  }
+
+  const cardsBox = $("#cards");
+  CARDS.forEach((c) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "card";
+    const dist = COORD[c.code] ? nf.format(Math.round(km(COORD.CNF, COORD[c.code]) / 10) * 10) + " km" : "";
+    b.innerHTML = scene(c) + `<div class="card-body"><div class="meta"><span class="pais"></span><b></b></div><h3></h3><p></p><span class="go">Quero ir →</span></div>`;
+    b.querySelector(".pais").textContent = c.pais;
+    b.querySelector(".meta b").textContent = dist ? dist + " de Confins" : "";
+    b.querySelector("h3").textContent = c.n;
+    b.querySelector("p").textContent = c.frase;
+    b.setAttribute("aria-label", `${c.n}, ${c.pais}. Usar como destino`);
+    b.addEventListener("click", () => {
+      const dest = $("#dest");
+      dest.value = `${c.n.split(" e ")[0]} (${c.code})`;
+      dest.dispatchEvent(new Event("input", { bubbles: true }));
+      $("#busca").scrollIntoView({ behavior: reduce ? "auto" : "smooth" });
+    });
+    cardsBox.append(b);
+  });
+
+  /* ---------- palavra que troca no hero ---------- */
+  const rot = $("#rot");
+  if (!reduce) {
+    let i = 0;
+    setInterval(() => {
+      if (document.hidden) return;
+      i = (i + 1) % CARDS.length;
+      rot.textContent = CARDS[i].short;
+      rot.classList.remove("swap"); void rot.offsetWidth; rot.classList.add("swap");
+    }, 2600);
+  }
+
+  /* ---------- globo ---------- */
+  const cv = $("#globe"), ctx = cv.getContext("2d");
+  let W = 0, H = 0, R = 0;
+  const vec = ([la, lo]) => [Math.cos(la * rad) * Math.cos(lo * rad), Math.cos(la * rad) * Math.sin(lo * rad), Math.sin(la * rad)];
+  const DOTS = [];
+  for (let la = -78; la <= 78; la += 6) {
+    const step = 6 / Math.max(0.2, Math.cos(la * rad));
+    for (let lo = -180; lo < 180; lo += step) DOTS.push(vec([la, lo]));
+  }
+  const CITY = Object.values(COORD).map(vec);
+  const HOME = vec(COORD.CNF);
+  const DREAMS = CARDS.map((c) => vec(COORD[c.code]));
+  const view = { lon: -25, lat: -8 }, target = { lon: -25, lat: -8 };
+  let route = null;
+
+  function project(v, h = 0) {
+    const cl = Math.cos(-view.lon * rad), sl = Math.sin(-view.lon * rad);
+    const x1 = v[0] * cl - v[1] * sl, y1 = v[0] * sl + v[1] * cl, z1 = v[2];
+    const cp = Math.cos(view.lat * rad), sp = Math.sin(view.lat * rad);
+    const x2 = x1 * cp + z1 * sp, z2 = -x1 * sp + z1 * cp;
+    const s = 1 + h;
+    return { x: W / 2 + R * y1 * s, y: H / 2 - R * z2 * s, d: x2, r: Math.hypot(y1, z2) * s };
+  }
+  function slerp(a, b, t) {
+    const dot = Math.max(-1, Math.min(1, a[0] * b[0] + a[1] * b[1] + a[2] * b[2]));
+    const om = Math.acos(dot);
+    if (om < 1e-6) return a;
+    const s = Math.sin(om), k1 = Math.sin((1 - t) * om) / s, k2 = Math.sin(t * om) / s;
+    return [a[0] * k1 + b[0] * k2, a[1] * k1 + b[1] * k2, a[2] * k1 + b[2] * k2];
+  }
+  function arcPoints(a, b, n = 72) {
+    const om = Math.acos(Math.max(-1, Math.min(1, a[0] * b[0] + a[1] * b[1] + a[2] * b[2])));
+    const lift = 0.06 + 0.16 * Math.min(1, om / 1.6);
+    const pts = [];
+    for (let i = 0; i <= n; i++) { const t = i / n; pts.push(project(slerp(a, b, t), lift * Math.sin(Math.PI * t))); }
+    return pts;
+  }
+  const visible = (p) => p.d > 0 || (p.r > 1 && p.d > -0.25);
+  function strokeArc(pts, color, width, alpha, upTo = 1) {
+    ctx.strokeStyle = color; ctx.lineWidth = width; ctx.globalAlpha = alpha;
+    ctx.beginPath();
+    let pen = false;
+    const last = Math.floor((pts.length - 1) * upTo);
+    for (let i = 0; i <= last; i++) {
+      const p = pts[i];
+      if (!visible(p)) { pen = false; continue; }
+      if (!pen) { ctx.moveTo(p.x, p.y); pen = true; } else ctx.lineTo(p.x, p.y);
+    }
+    ctx.stroke(); ctx.globalAlpha = 1;
+  }
+
+  function size() {
+    const r = cv.getBoundingClientRect();
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    W = r.width; H = r.height;
+    cv.width = Math.max(1, Math.round(W * dpr)); cv.height = Math.max(1, Math.round(H * dpr));
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    R = Math.min(W, H) * 0.36;
+    draw(performance.now());
+  }
+
+  function draw(now) {
+    if (!W) return;
+    ctx.clearRect(0, 0, W, H);
+    const cx = W / 2, cy = H / 2;
+    // atmosfera
+    const atm = ctx.createRadialGradient(cx, cy, R * 0.9, cx, cy, R * 1.35);
+    atm.addColorStop(0, "rgba(99,227,255,.28)"); atm.addColorStop(1, "rgba(99,227,255,0)");
+    ctx.fillStyle = atm; ctx.beginPath(); ctx.arc(cx, cy, R * 1.35, 0, Math.PI * 2); ctx.fill();
+    // esfera
+    const sph = ctx.createRadialGradient(cx - R * 0.35, cy - R * 0.4, R * 0.1, cx, cy, R);
+    sph.addColorStop(0, "#1A2A66"); sph.addColorStop(0.7, "#0B1236"); sph.addColorStop(1, "#070B22");
+    ctx.fillStyle = sph; ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "rgba(99,227,255,.35)"; ctx.lineWidth = 1; ctx.stroke();
+    // grade de pontos
+    ctx.fillStyle = "#9FB4FF";
+    for (const v of DOTS) {
+      const p = project(v);
+      if (p.d <= 0) continue;
+      ctx.globalAlpha = 0.08 + p.d * 0.32;
+      ctx.fillRect(p.x - 0.7, p.y - 0.7, 1.4, 1.4);
+    }
+    ctx.globalAlpha = 1;
+    // cidades
+    for (const v of CITY) {
+      const p = project(v);
+      if (p.d <= 0) continue;
+      ctx.fillStyle = "rgba(99,227,255," + (0.35 + p.d * 0.5).toFixed(2) + ")";
+      ctx.beginPath(); ctx.arc(p.x, p.y, 1.6, 0, Math.PI * 2); ctx.fill();
+    }
+    // rotas dos sonhos
+    for (const d of DREAMS) strokeArc(arcPoints(HOME, d, 48), "#63E3FF", 1, 0.35);
+    // rota atual com avião
+    if (route) {
+      const pts = arcPoints(route.a, route.b);
+      strokeArc(pts, "#FFB547", 2.2, 0.95);
+      const t = reduce ? 0.62 : ((now / 4200) % 1);
+      const i = Math.floor(t * (pts.length - 1)), p = pts[i];
+      if (visible(p)) {
+        const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 12);
+        g.addColorStop(0, "rgba(255,181,71,.95)"); g.addColorStop(1, "rgba(255,181,71,0)");
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y, 12, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = "#FFF4DE"; ctx.beginPath(); ctx.arc(p.x, p.y, 2.6, 0, Math.PI * 2); ctx.fill();
+      }
+      const e = project(route.b);
+      if (visible(e)) { ctx.fillStyle = "#FF6E5B"; ctx.beginPath(); ctx.arc(e.x, e.y, 3.6, 0, Math.PI * 2); ctx.fill(); }
+    }
+    // casa: Confins
+    const h = project(HOME);
+    if (h.d > 0) {
+      const pulse = reduce ? 0.5 : (Math.sin(now / 500) + 1) / 2;
+      ctx.strokeStyle = "rgba(255,181,71," + (0.6 - pulse * 0.4).toFixed(2) + ")";
+      ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(h.x, h.y, 5 + pulse * 9, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = "#FFB547"; ctx.beginPath(); ctx.arc(h.x, h.y, 4, 0, Math.PI * 2); ctx.fill();
+      ctx.font = "600 11px 'JetBrains Mono', monospace"; ctx.fillStyle = "#FFE2B0";
+      ctx.fillText("CNF", h.x + 8, h.y + 4);
+    }
+  }
+
+  function aim(a, b) {
+    const m = [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+    const len = Math.hypot(...m) || 1;
+    target.lon = Math.atan2(m[1] / len, m[0] / len) / rad;
+    target.lat = Math.max(-35, Math.min(35, Math.asin(m[2] / len) / rad * 0.7));
+  }
+
+  let last = 0;
+  function frame(now) {
+    const dt = Math.min(64, now - last); last = now;
+    let dl = ((target.lon + Math.sin(now / 7000) * 10 - view.lon + 540) % 360) - 180;
+    view.lon += dl * Math.min(1, dt / 900);
+    view.lat += (target.lat - view.lat) * Math.min(1, dt / 900);
+    if (!document.hidden) draw(now);
+    requestAnimationFrame(frame);
+  }
+
+  new ResizeObserver(size).observe(cv);
+  if (!reduce) requestAnimationFrame(frame);
+
+  /* ---------- cartão de embarque e rota do globo ---------- */
+  const MES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+  document.addEventListener("rota", (e) => {
+    const s = e.detail;
+    $("#b-orig-name").textContent = s.o.code === "CNF" ? "Confins" : (s.o.city || "—");
+    $("#b-dest-name").textContent = s.d.name || "—";
+    const a = COORD[s.o.code], b = COORD[s.d.code];
+    $("#b-dist").textContent = a && b ? nf.format(Math.round(km(a, b) / 10) * 10) + " km" : "";
+    if (s.ida) {
+      const today = new Date(); today.setHours(12, 0, 0, 0);
+      const days = Math.round((new Date(s.ida + "T12:00:00") - today) / 864e5);
+      $("#b-count").textContent = days >= 0 ? nf.format(days) : "—";
+    } else $("#b-count").textContent = "—";
+    if (a && b) {
+      route = { a: vec(a), b: vec(b) };
+      aim(route.a, route.b);
+    } else {
+      route = null;
+      aim(HOME, HOME);
+    }
+    if (reduce) { view.lon = target.lon; view.lat = target.lat; draw(performance.now()); }
+  });
+  // primeira sincronização com a busca
+  $("#f-busca").dispatchEvent(new Event("input"));
+  if (route) { view.lon = target.lon; view.lat = target.lat; }
 })();
 </script>

@@ -687,8 +687,14 @@ voo_casal = passagens de ida e volta para os dois; hotel_noite = diária de um q
   /* ---------- capabilities ---------- */
   const c = window.claude;
   if (!c?.use) {
-    kStatus.textContent = "A Kira funciona quando a página é aberta no claude.ai.";
-    useLocal("Abra pelo claude.ai para compartilhar a lista com a Janaina.");
+    // Fora do claude.ai (ex.: Vercel): Kira e lista compartilhada ficam na versão do Claude
+    const CLAUDE_URL = "https://claude.ai/artifact/TxZWWMiqtU76xHoSYfEgdr";
+    const viaClaude = (txt) => { const a = document.createElement("a"); a.href = CLAUDE_URL; a.target = "_blank"; a.rel = "noopener"; a.textContent = txt; a.style.color = "var(--accent)"; return a; };
+    kStatus.replaceChildren("A Kira funciona na versão do Claude: ", viaClaude("abrir no claude.ai"));
+    useLocal("Esta lista fica salva só neste aparelho.");
+    const n = document.createElement("p"); n.className = "small"; n.style.margin = "0";
+    n.append("Para dividir a lista com a Janaina, use a ", viaClaude("versão no claude.ai"), ".");
+    $("#l-sum").after(n);
   } else {
     c.use("sample").then(s => {
       sample = s;

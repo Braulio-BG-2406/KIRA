@@ -1,0 +1,6 @@
+__pycache__/
+.pytest_cache/
+saida/
+dados/
+# configuração pessoal (pode ter tokens do Telegram/Mercado Livre)
+buscas.toml

@@ -6,6 +6,7 @@ import { lerReais, formatarReais } from "@/lib/dinheiro";
 import { criarSlug } from "@/lib/texto";
 import { inicioDoDiaSP, hojeSP } from "@/lib/datas";
 import { FRETE_PADRAO, type Cupom } from "@/db/schema";
+import { lerCsv, csvParaObjetos, gerarCsv } from "@/lib/csv";
 
 describe("pix", () => {
   it("usa o CRC16-CCITT-FALSE", () => {
@@ -86,5 +87,20 @@ describe("dinheiro e texto", () => {
     const quaseMeiaNoiteSP = new Date("2026-03-10T02:30:00Z"); // 23:30 do dia 9 em SP
     expect(hojeSP(quaseMeiaNoiteSP)).toBe("2026-03-09");
     expect(inicioDoDiaSP(quaseMeiaNoiteSP).toISOString()).toBe("2026-03-09T03:00:00.000Z");
+  });
+});
+
+
+describe("csv", () => {
+  it("lê ; com aspas, quebra de linha e BOM", () => {
+    const t = '﻿Nome;Preço;Descrição\r\n"Anel; Ouro";79,90;"linha 1\nlinha ""2"""\r\nBrinco;49,90;\r\n';
+    expect(lerCsv(t)).toEqual([["Nome", "Preço", "Descrição"], ["Anel; Ouro", "79,90", 'linha 1\nlinha "2"'], ["Brinco", "49,90", ""]]);
+  });
+  it("detecta vírgula e normaliza o cabeçalho", () => {
+    expect(csvParaObjetos("Nome,Preço De,SKU\nColar,10.5,C1")).toEqual([{ nome: "Colar", preco_de: "10.5", sku: "C1" }]);
+  });
+  it("gera CSV que volta igual", () => {
+    const linhas = [["a;b", 'diz "oi"', 3]];
+    expect(lerCsv(gerarCsv(linhas))).toEqual([["a;b", 'diz "oi"', "3"]]);
   });
 });

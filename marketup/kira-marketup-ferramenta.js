@@ -132,12 +132,12 @@ const prepararLogin = node({
   config: {
     name: 'Preparar login',
     parameters: {
-      jsCode: `// Cabeçalhos que o próprio site do MarketUP manda no login: o token público de visitante e o domínio da conta.
+      jsCode: `// Cabeçalhos que a tela de login da empresa (infinitejs.marketup.com) manda: o token público de visitante e o domínio da conta.
 return [
   {
     json: {
       visitante: 'eyJBdXRoU2Vzc2lvbklEIjoiNEQ1RjgxQkYtREU4My00MzdDLUIyN0UtQ0QwNjVEQzJBRTY5In0=',
-      dominio: Buffer.from('infinitejs:0').toString('base64'),
+      dominio: Buffer.from('infinitejs:2522208').toString('base64'),
     },
   },
 ];
@@ -154,7 +154,7 @@ const entrar = node({
     onError: 'continueRegularOutput',
     parameters: {
       method: 'POST',
-      url: 'https://api-erp.marketup.com/v1/auth/authenticateUserWithDomain',
+      url: 'https://api-erp.marketup.com/v1/auth/authenticate-user',
       authentication: 'genericCredentialType',
       genericAuthType: 'httpCustomAuth',
       sendHeaders: true,
@@ -166,7 +166,7 @@ const entrar = node({
       },
       sendBody: true,
       specifyBody: 'json',
-      jsonBody: expr("{{ JSON.stringify({ Domain: 'infinitejs', applicationID: 1, SendDate: $now.toISO() }) }}"),
+      jsonBody: expr("{{ JSON.stringify({ Domain: 'infinitejs', LoginType: 1, SendDate: $now.toISO() }) }}"),
       options: { timeout: 60000 },
     },
     credentials: { httpCustomAuth: newCredential('MarketUP (Infinite)') },
@@ -320,6 +320,24 @@ const abrir = (valor) => {
   }
 };
 
+// Nomes das situações do pedido, iguais aos da tela do MarketUP.
+const SITUACAO = { 1: 'Novo', 2: 'Faturado', 3: 'Entrega parcial', 4: 'Não conformidade', 5: 'Atrasado', 6: 'Finalizado', 7: 'Cancelado', 8: 'NF-e solicitada', 9: 'Aguardando pagamento', 10: 'Pago', 11: 'Consignado', 12: 'Enviado' };
+const ENTREGA = { 1: 'Pendente', 2: 'Entregue', 3: 'Entrega parcial', 4: 'Atrasado', 5: 'Devolução parcial', 6: 'Devolvido', 7: 'Cancelado' };
+const FINANCEIRO = { 1: 'Pendente', 2: 'Pago' };
+const traduzir = (item) => {
+  if (!item || typeof item !== 'object' || !('SaleOrderID' in item)) return item;
+  const t = { ...item };
+  if (SITUACAO[t.Status]) t.Situacao = SITUACAO[t.Status];
+  if (ENTREGA[t.DeliveryStatus]) t.SituacaoEntrega = ENTREGA[t.DeliveryStatus];
+  if (FINANCEIRO[t.FinancialStatus]) t.SituacaoFinanceira = FINANCEIRO[t.FinancialStatus];
+  if (t.Client && typeof t.Client === 'object') t.Cliente = t.Client.OfficialName || t.Client.Name;
+  if (t.Seller && typeof t.Seller === 'object') t.Vendedor = t.Seller.OfficialName || t.Seller.Name;
+  delete t.Status;
+  delete t.DeliveryStatus;
+  delete t.FinancialStatus;
+  return t;
+};
+
 const chamar = async (caminho, corpo = {}, comToken = true) => {
   const resposta = await helpers.httpRequest({
     method: 'POST',
@@ -378,15 +396,17 @@ const compactar = (valor, profundidade = 0, chave = '') => {
 };
 
 // Nas listas, só os campos que importam (nome, código, preço, estoque, cliente, valores, datas, situação...).
-const CAMPOS_LISTA = /ID$|Code|Number|Name|Description|BarCode|Reference|Price|Value|Cost|Stock|Amount|Quantity|Category|Brand|Unit|Ecommerce|Marketplace|Publi|Active|Date|Status|Situation|Client|Customer|Person|Seller|Total|Discount|Payment|Delivery|Tracking|Invoice|Cancel|B2c|Sync/i;
+const CAMPOS_LISTA = /ID$|Code|Number|Name|Description|BarCode|Reference|Price|Value|Cost|Stock|Amount|Quantity|Category|Brand|Unit|Ecommerce|Marketplace|Publi|Active|Date|Status|Situation|Situacao|Cliente|Vendedor|Client|Customer|Person|Seller|Total|Discount|Payment|Delivery|Tracking|Invoice|Cancel|B2c|Sync/i;
+const ZERO_SEM_SENTIDO = /ID$|Discount|Percent|Subtotal|Shipping|Taxes|Exchange|ItemsToDelivery|Balance|Rescue/;
 const resumir = (item) => {
-  const c = compactar(item) || {};
+  const c = compactar(traduzir(item)) || {};
   const r = {};
   for (const [k, v] of Object.entries(c)) {
     if (!CAMPOS_LISTA.test(k)) continue;
     if (Array.isArray(v)) continue;
+    if (v === 0 && ZERO_SEM_SENTIDO.test(k)) continue;
     if (v && typeof v === 'object') {
-      const nome = v.Name ?? v.FullName ?? v.CompanyName ?? v.Description;
+      const nome = v.OfficialName ?? v.Name ?? v.FullName ?? v.CompanyName ?? v.Description;
       if (nome !== undefined) r[k] = nome;
       continue;
     }
@@ -442,7 +462,7 @@ const detalhar = async (caminhoLista, caminhoGet, campoId, nomeCoisa) => {
   if (tem('InEcommerce')) checagem.na_loja_virtual = Boolean(item.InEcommerce);
   const medidas = ['GrossWeith', 'Heigth', 'Width', 'Length'].filter(tem);
   if (medidas.length) checagem.peso_e_medidas = medidas.every((k) => Number(item[k]) > 0) ? 'preenchidos' : 'faltando';
-  return { id, detalhes: compactar(item), checagem_publicacao: Object.keys(checagem).length ? checagem : undefined, outros_parecidos: outros };
+  return { id, detalhes: compactar(traduzir(item)), checagem_publicacao: Object.keys(checagem).length ? checagem : undefined, outros_parecidos: outros };
 };
 
 const base = { ok: true, fonte: FONTE, consultado_em: agora, acao };
@@ -481,7 +501,6 @@ try {
       site: site === 200 ? 'no ar' : 'com problema (' + site + ')',
       login: 'ok',
       produtos_cadastrados: await contar('/v1/CatalogItem/GetPagedList'),
-      pedidos_de_venda: await contar('/v1/SaleOrder/GetPagedList'),
       ultimos_pedidos: ultimos,
       integracao_loja_integrada: lojaIntegrada,
       links: { produtos: PAINEL + 'item', pedidos: PAINEL + 'sale_order' },
@@ -499,7 +518,7 @@ try {
     return caber({
       ...base,
       busca: busca || '(mais recentes)',
-      total: Number(resultado.total ?? resultado.TotalItems ?? itens.length) || 0,
+      total: Math.max(Number(resultado.total ?? resultado.TotalItems) || 0, itens.length),
       itens: itens.slice(0, limite).map(resumir),
       link: PAINEL + (acao === 'pedidos' ? 'sale_order' : 'item'),
       orientacao: (itens.length ? 'Resuma o que achou, sem copiar campos técnicos. ' : 'Não veio nenhum resultado: diga isso e sugira outra busca. ') + lembrete,

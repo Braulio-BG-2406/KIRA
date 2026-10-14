@@ -6,6 +6,8 @@ A Kira consulta o MarketUP da Infinite Semijoias (`infinitejs.marketup.com`) pel
 - Workflow da ferramenta no n8n: **Kira — MarketUP da Infinite (ferramenta)** (código em `kira-marketup-ferramenta.js`, no formato do n8n Workflow SDK).
 - Na Kira 2.0, a ferramenta `consultar_marketup` fica no grupo "Cérebro da Kira".
 - A Kira usa a mesma API que o site usa (`api-erp.marketup.com`): entra com o login da conta e lê os dados.
+- O login é o mesmo da tela `infinitejs.marketup.com`: `POST /v1/auth/authenticate-user` com `Domain: infinitejs` e `LoginType: 1` (login e senha). O acesso volta em `AuthToken` (vale 2 horas) e a Kira entra de novo a cada consulta. O outro endereço de login (`/v1/auth/authenticateUserWithDomain`, da tela geral do MarketUP) recusa o mesmo e-mail e senha: não use.
+- Situações do pedido (`Status`): 1 Novo, 2 Faturado, 3 Entrega parcial, 4 Não conformidade, 5 Atrasado, 6 Finalizado, 7 Cancelado, 8 NF-e solicitada, 9 Aguardando pagamento, 10 Pago, 11 Consignado, 12 Enviado. Entrega: 1 Pendente, 2 Entregue, 3 Entrega parcial, 4 Atrasado, 5 Devolução parcial, 6 Devolvido, 7 Cancelado. Financeiro: 1 Pendente, 2 Pago. A Kira já mostra os nomes.
 
 ## O que a Kira faz
 
@@ -48,6 +50,8 @@ A senha fica guardada criptografada no n8n. Não mande a senha pelo Telegram nem
 Se a senha do MarketUP mudar, é só atualizar essa credencial.
 
 ### Se a Kira disser que o login não deu certo
+
+- A credencial tem de estar no n8n da Kira, `https://vps71390.publiccloud.com.br` (não no n8n Cloud), na conta do Braulio: **Credentials > MarketUP (Infinite)**. Credencial criada em outro n8n ou com outro usuário não chega à Kira.
 
 - **"Usuário ou senha inválidos no MarketUP"**: o MarketUP recebeu o pedido e recusou.
   - Confira o JSON da credencial: tem de estar dentro de `"body"`, com `Login` e `Password` exatamente assim (L e P maiúsculos), sem espaço antes ou depois do e-mail e da senha. Se a senha tiver `"` ou `\`, escreva `\"` ou `\\`.

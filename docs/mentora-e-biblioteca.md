@@ -59,8 +59,17 @@ Para entrar: `modo pessoal` (ou os novos apelidos `modo estudo`, `modo estudos`,
   `n8n/kira-biblioteca/*.js`; o workflow inteiro em `n8n/kira-biblioteca/workflow.sdk.ts`.
 - **Tabela** `kira_biblioteca`: um fichamento por arquivo (`arquivo_id`). Entra no backup de domingo.
 
-## Pendência importante
+## Google Drive: conexão que não expira
 
-A credencial **"Google Drive account"** do n8n expirou ("needs to be reconnected"). Enquanto ela não
-for reconectada, a Biblioteca (e as outras ferramentas de Drive da Kira, e o backup) não acessam o Drive.
-Para reconectar: n8n → *Credentials* → *Google Drive account* → *Reconnect* e fazer o login do Google.
+O app OAuth do Google (projeto **IA BG IMPORTS**, nome exibido **Kira**) estava em modo "Testando", e nesse
+modo o Google derruba o acesso a cada 7 dias. Por isso a credencial "Google Drive account" do n8n expirava.
+Correção feita em 14/10/2026:
+
+- Branding preenchido (nome Kira, e-mails de contato, sem logotipo) com a página inicial e a política de
+  privacidade exigidas para publicar o app. As duas páginas são servidas pelo próprio n8n, no workflow
+  **Kira — páginas públicas (Google OAuth)**:
+  - https://vps71390.publiccloud.com.br/webhook/kira-inicio
+  - https://vps71390.publiccloud.com.br/webhook/kira-privacidade
+- App publicado ("Em produção") e credencial reconectada.
+
+Não apague nem desative esse workflow: o Google pode conferir os links.

@@ -66,7 +66,7 @@ export default async function PaginaProduto(props: Props) {
         )}
       </nav>
       <div className="grid gap-10 md:grid-cols-2">
-        <Galeria imagens={p.imagens} nome={p.nome} />
+        <Galeria imagens={p.imagens} nome={p.nome} relojoaria={loja.tema === "relojoaria"} />
         <div>
           {p.marca && <p className="mb-1 text-xs uppercase tracking-widest text-stone-500">{p.marca}</p>}
           <h1 className="font-titulo text-4xl leading-tight text-marca">{p.nome}</h1>
@@ -80,7 +80,20 @@ export default async function PaginaProduto(props: Props) {
             />
           </div>
           {p.descricao && <p className="mt-8 whitespace-pre-line leading-relaxed text-stone-700">{p.descricao}</p>}
-          {p.especificacoes.length > 0 && (
+          {p.especificacoes.length > 0 && loja.tema === "relojoaria" && (
+            <section className="mt-10">
+              <h2 className="mb-4 text-[11px] font-semibold uppercase tracking-[0.3em] text-stone-500">Ficha técnica</h2>
+              <dl className="grid grid-cols-2 gap-px overflow-hidden border border-stone-200 bg-stone-200 [&>div:last-child:nth-child(odd)]:col-span-2">
+                {p.especificacoes.map((e) => (
+                  <div key={e.nome} className="bg-white p-4">
+                    <dt className="text-[10px] uppercase tracking-[0.22em] text-stone-500">{e.nome}</dt>
+                    <dd className="mt-1 text-sm text-stone-900">{e.valor}</dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+          )}
+          {p.especificacoes.length > 0 && loja.tema !== "relojoaria" && (
             <section className="mt-8">
               <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-stone-700">Ficha técnica</h2>
               <dl className="divide-y divide-stone-200 border-y border-stone-200 text-sm">

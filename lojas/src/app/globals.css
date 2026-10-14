@@ -10,14 +10,34 @@ html {
   -webkit-text-size-adjust: 100%;
 }
 
-/* tema "moderno" (BG Imports): títulos sem serifa, em caixa alta */
-[data-tema="moderno"] {
+/* temas "moderno" e "relojoaria": títulos sem serifa, em caixa alta */
+[data-tema="moderno"],
+[data-tema="relojoaria"] {
   --fonte-titulo: ui-sans-serif, system-ui, "Helvetica Neue", Arial, sans-serif;
 }
 [data-tema="moderno"] .font-titulo {
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+[data-tema="relojoaria"] .font-titulo {
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* produto sem foto: letra no tema claro, desenho de relógio na relojoaria */
+.vazio-relogio {
+  display: none;
+}
+[data-tema="relojoaria"] .vazio-relogio {
+  display: block;
+}
+[data-tema="relojoaria"] .vazio-letra {
+  display: none;
+}
+[data-tema="relojoaria"] .vazio-fundo {
+  background: #efeeea;
 }
 
 body {
@@ -43,4 +63,16 @@ body {
 }
 @utility botao-perigo {
   @apply botao border border-red-200 bg-white text-red-700 hover:bg-red-50;
+}
+
+/* relojoaria: cantos retos e botões em caixa alta, como nas relojoarias */
+[data-tema="relojoaria"] main .rounded-md,
+[data-tema="relojoaria"] main .rounded-lg,
+[data-tema="relojoaria"] main .rounded-xl {
+  border-radius: 0;
+}
+[data-tema="relojoaria"] main button.bg-marca {
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-size: 0.8rem;
 }

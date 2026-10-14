@@ -3,11 +3,11 @@
 import { useState } from "react";
 import { FotoProduto } from "./FotoProduto";
 
-export function Galeria({ imagens, nome }: { imagens: string[]; nome: string }) {
+export function Galeria({ imagens, nome, relojoaria = false }: { imagens: string[]; nome: string; relojoaria?: boolean }) {
   const [atual, setAtual] = useState(0);
   return (
     <div>
-      <div className="aspect-square overflow-hidden rounded-xl bg-stone-100">
+      <div className={`aspect-square overflow-hidden ${relojoaria ? "bg-[#efeeea]" : "rounded-xl bg-stone-100"}`}>
         <FotoProduto url={imagens[atual]} nome={nome} />
       </div>
       {imagens.length > 1 && (

@@ -37,7 +37,9 @@ async function completar(lista: Produto[]): Promise<ProdutoVitrine[]> {
     .filter((p) => p.variantes.length > 0);
 }
 
-export async function listarVitrine(p: { lojaId: number; categoriaId?: number; busca?: string; destaque?: boolean; marca?: string; limite?: number }) {
+export type Ordem = "novidades" | "menor" | "maior";
+
+export async function listarVitrine(p: { lojaId: number; categoriaId?: number; busca?: string; destaque?: boolean; marca?: string; ordem?: Ordem; limite?: number }) {
   const filtros: SQL[] = [eq(produtos.lojaId, p.lojaId), eq(produtos.ativo, true)];
   if (p.categoriaId) filtros.push(eq(produtos.categoriaId, p.categoriaId));
   if (p.destaque) filtros.push(eq(produtos.destaque, true));
@@ -53,7 +55,10 @@ export async function listarVitrine(p: { lojaId: number; categoriaId?: number; b
     .orderBy(desc(produtos.destaque), desc(produtos.criadoEm))
     .limit(p.limite ?? 60);
   const completos = await completar(lista);
-  // esgotados vão para o fim
+  if (p.ordem === "menor") completos.sort((a, b) => a.precoMin - b.precoMin);
+  if (p.ordem === "maior") completos.sort((a, b) => b.precoMin - a.precoMin);
+  if (p.ordem === "novidades") completos.sort((a, b) => b.criadoEm.getTime() - a.criadoEm.getTime());
+  // esgotados vão para o fim (o sort é estável)
   return completos.sort((a, b) => Number(b.estoqueTotal > 0) - Number(a.estoqueTotal > 0));
 }
 

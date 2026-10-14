@@ -89,16 +89,15 @@ test("cadastro de produto com foto aparece na vitrine", async ({ page }) => {
   await entrarNoPainel(page);
   await page.goto("/admin/produtos/novo");
   await page.getByLabel("Nome").fill("Tornozeleira Estrela");
-  await page.getByLabel("Preço", { exact: true }).fill("59,90");
+  await page.getByLabel("Marca").fill("Infinite");
+  await page.getByLabel("Preço (R$)").fill("59,90");
   await page.getByLabel("Estoque").fill("4");
-  await page.getByRole("button", { name: "Salvar produto" }).click();
-  await expect(page.getByText("Produto salvo.")).toBeVisible();
-
-  // PNG 1×1
+  // PNG 1×1, enviado junto com o cadastro
   const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
   await page.locator("input[name=fotos]").setInputFiles({ name: "foto.png", mimeType: "image/png", buffer: png });
-  await page.getByRole("button", { name: "Enviar fotos" }).click();
-  await expect(page.getByText("Fotos enviadas.")).toBeVisible();
+  await page.getByRole("button", { name: "Salvar produto" }).click();
+  await expect(page.getByText("Produto salvo.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Fotos" })).toBeVisible();
 
   await page.goto("/loja/infinite/busca?q=tornozeleira");
   const foto = page.getByRole("img", { name: "Tornozeleira Estrela" });
@@ -106,6 +105,43 @@ test("cadastro de produto com foto aparece na vitrine", async ({ page }) => {
   const src = await foto.getAttribute("src");
   const resp = await page.request.get(src!);
   expect(resp.headers()["content-type"]).toBe("image/png");
+
+  // com foto, o produto entra no feed do Google/Instagram
+  const feed = await page.request.get("/loja/infinite/feed.xml");
+  expect(feed.status()).toBe(200);
+  expect(await feed.text()).toContain("<g:title>Tornozeleira Estrela</g:title>");
+});
+
+test("BG Imports: abertura de relojoaria e desconto no Pix no pedido", async ({ page }) => {
+  await page.goto("/loja/bg-imports");
+  await expect(page.getByRole("heading", { level: 1, name: "Relógio Automático Skeleton" })).toBeVisible();
+  await expect(page.getByText("5% off no Pix").first()).toBeVisible();
+  await page.getByRole("link", { name: "Comprar", exact: true }).click();
+  await expect(page.getByText("no Pix (5% de desconto)")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Ficha técnica" })).toBeVisible();
+  await page.getByRole("button", { name: "Adicionar ao carrinho" }).click();
+  await page.goto("/loja/bg-imports/checkout");
+  await page.getByRole("textbox", { name: "Nome completo", exact: true }).fill("Carlos Teste");
+  await page.getByRole("textbox", { name: "E-mail", exact: true }).fill("carlos@teste.com");
+  await page.getByRole("textbox", { name: "WhatsApp", exact: true }).fill("(11) 97777-6666");
+  await page.getByRole("radio", { name: /Retirar/ }).check();
+  await page.getByRole("radio", { name: /Pix com 5% de desconto/ }).check();
+  await expect(page.getByText("Desconto no Pix (5%)")).toBeVisible();
+  await page.getByRole("button", { name: "Fechar pedido" }).click();
+  await page.waitForURL(/\/pedido\/[A-Z0-9]+$/);
+  // 699,90 − 5% (35,00) = 664,90
+  await expect(page.getByText("Total: R$ 664,90")).toBeVisible();
+});
+
+test("painel enxuto: canais e abas", async ({ page }) => {
+  await entrarNoPainel(page);
+  await page.goto("/admin/canais");
+  await expect(page.getByRole("heading", { name: "Canais de venda" })).toBeVisible();
+  await expect(page.getByText("Feed de produtos (Merchant Center)")).toBeVisible();
+  await page.goto("/admin/canais/mercadolivre");
+  await expect(page.getByText("ML_CLIENT_ID")).toBeVisible();
+  await page.goto("/admin/estoque");
+  await expect(page.getByRole("link", { name: "Categorias" })).toBeVisible();
 });
 
 test("estoque esgotado não deixa comprar", async ({ page, request }) => {

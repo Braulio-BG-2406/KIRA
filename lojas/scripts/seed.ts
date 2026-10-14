@@ -15,6 +15,7 @@ const LOJAS = [
     corPrimaria: "#2b2320",
     corDestaque: "#b08d57",
     tema: "elegante" as const,
+    instagram: undefined as string | undefined,
     categorias: ["Brincos", "Colares", "Anéis", "Pulseiras", "Conjuntos"],
   },
   {
@@ -24,7 +25,8 @@ const LOJAS = [
     sobre: "Relógios e acessórios masculinos importados, com garantia, nota e envio rápido para todo o Brasil.",
     corPrimaria: "#141414",
     corDestaque: "#c9a45c",
-    tema: "moderno" as const,
+    tema: "relojoaria" as const,
+    instagram: "bgimports_brasil",
     categorias: ["Relógios", "Pulseiras", "Carteiras", "Cintos", "Óculos", "Correntes", "Kits presente"],
   },
 ];

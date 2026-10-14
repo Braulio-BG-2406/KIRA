@@ -51,8 +51,11 @@ export type Entrega = {
 
 const criadoEm = () => timestamp("criado_em", { withTimezone: true }).notNull().defaultNow();
 
-/** visual da vitrine: "elegante" (serifada, clara) ou "moderno" (sem serifa, cabeçalho escuro) */
-export type TemaLoja = "elegante" | "moderno";
+/**
+ * visual da vitrine: "elegante" (serifada, clara), "moderno" (sem serifa, cabeçalho escuro)
+ * ou "relojoaria" (escuro com dourado, abertura com relógio em destaque)
+ */
+export type TemaLoja = "elegante" | "moderno" | "relojoaria";
 
 export type Especificacao = { nome: string; valor: string };
 

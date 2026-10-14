@@ -32,6 +32,7 @@ export default async function Configuracoes({ searchParams }: { searchParams: Pr
                 <select name="tema" defaultValue={loja.tema} className="campo">
                   <option value="elegante">Elegante: títulos com serifa e cabeçalho claro</option>
                   <option value="moderno">Moderno: títulos em caixa alta e cabeçalho escuro</option>
+                  <option value="relojoaria">Relojoaria: escuro com dourado, abertura com o produto em destaque</option>
                 </select>
               </label>
               <label className="block"><span className="rotulo">Cor principal</span><input type="color" name="corPrimaria" defaultValue={loja.corPrimaria} className="h-10 w-full cursor-pointer rounded-md border border-stone-300" /></label>

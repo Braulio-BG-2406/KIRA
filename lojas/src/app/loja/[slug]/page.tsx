@@ -1,21 +1,37 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { baseDaLoja, buscarLoja } from "@/lib/lojas";
-import { categoriasDaLoja, listarVitrine } from "@/lib/catalogo";
+import { categoriasDaLoja, listarVitrine, type Ordem } from "@/lib/catalogo";
 import { GradeProdutos } from "@/components/loja/CartaoProduto";
+import { InicioRelojoaria } from "@/components/loja/InicioRelojoaria";
 
-export default async function VitrineInicio({ params }: { params: Promise<{ slug: string }> }) {
+const ORDENS = ["novidades", "menor", "maior"];
+
+export default async function VitrineInicio({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ ordem?: string }> }) {
   const { slug } = await params;
   const loja = await buscarLoja(slug);
   if (!loja) notFound();
+  const ordemPedida = (await searchParams).ordem;
+  const ordem = ORDENS.includes(ordemPedida ?? "") ? (ordemPedida as Ordem) : undefined;
   const [base, cats, destaques, todos] = await Promise.all([
     baseDaLoja(slug),
     categoriasDaLoja(loja.id),
     listarVitrine({ lojaId: loja.id, destaque: true, limite: 8 }),
-    listarVitrine({ lojaId: loja.id, limite: 24 }),
+    listarVitrine({ lojaId: loja.id, limite: 48, ordem }),
   ]);
-  const gratis = loja.frete.entrega.ativo ? loja.frete.entrega.gratisAcimaCentavos : null;
 
+  if (loja.tema === "relojoaria") {
+    // capa e quantidade de cada coleção, a partir dos produtos à venda
+    const colecoes = cats
+      .map((c) => {
+        const daCategoria = todos.filter((p) => p.categoriaId === c.id);
+        return { ...c, total: daCategoria.length, capa: daCategoria.find((p) => p.imagens.length)?.imagens[0] };
+      })
+      .filter((c) => c.total > 0);
+    return <InicioRelojoaria loja={loja} base={base} categorias={colecoes} destaques={destaques} todos={todos} ordem={ordem} />;
+  }
+
+  const gratis = loja.frete.entrega.ativo ? loja.frete.entrega.gratisAcimaCentavos : null;
   return (
     <>
       <section className="bg-marca text-white">

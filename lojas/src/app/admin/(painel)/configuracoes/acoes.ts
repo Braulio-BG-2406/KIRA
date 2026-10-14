@@ -51,7 +51,7 @@ export async function acaoSalvarLoja(fd: FormData) {
         pixChave: textoOuNulo(fd, "pixChave"),
         pixNome: textoOuNulo(fd, "pixNome"),
         pixCidade: textoOuNulo(fd, "pixCidade"),
-        tema: texto(fd, "tema") === "moderno" ? "moderno" : "elegante",
+        tema: (["moderno", "relojoaria"] as const).find((t) => t === texto(fd, "tema")) ?? "elegante",
         descontoPixPct: Math.min(30, Math.max(0, inteiro(fd, "descontoPixPct", 0))),
         parcelasSemJuros: Math.min(12, Math.max(1, inteiro(fd, "parcelasSemJuros", 1))),
         estoqueMinimo: Math.max(0, inteiro(fd, "estoqueMinimo", 3)),

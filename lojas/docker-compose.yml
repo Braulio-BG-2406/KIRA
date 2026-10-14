@@ -1,0 +1,50 @@
+# Sobe banco + plataforma na VPS:  docker compose up -d --build
+# Antes, copie .env.example para .env e preencha (principalmente DB_SENHA, ADMIN_*, APP_URL e LOJA_DOMINIOS).
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: lojas
+      POSTGRES_PASSWORD: ${DB_SENHA:?defina DB_SENHA no .env}
+      POSTGRES_DB: lojas
+    volumes:
+      - banco:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lojas -d lojas"]
+      interval: 5s
+      retries: 20
+
+  # roda as migrações e cria as lojas/usuário (se ainda não existirem) a cada subida
+  migrar:
+    build:
+      context: .
+      target: builder
+    command: sh -c "npx tsx scripts/migrate.ts && npx tsx scripts/seed.ts"
+    environment:
+      DATABASE_URL: postgres://lojas:${DB_SENHA}@db:5432/lojas
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_SENHA: ${ADMIN_SENHA:-}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://lojas:${DB_SENHA}@db:5432/lojas
+      UPLOAD_DIR: /app/uploads
+    volumes:
+      - fotos:/app/uploads
+    # só a própria VPS enxerga a porta; o proxy (Caddy/Traefik/Nginx) publica com HTTPS
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      migrar:
+        condition: service_completed_successfully
+
+volumes:
+  banco:
+  fotos:

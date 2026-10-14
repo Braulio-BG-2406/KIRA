@@ -8,40 +8,43 @@ import { avancarStatus, cancelarPedido, criarPedido, marcarComoPago } from "@/li
 import { ErroNegocio } from "@/lib/erros";
 import { NOMES_CANAL, NOMES_PAGAMENTO } from "@/lib/rotulos";
 
-async function pedidoDaLoja(id: number) {
-  const { loja } = await contexto();
-  const [p] = await db.select({ id: pedidos.id }).from(pedidos).where(and(eq(pedidos.id, id), eq(pedidos.lojaId, loja.id)));
+async function pedidoDaLoja(id: number, lojaId: number) {
+  const [p] = await db.select({ id: pedidos.id }).from(pedidos).where(and(eq(pedidos.id, id), eq(pedidos.lojaId, lojaId)));
   if (!p) throw new ErroNegocio("Pedido não encontrado.");
   return p.id;
 }
 
 export async function acaoMarcarPago(fd: FormData) {
+  const { loja } = await contexto();
   const id = Number(fd.get("id"));
   await executar(`/admin/pedidos/${id}`, async () => {
-    await marcarComoPago(await pedidoDaLoja(id), { nota: "Pagamento confirmado no painel" });
+    await marcarComoPago(await pedidoDaLoja(id, loja.id), { nota: "Pagamento confirmado no painel" });
   }, "Pagamento registrado.");
 }
 
 export async function acaoAvancar(fd: FormData) {
+  const { loja } = await contexto();
   const id = Number(fd.get("id"));
   const novo = texto(fd, "status") as "separacao" | "enviado" | "entregue";
   await executar(`/admin/pedidos/${id}`, async () => {
     if (!["separacao", "enviado", "entregue"].includes(novo)) throw new ErroNegocio("Status inválido.");
-    await avancarStatus(await pedidoDaLoja(id), novo, { codigoRastreio: texto(fd, "rastreio"), nota: texto(fd, "nota") });
+    await avancarStatus(await pedidoDaLoja(id, loja.id), novo, { codigoRastreio: texto(fd, "rastreio"), nota: texto(fd, "nota") });
   }, "Status atualizado.");
 }
 
 export async function acaoCancelar(fd: FormData) {
+  const { loja } = await contexto();
   const id = Number(fd.get("id"));
   await executar(`/admin/pedidos/${id}`, async () => {
-    await cancelarPedido(await pedidoDaLoja(id), texto(fd, "motivo") || "Cancelado no painel");
+    await cancelarPedido(await pedidoDaLoja(id, loja.id), texto(fd, "motivo") || "Cancelado no painel");
   }, "Pedido cancelado e estoque devolvido.");
 }
 
 export async function acaoObservacao(fd: FormData) {
+  const { loja } = await contexto();
   const id = Number(fd.get("id"));
   await executar(`/admin/pedidos/${id}`, async () => {
-    await db.update(pedidos).set({ observacoes: texto(fd, "observacoes") || null }).where(eq(pedidos.id, await pedidoDaLoja(id)));
+    await db.update(pedidos).set({ observacoes: texto(fd, "observacoes") || null }).where(eq(pedidos.id, await pedidoDaLoja(id, loja.id)));
   });
 }
 

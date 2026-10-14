@@ -20,6 +20,7 @@ export function Checkout({ slug, base, pagamentos }: { slug: string; base: strin
   const [endereco, setEndereco] = useState(enderecoVazio);
   const [opcoes, setOpcoes] = useState<OpcaoFrete[]>([]);
   const [metodo, setMetodo] = useState<"entrega" | "retirada" | "">("");
+  const [metodoEscolhido, setMetodoEscolhido] = useState(false);
   const [cupom, setCupom] = useState("");
   const [desconto, setDesconto] = useState<{ codigo: string; valor: number } | null>(null);
   const [erroCupom, setErroCupom] = useState("");
@@ -35,11 +36,16 @@ export function Checkout({ slug, base, pagamentos }: { slug: string; base: strin
       .then((r) => r.json())
       .then((d: { opcoes: OpcaoFrete[] }) => {
         setOpcoes(d.opcoes);
-        setMetodo((m) => (d.opcoes.some((o) => o.metodo === m) ? m : (d.opcoes[0]?.metodo ?? "")));
+        // quem preencheu o endereço quer receber em casa, até escolher outra opção
+        setMetodo((m) =>
+          metodoEscolhido && d.opcoes.some((o) => o.metodo === m)
+            ? m
+            : (d.opcoes.find((o) => o.metodo === "entrega")?.metodo ?? d.opcoes[0]?.metodo ?? ""),
+        );
       })
       .catch(() => {});
     return () => ctrl.abort();
-  }, [slug, endereco.uf, subtotal]);
+  }, [slug, endereco.uf, subtotal, metodoEscolhido]);
 
   // o desconto do cupom depende do subtotal: confere de novo quando ele muda
   useEffect(() => {
@@ -188,7 +194,11 @@ export function Checkout({ slug, base, pagamentos }: { slug: string; base: strin
             {opcoes.length === 0 && <p className="text-sm text-stone-500">Informe o CEP para ver as opções de entrega.</p>}
             {opcoes.map((o) => (
               <label key={o.metodo} className="flex cursor-pointer items-start gap-3 rounded-md border border-stone-200 p-3 has-checked:border-marca">
-                <input type="radio" name="metodo" checked={metodo === o.metodo} onChange={() => setMetodo(o.metodo)} className="mt-1" />
+                <input type="radio" name="metodo" checked={metodo === o.metodo}
+                  onChange={() => {
+                    setMetodo(o.metodo);
+                    setMetodoEscolhido(true);
+                  }} className="mt-1" />
                 <span className="flex-1 text-sm">
                   <span className="font-medium">{o.descricao}</span>
                   <span className="block text-stone-500">{o.prazo}</span>

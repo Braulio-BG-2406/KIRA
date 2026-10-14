@@ -151,9 +151,9 @@ button.hol:hover { border-color: var(--accent); }
   <div class="wrap">
     <span class="eyebrow" style="color:var(--board-muted)">Painel de partidas · férias 2027</span>
     <h1>Radar de Férias 2027</h1>
-    <div class="who">Braulio &amp; Janaina · 2 adultos · preços em reais</div>
+    <div class="who">Braulio &amp; Janaina · saindo de Juatuba (MG) por Confins · 2 adultos · preços em reais</div>
     <div class="route" aria-live="polite">
-      <span class="code" id="b-orig">GRU</span><span class="arrow">✈</span><span class="code" id="b-dest">LIS</span>
+      <span class="code" id="b-orig">CNF</span><span class="arrow">✈</span><span class="code" id="b-dest">LIS</span>
       <span class="meta" id="b-meta">17 abr → 25 abr · 8 noites</span>
     </div>
   </div>
@@ -167,10 +167,10 @@ button.hol:hover { border-color: var(--accent); }
       <h2>Buscar voos e hospedagem</h2>
       <span class="eyebrow">Compara em 9 sites</span>
     </div>
-    <p class="lede">Preencha uma vez e abra a mesma busca em cada site. Os campos começam com um exemplo (São Paulo para Lisboa no feriado de Tiradentes); troque pela sua cidade e pelo destino que quiserem.</p>
+    <p class="lede">Preencha uma vez e abra a mesma busca em cada site. A origem já é Confins (CNF). O destino começa com um exemplo (Lisboa no feriado de Tiradentes); troque pelo que quiserem.</p>
     <form id="f-busca" class="grid" autocomplete="off">
       <label class="f">Saindo de
-        <input id="orig" list="lugares" value="São Paulo (GRU)" placeholder="Cidade (código)">
+        <input id="orig" list="lugares" value="Belo Horizonte – Confins (CNF)" placeholder="Cidade (código)">
       </label>
       <label class="f">Destino
         <input id="dest" list="lugares" value="Lisboa (LIS)" placeholder="Cidade (código)">
@@ -251,7 +251,7 @@ button.hol:hover { border-color: var(--accent); }
       <summary class="btn btn-ghost" style="display:inline-flex">+ Guardar uma opção</summary>
       <form id="f-add" class="grid wide" style="margin-top:14px">
         <label class="f span-2">O que é
-          <input id="a-titulo" required maxlength="140" placeholder="ex.: TAP GRU→LIS direto, 17 a 25/abr">
+          <input id="a-titulo" required maxlength="140" placeholder="ex.: TAP CNF→LIS direto, 17 a 25/abr">
         </label>
         <label class="f">Tipo
           <select id="a-tipo"><option value="voo">Voo</option><option value="hospedagem">Hospedagem</option><option value="pacote">Pacote</option><option value="passeio">Passeio</option></select>
@@ -284,6 +284,7 @@ button.hol:hover { border-color: var(--accent); }
       <li><b>Promoções relâmpago</b>Acompanhe <a href="https://www.melhoresdestinos.com.br" target="_blank" rel="noopener">Melhores Destinos</a> e <a href="https://passagensimperdiveis.com.br" target="_blank" rel="noopener">Passagens Imperdíveis</a>. As melhores tarifas somem em horas.</li>
       <li><b>Hotel com cancelamento grátis</b>Reserve uma opção que pode cancelar e confira o preço de novo perto da viagem. Se cair, cancele e reserve outra vez.</li>
       <li><b>Viagem para fora</b>Some o IOF do cartão no orçamento. Para a Europa, o seguro-viagem é obrigatório; para os EUA, o visto precisa ser agendado com muita antecedência.</li>
+      <li><b>Saindo de Confins</b>Para fora do país, compare voo direto de CNF com conexão em Guarulhos, Campinas ou no Panamá. Às vezes compensa um voo nacional barato até São Paulo e outro bilhete de lá; nesse caso deixe folga de pelo menos 4 horas entre os voos.</li>
       <li><b>Baixa temporada</b>No Brasil: março a junho e agosto a novembro, fora dos feriados. Na Europa: abril, maio, setembro e outubro.</li>
     </ul>
   </section>
@@ -305,7 +306,7 @@ button.hol:hover { border-color: var(--accent); }
   const PLACES = [
     // Brasil
     ["São Paulo", "GRU", 1], ["São Paulo – Congonhas", "CGH", 1], ["Campinas", "VCP", 1], ["Rio de Janeiro", "GIG", 1], ["Rio de Janeiro – Santos Dumont", "SDU", 1],
-    ["Belo Horizonte", "CNF", 1], ["Brasília", "BSB", 1], ["Curitiba", "CWB", 1], ["Porto Alegre", "POA", 1], ["Gramado – Porto Alegre", "POA", 1],
+    ["Belo Horizonte – Confins", "CNF", 1], ["Belo Horizonte – Pampulha", "PLU", 1], ["Brasília", "BSB", 1], ["Curitiba", "CWB", 1], ["Porto Alegre", "POA", 1], ["Gramado – Porto Alegre", "POA", 1],
     ["Florianópolis", "FLN", 1], ["Foz do Iguaçu", "IGU", 1], ["Goiânia", "GYN", 1], ["Vitória", "VIX", 1], ["Uberlândia", "UDI", 1], ["Ribeirão Preto", "RAO", 1],
     ["Salvador", "SSA", 1], ["Porto Seguro", "BPS", 1], ["Recife", "REC", 1], ["Porto de Galinhas – Recife", "REC", 1], ["Fernando de Noronha", "FEN", 1],
     ["Maceió", "MCZ", 1], ["Maragogi – Maceió", "MCZ", 1], ["João Pessoa", "JPA", 1], ["Natal", "NAT", 1], ["Fortaleza", "FOR", 1], ["Jericoacoara", "JJD", 1],
@@ -340,7 +341,7 @@ button.hol:hover { border-color: var(--accent); }
 
   /* ---------- search ---------- */
   const F = ["orig", "dest", "ida", "volta", "adultos", "quartos"];
-  const LS_KEY = "radar-ferias-busca";
+  const LS_KEY = "radar-ferias-busca-cnf";
   const saved = safe(() => JSON.parse(localStorage.getItem(LS_KEY) || "null"));
   if (saved) F.forEach(k => { if (typeof saved[k] === "string") $("#" + k).value = saved[k]; });
 
@@ -498,8 +499,8 @@ button.hol:hover { border-color: var(--accent); }
   async function askKira() {
     if (!sample) return;
     const s = state();
-    const orig = s.o.name ? `${s.o.name}${s.o.code ? " (" + s.o.code + ")" : ""}` : "São Paulo (GRU)";
-    const prompt = `Você é a Kira, assistente de viagens de um casal brasileiro, Braulio e Janaina, planejando as férias de 2027.
+    const orig = s.o.name ? `${s.o.name}${s.o.code ? " (" + s.o.code + ")" : ""}` : "Belo Horizonte – Confins (CNF)";
+    const prompt = `Você é a Kira, assistente de viagens de um casal brasileiro, Braulio e Janaina, planejando as férias de 2027. Eles moram em Juatuba (MG), perto de Belo Horizonte, e voam pelo aeroporto de Confins (CNF), ida e volta.
 Dados do pedido:
 - Cidade de saída: ${orig}
 - Orçamento total para os dois (passagens de ida e volta + hospedagem), em reais: ${k("#k-orc") || "não informado"}
@@ -509,7 +510,7 @@ Dados do pedido:
 - Estilo: ${$("#k-estilo").value}
 - Observações do casal: ${k("#k-obs") || "nenhuma"}
 
-Sugira 4 destinos diferentes que caibam no orçamento nessa época. Leve em conta clima e alta/baixa temporada no período, tempo de voo e conexões a partir da cidade de saída, e exigências de visto para brasileiros.
+Sugira 4 destinos diferentes que caibam no orçamento nessa época. Leve em conta clima e alta/baixa temporada no período, tempo de voo, voos diretos e conexões a partir da cidade de saída (de Confins, muitos destinos exigem conexão em Guarulhos, Campinas, Rio, Brasília ou Panamá), e exigências de visto para brasileiros.
 Os preços são estimativas de faixa, em reais, para 2 adultos, com base no seu conhecimento geral de tarifas; não invente promoções específicas.
 Responda somente com um array JSON de 4 objetos, cada um assim:
 {"destino": "Nome da cidade ou região", "pais": "País", "iata": "código IATA do aeroporto principal (3 letras)", "porque": "1 ou 2 frases sobre por que combina com eles", "voo_casal": [min, max], "hotel_noite": [min, max], "total_estimado": número, "atencao": "1 frase: clima, visto, documento ou alta temporada", "dica": "1 frase prática para economizar nesse destino"}

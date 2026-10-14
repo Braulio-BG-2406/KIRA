@@ -1,0 +1,710 @@
+<title>Radar de Férias 2027</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=JetBrains+Mono:wght@500;700&family=Source+Sans+3:wght@400;600;700&display=swap">
+<style>
+/* Layout: one column of stacked "gates" (sections) under a departure-board header; tools first, reference last. */
+:root {
+  --bg: #F1F4F6;
+  --surface: #FFFFFF;
+  --ink: #14222E;
+  --muted: #5A6A77;
+  --line: #D5DDE3;
+  --accent: #0D6A62;
+  --accent-ink: #FFFFFF;
+  --accent-soft: #E1F0EE;
+  --board: #14222E;
+  --board-fg: #F3B53A;
+  --board-muted: #9FB0BD;
+  --signal-soft: #FFF2D4;
+  --danger: #B3261E;
+  --ok: #1E7A3B;
+  --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --r: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0D141A; --surface: #15202A; --ink: #E5ECF1; --muted: #93A4B1; --line: #26343F;
+    --accent: #45B9AD; --accent-ink: #052421; --accent-soft: #123430;
+    --board: #080D11; --board-fg: #F5BC4A; --board-muted: #7F909C;
+    --signal-soft: #3A2D11; --danger: #F08680; --ok: #73CF90;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0D141A; --surface: #15202A; --ink: #E5ECF1; --muted: #93A4B1; --line: #26343F;
+  --accent: #45B9AD; --accent-ink: #052421; --accent-soft: #123430;
+  --board: #080D11; --board-fg: #F5BC4A; --board-muted: #7F909C;
+  --signal-soft: #3A2D11; --danger: #F08680; --ok: #73CF90;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 16px; line-height: 1.5; }
+.wrap { max-width: 980px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+
+/* Board header */
+.board { background: var(--board); color: var(--board-muted); }
+.board .wrap { padding-block: 28px 24px; display: grid; gap: 14px; }
+.board h1 { margin: 0; font-family: var(--font-display); font-weight: 700; font-size: clamp(1.9rem, 5vw, 2.8rem); line-height: 1.05; color: #F4F6F8; text-wrap: balance; }
+.board .who { font-size: 1rem; }
+.route { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px 18px; font-family: var(--font-mono); color: var(--board-fg); }
+.route .code { font-size: clamp(1.8rem, 6vw, 2.6rem); font-weight: 700; letter-spacing: .06em; }
+.route .arrow { font-size: 1.4rem; color: var(--board-muted); }
+.route .meta { font-size: .9rem; color: var(--board-muted); letter-spacing: .04em; text-transform: uppercase; }
+
+main.wrap { padding-block: 28px 64px; display: grid; gap: 28px; }
+section.gate { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 22px clamp(16px, 3vw, 28px); display: grid; gap: 18px; min-width: 0; }
+.gate-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 16px; }
+.gate h2 { margin: 0; font-family: var(--font-display); font-weight: 700; font-size: 1.45rem; text-wrap: balance; }
+.gate .lede { margin: 0; color: var(--muted); max-width: 62ch; }
+.eyebrow { font-family: var(--font-mono); font-size: .72rem; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+
+/* Forms */
+.grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+.grid.wide { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+label.f { display: grid; gap: 4px; font-size: .85rem; font-weight: 600; color: var(--muted); min-width: 0; }
+input, select, textarea { font: inherit; font-size: 1rem; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; width: 100%; min-width: 0; }
+textarea { resize: vertical; min-height: 64px; }
+input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.span-2 { grid-column: span 2; }
+@media (max-width: 520px) { .span-2 { grid-column: auto; } }
+
+button, .btn { font: inherit; font-weight: 600; font-size: .95rem; border-radius: 8px; border: 1px solid transparent; padding: 9px 16px; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; }
+.btn-primary { background: var(--accent); color: var(--accent-ink); }
+.btn-primary:hover { filter: brightness(1.08); }
+.btn-ghost { background: transparent; color: var(--ink); border-color: var(--line); }
+.btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+button:disabled { opacity: .55; cursor: not-allowed; }
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+
+/* Search results */
+.legs { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.leg { display: grid; gap: 10px; align-content: start; min-width: 0; }
+.leg h3 { margin: 0; font-size: 1rem; font-weight: 700; display: flex; gap: 8px; align-items: baseline; }
+.leg h3 .eyebrow { font-weight: 500; }
+.sites { display: grid; gap: 8px; }
+a.site { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); text-decoration: none; background: var(--bg); min-width: 0; }
+a.site:hover { border-color: var(--accent); }
+a.site strong { font-weight: 700; }
+a.site span { color: var(--muted); font-size: .85rem; text-align: right; }
+a.site::after { content: "↗"; color: var(--accent); font-weight: 700; }
+.note { background: var(--signal-soft); border-radius: 8px; padding: 10px 14px; font-size: .92rem; }
+.note b { font-weight: 700; }
+.muted { color: var(--muted); }
+.small { font-size: .86rem; }
+.err { color: var(--danger); font-weight: 600; }
+
+/* Holidays */
+.hols { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
+button.hol { text-align: left; display: grid; gap: 2px; padding: 12px 14px; background: var(--bg); border: 1px solid var(--line); color: var(--ink); font-weight: 400; border-radius: 8px; }
+button.hol:hover { border-color: var(--accent); }
+.hol .date { font-family: var(--font-mono); font-size: .8rem; color: var(--accent); font-weight: 700; letter-spacing: .03em; }
+.hol .name { font-weight: 700; font-size: 1rem; }
+.hol .gain { font-size: .86rem; color: var(--muted); }
+.pill { display: inline-block; font-family: var(--font-mono); font-size: .72rem; padding: 2px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-weight: 700; letter-spacing: .03em; }
+
+/* Kira suggestions */
+.ideas { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.idea { border: 1px solid var(--line); border-radius: 8px; padding: 14px; display: grid; gap: 8px; align-content: start; background: var(--bg); min-width: 0; }
+.idea h3 { margin: 0; font-family: var(--font-display); font-size: 1.2rem; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.idea h3 .code { font-family: var(--font-mono); font-size: .85rem; color: var(--accent); }
+.idea p { margin: 0; font-size: .94rem; }
+.figures { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; font-size: .88rem; }
+.figures dt { color: var(--muted); }
+.figures dd { margin: 0; font-variant-numeric: tabular-nums; text-align: right; font-weight: 600; }
+.figures .total { font-weight: 700; color: var(--accent); }
+.thinking { font-family: var(--font-mono); font-size: .85rem; color: var(--muted); }
+
+/* Shortlist */
+.sum { display: flex; flex-wrap: wrap; gap: 8px 22px; font-size: .92rem; }
+.sum b { font-variant-numeric: tabular-nums; }
+.list { display: grid; gap: 10px; }
+.item { display: grid; grid-template-columns: 1fr auto; gap: 6px 14px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); min-width: 0; }
+.item[data-status="reservado"] { border-color: var(--ok); }
+.item[data-status="favorita"] { border-color: var(--board-fg); }
+.item .t { font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
+.item .t a { color: var(--accent); }
+.item .p { font-variant-numeric: tabular-nums; font-weight: 700; text-align: right; white-space: nowrap; }
+.item .n { grid-column: 1 / -1; font-size: .92rem; color: var(--muted); overflow-wrap: anywhere; }
+.item .acts { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: .82rem; }
+.item .acts button { padding: 4px 10px; font-size: .82rem; }
+.status-btn[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.tag { font-family: var(--font-mono); font-size: .7rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.empty { border: 1px dashed var(--line); border-radius: 8px; padding: 18px; color: var(--muted); }
+
+/* Tips */
+.tips { margin: 0; padding: 0; list-style: none; display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.tips li { display: grid; gap: 2px; font-size: .95rem; }
+.tips li b { font-weight: 700; }
+.tips a { color: var(--accent); }
+
+@media (prefers-reduced-motion: no-preference) {
+  a.site, button { transition: border-color .15s, background-color .15s, filter .15s; }
+}
+</style>
+
+<header class="board">
+  <div class="wrap">
+    <span class="eyebrow" style="color:var(--board-muted)">Painel de partidas · férias 2027</span>
+    <h1>Radar de Férias 2027</h1>
+    <div class="who">Braulio &amp; Janaina · 2 adultos · preços em reais</div>
+    <div class="route" aria-live="polite">
+      <span class="code" id="b-orig">GRU</span><span class="arrow">✈</span><span class="code" id="b-dest">LIS</span>
+      <span class="meta" id="b-meta">17 abr → 25 abr · 8 noites</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- 1. Busca -->
+  <section class="gate" id="busca">
+    <div class="gate-head">
+      <h2>Buscar voos e hospedagem</h2>
+      <span class="eyebrow">Compara em 9 sites</span>
+    </div>
+    <p class="lede">Preencha uma vez e abra a mesma busca em cada site. Os campos começam com um exemplo (São Paulo para Lisboa no feriado de Tiradentes); troque pela sua cidade e pelo destino que quiserem.</p>
+    <form id="f-busca" class="grid" autocomplete="off">
+      <label class="f">Saindo de
+        <input id="orig" list="lugares" value="São Paulo (GRU)" placeholder="Cidade (código)">
+      </label>
+      <label class="f">Destino
+        <input id="dest" list="lugares" value="Lisboa (LIS)" placeholder="Cidade (código)">
+      </label>
+      <label class="f">Ida
+        <input id="ida" type="date" value="2027-04-17" min="2026-10-14">
+      </label>
+      <label class="f">Volta <span class="muted small">(vazio = só ida)</span>
+        <input id="volta" type="date" value="2027-04-25" min="2026-10-14">
+      </label>
+      <label class="f">Adultos
+        <select id="adultos"><option>1</option><option selected>2</option><option>3</option><option>4</option></select>
+      </label>
+      <label class="f">Quartos
+        <select id="quartos"><option selected>1</option><option>2</option></select>
+      </label>
+    </form>
+    <datalist id="lugares"></datalist>
+    <div id="busca-out" class="legs"></div>
+    <div id="busca-tempo" class="note"></div>
+  </section>
+
+  <!-- 2. Feriados -->
+  <section class="gate" id="feriados">
+    <div class="gate-head">
+      <h2>Feriados de 2027 para emendar</h2>
+      <span class="eyebrow">Toque para usar as datas</span>
+    </div>
+    <p class="lede">Janelas que rendem mais dias de viagem com poucos dias de folga. Feriados estaduais e municipais da sua cidade podem render ainda mais.</p>
+    <div class="hols" id="hols"></div>
+  </section>
+
+  <!-- 3. Kira -->
+  <section class="gate" id="kira">
+    <div class="gate-head">
+      <h2>Pergunte à Kira</h2>
+      <span class="eyebrow">Sugestões pelo orçamento</span>
+    </div>
+    <p class="lede">Diga quanto querem gastar e o que gostam. A Kira sugere destinos com faixas de preço estimadas. São estimativas, não cotações: confira o valor real com a busca acima.</p>
+    <form id="f-kira" class="grid wide">
+      <label class="f">Orçamento total do casal (R$)
+        <input id="k-orc" type="number" min="1000" step="500" value="15000" inputmode="numeric">
+      </label>
+      <label class="f">Quando
+        <input id="k-quando" value="abril de 2027 (Tiradentes)" placeholder="mês ou feriado">
+      </label>
+      <label class="f">Noites
+        <input id="k-noites" type="number" min="2" max="40" value="8" inputmode="numeric">
+      </label>
+      <label class="f">Para onde
+        <select id="k-regiao"><option value="tanto faz">Brasil ou exterior</option><option value="só Brasil">Só Brasil</option><option value="América do Sul">América do Sul</option><option value="exterior fora da América do Sul">Exterior (mais longe)</option></select>
+      </label>
+      <label class="f">Estilo
+        <select id="k-estilo"><option>praia e descanso</option><option>cidade, cultura e gastronomia</option><option>natureza e aventura</option><option>romântico</option><option>um pouco de tudo</option></select>
+      </label>
+      <label class="f span-2">Algo mais? <span class="muted small">(opcional)</span>
+        <input id="k-obs" placeholder="ex.: sem conexão longa, Janaina quer neve, já fomos a Salvador">
+      </label>
+    </form>
+    <div class="row">
+      <button class="btn btn-primary" id="k-go" type="button">Pedir sugestões</button>
+      <button class="btn btn-ghost" id="k-stop" type="button" hidden>Parar</button>
+      <span id="k-status" class="small muted"></span>
+    </div>
+    <div id="k-out" class="ideas"></div>
+  </section>
+
+  <!-- 4. Lista -->
+  <section class="gate" id="lista">
+    <div class="gate-head">
+      <h2>Nossa lista</h2>
+      <span class="eyebrow" id="l-mode">Carregando…</span>
+    </div>
+    <p class="lede">Achou um preço bom? Guarde aqui com o link. Vocês dois veem a mesma lista e marcam o que gostaram e o que já reservaram.</p>
+    <div class="sum" id="l-sum"></div>
+    <div class="list" id="l-items"><div class="empty">Carregando a lista…</div></div>
+    <details id="l-add-box">
+      <summary class="btn btn-ghost" style="display:inline-flex">+ Guardar uma opção</summary>
+      <form id="f-add" class="grid wide" style="margin-top:14px">
+        <label class="f span-2">O que é
+          <input id="a-titulo" required maxlength="140" placeholder="ex.: TAP GRU→LIS direto, 17 a 25/abr">
+        </label>
+        <label class="f">Tipo
+          <select id="a-tipo"><option value="voo">Voo</option><option value="hospedagem">Hospedagem</option><option value="pacote">Pacote</option><option value="passeio">Passeio</option></select>
+        </label>
+        <label class="f">Preço total (R$)
+          <input id="a-preco" type="number" min="0" step="1" inputmode="decimal" placeholder="ex.: 6400">
+        </label>
+        <label class="f span-2">Link
+          <input id="a-link" type="url" maxlength="1500" placeholder="https://…">
+        </label>
+        <label class="f span-2">Observação
+          <input id="a-nota" maxlength="300" placeholder="ex.: bagagem inclusa, cancelamento grátis até 10/abr">
+        </label>
+        <div class="row span-2">
+          <button class="btn btn-primary" type="submit">Guardar</button>
+          <span id="a-msg" class="small"></span>
+        </div>
+      </form>
+    </details>
+  </section>
+
+  <!-- 5. Dicas -->
+  <section class="gate" id="dicas">
+    <div class="gate-head"><h2>Como pagar menos</h2></div>
+    <ul class="tips">
+      <li><b>Alerta de preço</b>No Google Voos, ative "Acompanhar preços" para a rota e as datas. Ele avisa por e-mail quando o preço cai.</li>
+      <li><b>Antecedência</b>Voo nacional: compre de 1 a 3 meses antes. Internacional: de 2 a 6 meses. Julho, dezembro, janeiro e Carnaval enchem cedo.</li>
+      <li><b>Datas flexíveis</b>Use o gráfico de preços do Google Voos e a opção "mês inteiro" do Skyscanner. Sair de terça a quinta costuma custar menos.</li>
+      <li><b>Milhas</b>Compare o mesmo voo em milhas: <a href="https://www.smiles.com.br" target="_blank" rel="noopener">Smiles</a>, <a href="https://latampass.latam.com/pt_br/" target="_blank" rel="noopener">LATAM Pass</a> e <a href="https://www.voeazul.com.br/br/pt/programa-fidelidade" target="_blank" rel="noopener">Azul Fidelidade</a>. Transfira pontos do cartão quando houver bônus.</li>
+      <li><b>Promoções relâmpago</b>Acompanhe <a href="https://www.melhoresdestinos.com.br" target="_blank" rel="noopener">Melhores Destinos</a> e <a href="https://passagensimperdiveis.com.br" target="_blank" rel="noopener">Passagens Imperdíveis</a>. As melhores tarifas somem em horas.</li>
+      <li><b>Hotel com cancelamento grátis</b>Reserve uma opção que pode cancelar e confira o preço de novo perto da viagem. Se cair, cancele e reserve outra vez.</li>
+      <li><b>Viagem para fora</b>Some o IOF do cartão no orçamento. Para a Europa, o seguro-viagem é obrigatório; para os EUA, o visto precisa ser agendado com muita antecedência.</li>
+      <li><b>Baixa temporada</b>No Brasil: março a junho e agosto a novembro, fora dos feriados. Na Europa: abril, maio, setembro e outubro.</li>
+    </ul>
+  </section>
+
+</main>
+
+<script>
+(() => {
+  const $ = (s, el = document) => el.querySelector(s);
+  const enc = encodeURIComponent;
+  const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
+  const MES = ["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
+  const fmtDay = iso => { const [y, m, d] = iso.split("-").map(Number); return `${d} ${MES[m - 1]}`; };
+  const dt = iso => new Date(iso + "T12:00:00");
+  const nights = (a, b) => Math.round((dt(b) - dt(a)) / 864e5);
+  const safe = (fn) => { try { return fn(); } catch { return null; } };
+
+  /* ---------- places ---------- */
+  const PLACES = [
+    // Brasil
+    ["São Paulo", "GRU", 1], ["São Paulo – Congonhas", "CGH", 1], ["Campinas", "VCP", 1], ["Rio de Janeiro", "GIG", 1], ["Rio de Janeiro – Santos Dumont", "SDU", 1],
+    ["Belo Horizonte", "CNF", 1], ["Brasília", "BSB", 1], ["Curitiba", "CWB", 1], ["Porto Alegre", "POA", 1], ["Gramado – Porto Alegre", "POA", 1],
+    ["Florianópolis", "FLN", 1], ["Foz do Iguaçu", "IGU", 1], ["Goiânia", "GYN", 1], ["Vitória", "VIX", 1], ["Uberlândia", "UDI", 1], ["Ribeirão Preto", "RAO", 1],
+    ["Salvador", "SSA", 1], ["Porto Seguro", "BPS", 1], ["Recife", "REC", 1], ["Porto de Galinhas – Recife", "REC", 1], ["Fernando de Noronha", "FEN", 1],
+    ["Maceió", "MCZ", 1], ["Maragogi – Maceió", "MCZ", 1], ["João Pessoa", "JPA", 1], ["Natal", "NAT", 1], ["Fortaleza", "FOR", 1], ["Jericoacoara", "JJD", 1],
+    ["São Luís", "SLZ", 1], ["Lençóis Maranhenses – São Luís", "SLZ", 1], ["Belém", "BEL", 1], ["Manaus", "MAO", 1], ["Cuiabá", "CGB", 1],
+    ["Bonito", "BYO", 1], ["Campo Grande", "CGR", 1], ["Chapada Diamantina – Lençóis", "LEC", 1], ["Ilhéus", "IOS", 1], ["Aracaju", "AJU", 1],
+    // América do Sul e Caribe
+    ["Buenos Aires", "EZE", 0], ["Bariloche", "BRC", 0], ["Mendoza", "MDZ", 0], ["Ushuaia", "USH", 0], ["Santiago", "SCL", 0], ["Montevidéu", "MVD", 0],
+    ["Punta del Este", "PDP", 0], ["Lima", "LIM", 0], ["Cusco", "CUZ", 0], ["Cartagena", "CTG", 0], ["San Andrés", "ADZ", 0], ["Bogotá", "BOG", 0],
+    ["Cancún", "CUN", 0], ["Punta Cana", "PUJ", 0], ["Aruba", "AUA", 0], ["Curaçao", "CUR", 0], ["Cidade do Panamá", "PTY", 0],
+    // América do Norte
+    ["Orlando", "MCO", 0], ["Miami", "MIA", 0], ["Nova York", "JFK", 0], ["Las Vegas", "LAS", 0], ["Cidade do México", "MEX", 0], ["Toronto", "YYZ", 0],
+    // Europa
+    ["Lisboa", "LIS", 0], ["Porto", "OPO", 0], ["Madri", "MAD", 0], ["Barcelona", "BCN", 0], ["Paris", "CDG", 0], ["Roma", "FCO", 0], ["Milão", "MXP", 0],
+    ["Veneza", "VCE", 0], ["Londres", "LHR", 0], ["Amsterdã", "AMS", 0], ["Frankfurt", "FRA", 0], ["Zurique", "ZRH", 0], ["Atenas", "ATH", 0],
+    ["Istambul", "IST", 0], ["Praga", "PRG", 0], ["Viena", "VIE", 0],
+    // Resto do mundo
+    ["Dubai", "DXB", 0], ["Cairo", "CAI", 0], ["Marrakech", "RAK", 0], ["Cidade do Cabo", "CPT", 0], ["Tóquio", "NRT", 0], ["Bangkok", "BKK", 0],
+    ["Bali – Denpasar", "DPS", 0], ["Maldivas – Malé", "MLE", 0], ["Sydney", "SYD", 0],
+  ];
+  const BR = new Set(PLACES.filter(p => p[2]).map(p => p[1]));
+  $("#lugares").innerHTML = PLACES.map(([c, i]) => `<option value="${c} (${i})"></option>`).join("");
+
+  function parsePlace(raw) {
+    const v = (raw || "").trim();
+    const m = v.match(/\(([A-Za-z]{3})\)\s*$/);
+    let code = m ? m[1].toUpperCase() : (/^[A-Za-z]{3}$/.test(v) ? v.toUpperCase() : "");
+    let name = v.replace(/\s*\([^)]*\)\s*$/, "").trim();
+    if (!m && code) { const p = PLACES.find(x => x[1] === code); name = p ? p[0] : code; }
+    const city = name.split(" – ")[0].trim();
+    return { code, name, city };
+  }
+
+  /* ---------- search ---------- */
+  const F = ["orig", "dest", "ida", "volta", "adultos", "quartos"];
+  const LS_KEY = "radar-ferias-busca";
+  const saved = safe(() => JSON.parse(localStorage.getItem(LS_KEY) || "null"));
+  if (saved) F.forEach(k => { if (typeof saved[k] === "string") $("#" + k).value = saved[k]; });
+
+  function state() {
+    return {
+      o: parsePlace($("#orig").value), d: parsePlace($("#dest").value),
+      ida: $("#ida").value, volta: $("#volta").value,
+      ad: Number($("#adultos").value) || 2, qt: Number($("#quartos").value) || 1,
+    };
+  }
+
+  function buildLinks(s) {
+    const rt = !!s.volta, oc = s.o.code, dc = s.d.code;
+    const flights = [], stays = [];
+    const q = `Flights from ${oc || s.o.city} to ${dc || s.d.city} on ${s.ida}${rt ? ` through ${s.volta}` : " one way"}`;
+    flights.push(["Google Voos", `https://www.google.com/travel/flights?q=${enc(q)}&hl=pt-BR&curr=BRL`, "gráfico de preços por dia"]);
+    if (oc && dc) {
+      const yy = d => d.slice(2).replace(/-/g, "");
+      const adP = s.ad > 1 ? `/${s.ad}adults` : "";
+      const dates = `${s.ida}${rt ? "/" + s.volta : ""}`;
+      flights.push(["Skyscanner", `https://www.skyscanner.com.br/transporte/passagens-aereas/${oc.toLowerCase()}/${dc.toLowerCase()}/${yy(s.ida)}/${rt ? yy(s.volta) + "/" : ""}?adultsv2=${s.ad}&cabinclass=economy&rtn=${rt ? 1 : 0}`, "bom para mês inteiro"]);
+      flights.push(["Kayak", `https://www.kayak.com.br/flights/${oc}-${dc}/${dates}${adP}?sort=price_a`, "ordenado pelo menor preço"]);
+      flights.push(["Momondo", `https://www.momondo.com.br/flight-search/${oc}-${dc}/${dates}${adP}?sort=price_a`, "acha tarifas de agências"]);
+      flights.push(["Decolar", `https://www.decolar.com/shop/flights/results/${rt ? "roundtrip" : "oneway"}/${oc}/${dc}/${dates}/${s.ad}/0/0`, "parcela em reais"]);
+    }
+    const c = s.d.city;
+    if (c) {
+      const ci = s.ida, co = s.volta;
+      stays.push(["Booking", `https://www.booking.com/searchresults.pt-br.html?ss=${enc(c)}${ci ? "&checkin=" + ci : ""}${co ? "&checkout=" + co : ""}&group_adults=${s.ad}&no_rooms=${s.qt}&group_children=0&selected_currency=BRL`, "muitas com cancelamento grátis"]);
+      stays.push(["Airbnb", `https://www.airbnb.com.br/s/${enc(c)}/homes?adults=${s.ad}${ci ? "&checkin=" + ci : ""}${co ? "&checkout=" + co : ""}`, "casas e apartamentos"]);
+      stays.push(["Hoteis.com", `https://www.hoteis.com/Hotel-Search?destination=${enc(c)}${ci ? "&startDate=" + ci : ""}${co ? "&endDate=" + co : ""}&adults=${s.ad}`, "programa de recompensas"]);
+      stays.push(["Google Hotéis", `https://www.google.com/travel/search?q=${enc("hotéis em " + c)}&hl=pt-BR&curr=BRL`, "compara vários sites"]);
+    }
+    return { flights, stays };
+  }
+
+  function siteList(items) {
+    const box = document.createElement("div"); box.className = "sites";
+    items.forEach(([n, u, tip]) => {
+      const a = document.createElement("a");
+      a.className = "site"; a.href = u; a.target = "_blank"; a.rel = "noopener";
+      const s = document.createElement("strong"); s.textContent = n;
+      const t = document.createElement("span"); t.textContent = tip;
+      a.append(s, t); box.append(a);
+    });
+    return box;
+  }
+
+  function renderSearch() {
+    const s = state();
+    safe(() => localStorage.setItem(LS_KEY, JSON.stringify(Object.fromEntries(F.map(k => [k, $("#" + k).value])))));
+    const out = $("#busca-out"), when = $("#busca-tempo");
+    out.replaceChildren();
+
+    // board
+    $("#b-orig").textContent = s.o.code || (s.o.city || "???").slice(0, 3).toUpperCase();
+    $("#b-dest").textContent = s.d.code || (s.d.city || "???").slice(0, 3).toUpperCase();
+    let meta = s.ida ? fmtDay(s.ida) : "sem data";
+    if (s.ida && s.volta) {
+      const n = nights(s.ida, s.volta);
+      meta += ` → ${fmtDay(s.volta)} · ${n} ${n === 1 ? "noite" : "noites"}`;
+    } else if (s.ida) meta += " · só ida";
+    $("#b-meta").textContent = meta;
+
+    if (!s.o.city || !s.d.city || !s.ida) {
+      when.innerHTML = "<b>Faltam dados.</b> Preencha origem, destino e a data de ida.";
+      return;
+    }
+    if (s.volta && nights(s.ida, s.volta) < 0) {
+      when.innerHTML = "<b>A volta está antes da ida.</b> Ajuste as datas.";
+      return;
+    }
+
+    const { flights, stays } = buildLinks(s);
+    const legF = document.createElement("div"); legF.className = "leg";
+    legF.innerHTML = `<h3>Voos <span class="eyebrow"></span></h3>`;
+    $(".eyebrow", legF).textContent = `${s.o.code || s.o.city} → ${s.d.code || s.d.city} · ${s.ad} adulto${s.ad > 1 ? "s" : ""}`;
+    legF.append(siteList(flights));
+    if (!s.o.code || !s.d.code) {
+      const p = document.createElement("p"); p.className = "small muted"; p.style.margin = "0";
+      p.textContent = "Escolha cidades da lista (com o código do aeroporto) para abrir também Skyscanner, Kayak, Momondo e Decolar.";
+      legF.append(p);
+    }
+    const legH = document.createElement("div"); legH.className = "leg";
+    legH.innerHTML = `<h3>Hospedagem <span class="eyebrow"></span></h3>`;
+    $(".eyebrow", legH).textContent = `${s.d.city} · ${s.qt} quarto${s.qt > 1 ? "s" : ""}`;
+    legH.append(siteList(stays));
+    out.append(legF, legH);
+
+    // when to buy
+    const today = new Date(); today.setHours(12, 0, 0, 0);
+    const days = Math.round((dt(s.ida) - today) / 864e5);
+    const domestic = s.o.code && s.d.code ? (BR.has(s.o.code) && BR.has(s.d.code)) : null;
+    const [from, to] = domestic === false ? [180, 60] : [90, 30];
+    const addDays = (n) => { const d = dt(s.ida); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); };
+    const fmtFull = iso => { const [y, m, d] = iso.split("-").map(Number); return `${d} ${MES[m - 1]} ${y}`; };
+    const kind = domestic === false ? "internacional" : domestic ? "nacional" : "";
+    let msg = `<b>Faltam ${days} dias para a ida.</b> `;
+    if (days < 0) msg = "<b>Essa data já passou.</b> Escolha uma data futura.";
+    else if (days > from) msg += `Para voo ${kind || "como esse"}, a melhor janela de compra costuma ser entre ${fmtFull(addDays(from))} e ${fmtFull(addDays(to))}. Até lá, ative o alerta de preço no Google Voos e compre antes se aparecer promoção.`;
+    else if (days >= to) msg += `Vocês estão na melhor janela de compra para voo ${kind || "como esse"}. Compare os sites acima e compre quando o preço estiver dentro do orçamento.`;
+    else msg += "Já passou da janela ideal. Compre logo: perto da data o preço tende a subir.";
+    when.innerHTML = msg;
+  }
+  $("#f-busca").addEventListener("input", renderSearch);
+  $("#f-busca").addEventListener("change", renderSearch);
+  $("#f-busca").addEventListener("submit", e => e.preventDefault());
+  renderSearch();
+
+  function useDates(ida, volta) {
+    $("#ida").value = ida; $("#volta").value = volta;
+    renderSearch();
+    $("#busca").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  }
+
+  /* ---------- holidays 2027 ---------- */
+  const HOLS = [
+    { n: "Carnaval", d: "8 e 9 fev (seg e ter) · cinzas qua 10", ida: "2027-02-06", volta: "2027-02-14", gain: "9 dias de viagem tirando qui 11 e sex 12" },
+    { n: "Sexta-feira Santa", d: "26 mar (sex)", ida: "2027-03-20", volta: "2027-03-28", gain: "9 dias tirando 4 dias (22 a 25 mar)" },
+    { n: "Tiradentes", d: "21 abr (qua)", ida: "2027-04-17", volta: "2027-04-25", gain: "9 dias tirando 4 dias (19, 20, 22 e 23 abr)" },
+    { n: "Corpus Christi", d: "27 mai (qui) · ponto facultativo", ida: "2027-05-27", volta: "2027-05-30", gain: "4 dias tirando só a sex 28" },
+    { n: "Independência", d: "7 set (ter)", ida: "2027-09-04", volta: "2027-09-07", gain: "4 dias tirando só a seg 6" },
+    { n: "Nossa Senhora Aparecida", d: "12 out (ter)", ida: "2027-10-09", volta: "2027-10-12", gain: "4 dias tirando só a seg 11" },
+    { n: "Finados", d: "2 nov (ter)", ida: "2027-10-30", volta: "2027-11-02", gain: "4 dias tirando só a seg 1º" },
+    { n: "Proclamação da República", d: "15 nov (seg)", ida: "2027-11-13", volta: "2027-11-15", gain: "3 dias sem tirar folga" },
+    { n: "Natal e Ano-Novo", d: "25 dez e 1º jan caem no sábado", ida: "2027-12-18", volta: "2028-01-02", gain: "16 dias com 9 dias de férias; é alta temporada, compre cedo" },
+  ];
+  const hb = $("#hols");
+  HOLS.forEach(h => {
+    const b = document.createElement("button"); b.type = "button"; b.className = "hol";
+    const n = nights(h.ida, h.volta);
+    b.innerHTML = `<span class="date"></span><span class="name"></span><span class="gain"></span><span><span class="pill"></span></span>`;
+    $(".date", b).textContent = h.d;
+    $(".name", b).textContent = h.n;
+    $(".gain", b).textContent = h.gain;
+    $(".pill", b).textContent = `${fmtDay(h.ida)} → ${fmtDay(h.volta)} · ${n} noites`;
+    b.addEventListener("click", () => useDates(h.ida, h.volta));
+    hb.append(b);
+  });
+
+  /* ---------- Kira (Claude) ---------- */
+  const kGo = $("#k-go"), kStop = $("#k-stop"), kStatus = $("#k-status"), kOut = $("#k-out");
+  let sample = null, ctl = null;
+  kGo.disabled = true; kStatus.textContent = "Conectando…";
+  const ERR = {
+    not_granted: "Sem permissão para consultar a Kira nesta página.",
+    rate_limited: "Muitos pedidos seguidos. Espere um minuto e tente de novo.",
+    invalid_json: "A resposta veio fora do formato. Tente de novo.",
+    refused: "A Kira não conseguiu responder esse pedido. Mude a descrição e tente de novo.",
+    session_expired: "Sua sessão expirou. Recarregue a página.",
+    sampling_disabled: "Consultas ao Claude estão desligadas para esta conta.",
+  };
+
+  const k = (v) => $(v).value.trim();
+  async function askKira() {
+    if (!sample) return;
+    const s = state();
+    const orig = s.o.name ? `${s.o.name}${s.o.code ? " (" + s.o.code + ")" : ""}` : "São Paulo (GRU)";
+    const prompt = `Você é a Kira, assistente de viagens de um casal brasileiro, Braulio e Janaina, planejando as férias de 2027.
+Dados do pedido:
+- Cidade de saída: ${orig}
+- Orçamento total para os dois (passagens de ida e volta + hospedagem), em reais: ${k("#k-orc") || "não informado"}
+- Quando: ${k("#k-quando") || "flexível em 2027"}
+- Número de noites: ${k("#k-noites") || "7"}
+- Região: ${$("#k-regiao").value}
+- Estilo: ${$("#k-estilo").value}
+- Observações do casal: ${k("#k-obs") || "nenhuma"}
+
+Sugira 4 destinos diferentes que caibam no orçamento nessa época. Leve em conta clima e alta/baixa temporada no período, tempo de voo e conexões a partir da cidade de saída, e exigências de visto para brasileiros.
+Os preços são estimativas de faixa, em reais, para 2 adultos, com base no seu conhecimento geral de tarifas; não invente promoções específicas.
+Responda somente com um array JSON de 4 objetos, cada um assim:
+{"destino": "Nome da cidade ou região", "pais": "País", "iata": "código IATA do aeroporto principal (3 letras)", "porque": "1 ou 2 frases sobre por que combina com eles", "voo_casal": [min, max], "hotel_noite": [min, max], "total_estimado": número, "atencao": "1 frase: clima, visto, documento ou alta temporada", "dica": "1 frase prática para economizar nesse destino"}
+voo_casal = passagens de ida e volta para os dois; hotel_noite = diária de um quarto de casal de bom custo-benefício; total_estimado = voo médio + diária média × noites. Use apenas números inteiros nos campos de preço.`;
+
+    ctl = new AbortController();
+    kGo.disabled = true; kStop.hidden = false;
+    kStatus.innerHTML = '<span class="thinking">A Kira está pensando… (pode levar até 1 minuto)</span>';
+    kOut.replaceChildren();
+    try {
+      const data = await sample.json(prompt, { signal: ctl.signal, modelTier: "default" });
+      const list = Array.isArray(data) ? data : (Array.isArray(data?.destinos) ? data.destinos : []);
+      if (!list.length) throw { code: "invalid_json" };
+      list.slice(0, 6).forEach(renderIdea);
+      kStatus.textContent = "Estimativas da Kira. Use “Buscar este” para ver o preço real.";
+    } catch (e) {
+      kStatus.innerHTML = "";
+      if (e?.code === "cancelled") { kStatus.textContent = "Pedido cancelado."; }
+      else { const p = document.createElement("span"); p.className = "err"; p.textContent = ERR[e?.code] || "Não foi possível falar com a Kira agora. Tente de novo em instantes."; kStatus.append(p); }
+    } finally {
+      kGo.disabled = false; kStop.hidden = true; ctl = null;
+    }
+  }
+  const num = v => (typeof v === "number" && isFinite(v)) ? v : (isFinite(Number(v)) ? Number(v) : null);
+  const range = r => Array.isArray(r) && r.length === 2 && num(r[0]) != null && num(r[1]) != null ? `${brl.format(num(r[0]))} – ${brl.format(num(r[1]))}` : "—";
+  function renderIdea(it) {
+    const c = document.createElement("article"); c.className = "idea";
+    c.innerHTML = `<h3><span class="nm"></span><span class="code"></span></h3><span class="tag cn"></span><p class="why"></p>
+      <dl class="figures"><dt>Voo ida e volta (2)</dt><dd class="v"></dd><dt>Diária do hotel</dt><dd class="h"></dd><dt>Total estimado</dt><dd class="total t"></dd></dl>
+      <p class="small at"></p><p class="small muted tip"></p><div class="row"><button type="button" class="btn btn-ghost go">Buscar este</button></div>`;
+    $(".nm", c).textContent = String(it.destino || "Destino");
+    const code = /^[A-Za-z]{3}$/.test(it.iata || "") ? it.iata.toUpperCase() : "";
+    $(".code", c).textContent = code;
+    $(".cn", c).textContent = String(it.pais || "");
+    $(".why", c).textContent = String(it.porque || "");
+    $(".v", c).textContent = range(it.voo_casal);
+    $(".h", c).textContent = range(it.hotel_noite);
+    $(".t", c).textContent = num(it.total_estimado) != null ? "≈ " + brl.format(num(it.total_estimado)) : "—";
+    $(".at", c).textContent = it.atencao ? "Atenção: " + it.atencao : "";
+    $(".tip", c).textContent = it.dica ? "Dica: " + it.dica : "";
+    $(".go", c).addEventListener("click", () => {
+      $("#dest").value = code ? `${String(it.destino)} (${code})` : String(it.destino || "");
+      renderSearch();
+      $("#busca").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+    });
+    kOut.append(c);
+  }
+  kGo.addEventListener("click", askKira);
+  kStop.addEventListener("click", () => ctl?.abort());
+
+  /* ---------- shortlist ---------- */
+  const STATUS = [["ideia", "Ideia"], ["favorita", "Gostamos"], ["reservado", "Reservado"]];
+  const TIPO = { voo: "Voo", hospedagem: "Hospedagem", pacote: "Pacote", passeio: "Passeio" };
+  let items = [], col = null, user = null, mode = "loading", pendingDelete = null;
+  const LS_LIST = "radar-ferias-lista";
+
+  const local = {
+    read() { return safe(() => JSON.parse(localStorage.getItem(LS_LIST) || "[]")) || []; },
+    write(list) { safe(() => localStorage.setItem(LS_LIST, JSON.stringify(list))); items = list; renderList(); },
+  };
+
+  async function addItem(data) {
+    if (col) return col.add(data);
+    local.write([{ id: "l" + Date.now(), ...data }, ...local.read()]);
+  }
+  async function updateItem(id, patch) {
+    if (col) return col.doc(id).update(patch);
+    local.write(local.read().map(x => x.id === id ? { ...x, ...patch } : x));
+  }
+  async function deleteItem(id) {
+    if (col) return col.doc(id).delete();
+    local.write(local.read().filter(x => x.id !== id));
+  }
+  const errMsg = e => e?.code === "not_granted" ? "Você só tem acesso de leitura a esta lista." : "Não foi possível salvar agora. Tente de novo.";
+  const safeUrl = u => { const s = String(u || ""); return /^https?:\/\//i.test(s) ? s : ""; };
+
+  async function renderList() {
+    const box = $("#l-items");
+    const sorted = [...items].sort((a, b) => String(b.criadoEm || "").localeCompare(String(a.criadoEm || "")));
+    // summary
+    const sum = $("#l-sum"); sum.replaceChildren();
+    if (sorted.length) {
+      const chosen = sorted.filter(x => x.status === "favorita" || x.status === "reservado");
+      const booked = sorted.filter(x => x.status === "reservado");
+      const total = arr => arr.reduce((t, x) => t + (num(x.preco) || 0), 0);
+      [[`${sorted.length} opç${sorted.length === 1 ? "ão" : "ões"} guardada${sorted.length === 1 ? "" : "s"}`, null],
+       ["Gostamos + reservado: ", brl.format(total(chosen))],
+       ["Já reservado: ", brl.format(total(booked))]].forEach(([l, v]) => {
+        const s = document.createElement("span"); s.textContent = l;
+        if (v) { const b = document.createElement("b"); b.textContent = v; s.append(b); }
+        sum.append(s);
+      });
+    }
+    if (!sorted.length) {
+      box.innerHTML = `<div class="empty">Nada guardado ainda. Quando acharem um voo ou hotel bom, toque em “+ Guardar uma opção” e cole o link.</div>`;
+      return;
+    }
+    let names = {};
+    if (user && col) {
+      const ids = [...new Set(sorted.map(x => x.por).filter(Boolean))];
+      if (ids.length) names = await user.profiles(ids).catch(() => ({}));
+    }
+    box.replaceChildren();
+    sorted.forEach(x => {
+      const el = document.createElement("div"); el.className = "item"; el.dataset.status = x.status || "ideia";
+      const t = document.createElement("div"); t.className = "t";
+      const tag = document.createElement("span"); tag.className = "tag"; tag.textContent = (TIPO[x.tipo] || "Opção") + " · ";
+      t.append(tag);
+      const url = safeUrl(x.link);
+      if (url) { const a = document.createElement("a"); a.href = url; a.target = "_blank"; a.rel = "noopener"; a.textContent = String(x.titulo || "Sem título"); t.append(a); }
+      else t.append(document.createTextNode(String(x.titulo || "Sem título")));
+      const p = document.createElement("div"); p.className = "p"; p.textContent = num(x.preco) != null && x.preco !== "" ? brl.format(num(x.preco)) : "—";
+      el.append(t, p);
+      if (x.nota) { const n = document.createElement("div"); n.className = "n"; n.textContent = String(x.nota); el.append(n); }
+      const acts = document.createElement("div"); acts.className = "acts";
+      STATUS.forEach(([v, l]) => {
+        const b = document.createElement("button"); b.type = "button"; b.className = "btn btn-ghost status-btn";
+        b.textContent = l; b.setAttribute("aria-pressed", String((x.status || "ideia") === v));
+        b.addEventListener("click", () => { if ((x.status || "ideia") !== v) updateItem(x.id, { status: v }).catch(e => alertList(errMsg(e))); });
+        acts.append(b);
+      });
+      const del = document.createElement("button"); del.type = "button"; del.className = "btn btn-ghost";
+      del.textContent = pendingDelete === x.id ? "Confirmar remoção" : "Remover";
+      if (pendingDelete === x.id) del.style.color = "var(--danger)";
+      del.addEventListener("click", () => {
+        if (pendingDelete === x.id) { pendingDelete = null; deleteItem(x.id).catch(e => alertList(errMsg(e))); }
+        else { pendingDelete = x.id; renderList(); }
+      });
+      acts.append(del);
+      const who = names[x.por]?.name;
+      const meta = document.createElement("span"); meta.className = "muted";
+      const when = x.criadoEm ? new Date(x.criadoEm).toLocaleDateString("pt-BR") : "";
+      meta.textContent = [who ? "por " + who : "", when].filter(Boolean).join(" · ");
+      acts.append(meta);
+      el.append(acts);
+      box.append(el);
+    });
+  }
+  function alertList(m) { const s = $("#a-msg"); s.className = "small err"; s.textContent = m; $("#l-add-box").open = true; }
+
+  $("#f-add").addEventListener("submit", async e => {
+    e.preventDefault();
+    const titulo = k("#a-titulo");
+    if (!titulo) return;
+    const link = k("#a-link");
+    if (link && !safeUrl(link)) { alertList("O link precisa começar com https://"); return; }
+    const precoRaw = k("#a-preco");
+    const data = {
+      titulo, tipo: $("#a-tipo").value, preco: precoRaw === "" ? null : Number(precoRaw),
+      link, nota: k("#a-nota"), status: "ideia", criadoEm: new Date().toISOString(),
+    };
+    if (user && col) { const id = await user.id().catch(() => null); if (id) data.por = id; }
+    const msg = $("#a-msg"); msg.className = "small muted"; msg.textContent = "Guardando…";
+    try {
+      await addItem(data);
+      e.target.reset(); msg.textContent = "Guardado.";
+    } catch (err) { alertList(errMsg(err)); }
+  });
+
+  // Prefill the add form with the current search when it opens
+  $("#l-add-box").addEventListener("toggle", ev => {
+    if (!ev.target.open || k("#a-titulo")) return;
+    const s = state();
+    if (s.o.code && s.d.code && s.ida) $("#a-titulo").placeholder = `ex.: ${s.o.code}→${s.d.code}, ${fmtDay(s.ida)}${s.volta ? " a " + fmtDay(s.volta) : ""}`;
+  });
+
+  function useLocal(reason) {
+    mode = "local"; col = null;
+    $("#l-mode").textContent = "Salva só neste aparelho";
+    items = local.read(); renderList();
+    if (reason) { const n = document.createElement("p"); n.className = "small muted"; n.style.margin = "0"; n.textContent = reason; $("#l-sum").after(n); }
+  }
+
+  /* ---------- capabilities ---------- */
+  const c = window.claude;
+  if (!c?.use) {
+    kStatus.textContent = "A Kira funciona quando a página é aberta no claude.ai.";
+    useLocal("Abra pelo claude.ai para compartilhar a lista com a Janaina.");
+  } else {
+    c.use("sample").then(s => {
+      sample = s;
+      if (s) { kGo.disabled = false; kStatus.textContent = ""; }
+      else kStatus.textContent = "A Kira não está disponível nesta visualização.";
+    }).catch(() => { kStatus.textContent = "A Kira não está disponível nesta visualização."; });
+
+    Promise.all([c.use("db").catch(() => null), c.use("user").catch(() => null)]).then(([db, u]) => {
+      user = u;
+      if (!db) { useLocal("Entre no claude.ai para compartilhar a lista com a Janaina."); return; }
+      col = db.collection("opcoes"); mode = "db";
+      $("#l-mode").textContent = "Compartilhada";
+      col.onSnapshot(snap => {
+        items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        renderList();
+      }, () => useLocal("Não deu para carregar a lista compartilhada agora; usando a deste aparelho."));
+    });
+  }
+})();
+</script>

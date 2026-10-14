@@ -5,15 +5,23 @@ import { baseDaLoja, buscarLoja } from "@/lib/lojas";
 import { categoriasDaLoja } from "@/lib/catalogo";
 import { corValida, linkWhatsapp } from "@/lib/texto";
 import { IconeCarrinho } from "@/components/loja/IconeCarrinho";
+import { Rastreamento } from "@/components/loja/Rastreamento";
+import { rastreamentoSeguro } from "@/lib/rastreamento";
 
 type Props = { children: React.ReactNode; params: Promise<{ slug: string }> };
 
 export async function generateMetadata({ params }: Omit<Props, "children">): Promise<Metadata> {
   const loja = await buscarLoja((await params).slug);
   if (!loja) return {};
+  const r = rastreamentoSeguro(loja.rastreamento);
   return {
     title: { default: loja.slogan ? `${loja.nome} | ${loja.slogan}` : loja.nome, template: `%s | ${loja.nome}` },
     description: loja.sobre ?? loja.slogan ?? undefined,
+    openGraph: { siteName: loja.nome, locale: "pt_BR", type: "website" },
+    verification: {
+      google: r.googleVerificacao,
+      other: r.metaVerificacao ? { "facebook-domain-verification": r.metaVerificacao } : undefined,
+    },
   };
 }
 
@@ -31,6 +39,7 @@ export default async function LayoutLoja({ children, params }: Props) {
 
   return (
     <div style={estilo} data-tema={loja.tema} className="flex min-h-screen flex-col">
+      <Rastreamento r={rastreamentoSeguro(loja.rastreamento)} />
       <header className={`sticky top-0 z-20 border-b backdrop-blur ${moderno ? "border-white/10 bg-marca text-white" : "border-stone-200 bg-white/95"}`}>
         <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-3">
           <Link href={base || "/"} className="shrink-0">

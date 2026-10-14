@@ -2,6 +2,7 @@ import Link from "next/link";
 import { contexto } from "@/lib/painel";
 import { resumoDaLoja, pedidosRecentes } from "@/lib/consultas";
 import { cancelarPedidosVencidos } from "@/lib/pedidos";
+import { agendarSincronizacao } from "@/lib/canais/agendar";
 import { resumoDoMes } from "@/lib/financeiro";
 import { formatarReais } from "@/lib/dinheiro";
 import { formatarDataHora, hojeSP } from "@/lib/datas";
@@ -11,7 +12,7 @@ import { Cabecalho, Cartao, Etiqueta, Indicador, Vazio } from "@/components/admi
 export default async function Inicio() {
   const { loja } = await contexto();
   // aproveita a visita para liberar o estoque dos pedidos que não foram pagos a tempo
-  await cancelarPedidosVencidos();
+  if ((await cancelarPedidosVencidos()) > 0) agendarSincronizacao();
   const [r, fin, atencao] = await Promise.all([
     resumoDaLoja(loja),
     resumoDoMes(loja.id, hojeSP().slice(0, 7)),

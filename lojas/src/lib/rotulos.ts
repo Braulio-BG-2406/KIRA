@@ -16,6 +16,7 @@ export const NOMES_PAGAMENTO: Record<FormaPagamento, string> = {
   dinheiro: "Dinheiro",
   cartao: "Cartão",
   transferencia: "Transferência",
+  marketplace: "Pago no marketplace",
   outro: "Outro",
 };
 
@@ -24,5 +25,7 @@ export const NOMES_CANAL: Record<CanalVenda, string> = {
   whatsapp: "WhatsApp",
   instagram: "Instagram",
   loja_fisica: "Loja física",
+  mercadolivre: "Mercado Livre",
+  shopee: "Shopee",
   outro: "Outro",
 };

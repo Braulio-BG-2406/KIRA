@@ -56,6 +56,14 @@ export type TemaLoja = "elegante" | "moderno";
 
 export type Especificacao = { nome: string; valor: string };
 
+/** códigos de verificação e de medição de Google e Meta (Instagram/Facebook) */
+export type Rastreamento = {
+  googleVerificacao?: string;
+  googleAnalytics?: string;
+  metaVerificacao?: string;
+  metaPixel?: string;
+};
+
 export const lojas = pgTable("lojas", {
   id: serial("id").primaryKey(),
   slug: text("slug").notNull().unique(),
@@ -72,6 +80,7 @@ export const lojas = pgTable("lojas", {
   pixNome: text("pix_nome"),
   pixCidade: text("pix_cidade"),
   tema: text("tema").$type<TemaLoja>().notNull().default("elegante"),
+  rastreamento: jsonb("rastreamento").$type<Rastreamento>().notNull().default({}),
   frete: jsonb("frete").$type<ConfigFrete>().notNull().default(FRETE_PADRAO),
   /** desconto em % para quem paga com o Pix direto da loja */
   descontoPixPct: integer("desconto_pix_pct").notNull().default(0),
@@ -163,8 +172,8 @@ export const clientes = pgTable(
 
 export type StatusPedido = "aguardando_pagamento" | "pago" | "separacao" | "enviado" | "entregue" | "cancelado";
 export type StatusPagamento = "pendente" | "aprovado" | "recusado" | "estornado";
-export type CanalVenda = "site" | "whatsapp" | "instagram" | "loja_fisica" | "outro";
-export type FormaPagamento = "pix" | "mercadopago" | "whatsapp" | "dinheiro" | "cartao" | "transferencia" | "outro";
+export type CanalVenda = "site" | "whatsapp" | "instagram" | "loja_fisica" | "mercadolivre" | "shopee" | "outro";
+export type FormaPagamento = "pix" | "mercadopago" | "whatsapp" | "dinheiro" | "cartao" | "transferencia" | "marketplace" | "outro";
 
 export const pedidos = pgTable(
   "pedidos",
@@ -188,6 +197,8 @@ export const pedidos = pgTable(
     entrega: jsonb("entrega").$type<Entrega>().notNull(),
     codigoRastreio: text("codigo_rastreio"),
     observacoes: text("observacoes"),
+    /** número do pedido no marketplace (Mercado Livre, Shopee) */
+    canalPedidoId: text("canal_pedido_id"),
     mpPreferenciaId: text("mp_preferencia_id"),
     mpPagamentoId: text("mp_pagamento_id"),
     pagoEm: timestamp("pago_em", { withTimezone: true }),
@@ -198,6 +209,7 @@ export const pedidos = pgTable(
     uniqueIndex("pedidos_loja_numero").on(t.lojaId, t.numero),
     index("pedidos_loja_status").on(t.lojaId, t.status),
     index("pedidos_loja_criado").on(t.lojaId, t.criadoEm),
+    uniqueIndex("pedidos_canal_externo").on(t.lojaId, t.canal, t.canalPedidoId),
   ],
 );
 
@@ -321,6 +333,73 @@ export const cupons = pgTable(
   },
   (t) => [uniqueIndex("cupons_loja_codigo").on(t.lojaId, t.codigo)],
 );
+
+export type Marketplace = "mercadolivre" | "shopee";
+
+export type CredenciaisCanal = {
+  accessToken: string;
+  refreshToken: string;
+  /** ISO */
+  expiraEm: string;
+  /** Mercado Livre: id do vendedor; Shopee: shop_id */
+  contaId: string;
+  contaNome?: string;
+};
+
+export type ConfigCanal = {
+  /** manda o preço do site (com o acréscimo) para o marketplace */
+  sincronizarPreco: boolean;
+  /** % a mais no marketplace para cobrir a comissão */
+  acrescimoPct: number;
+  /** Mercado Livre: gold_special (Clássico) ou gold_pro (Premium) */
+  tipoAnuncio?: "gold_special" | "gold_pro";
+};
+
+export const CONFIG_CANAL_PADRAO: ConfigCanal = { sincronizarPreco: true, acrescimoPct: 0, tipoAnuncio: "gold_special" };
+
+/** conta de marketplace ligada a uma loja */
+export const canais = pgTable(
+  "canais",
+  {
+    id: serial("id").primaryKey(),
+    lojaId: integer("loja_id").notNull().references(() => lojas.id, { onDelete: "cascade" }),
+    tipo: text("tipo").$type<Marketplace>().notNull(),
+    credenciais: jsonb("credenciais").$type<CredenciaisCanal>(),
+    config: jsonb("config").$type<ConfigCanal>().notNull().default(CONFIG_CANAL_PADRAO),
+    ativo: boolean("ativo").notNull().default(true),
+    ultimoErro: text("ultimo_erro"),
+    sincronizadoEm: timestamp("sincronizado_em", { withTimezone: true }),
+    criadoEm: criadoEm(),
+  },
+  (t) => [uniqueIndex("canais_loja_tipo").on(t.lojaId, t.tipo)],
+);
+
+/** variação da loja ligada a um anúncio do marketplace */
+export const anuncios = pgTable(
+  "anuncios",
+  {
+    id: serial("id").primaryKey(),
+    canalId: integer("canal_id").notNull().references(() => canais.id, { onDelete: "cascade" }),
+    varianteId: integer("variante_id").notNull().references(() => variantes.id, { onDelete: "cascade" }),
+    /** Mercado Livre: MLB...; Shopee: item_id */
+    externoId: text("externo_id").notNull(),
+    /** variação dentro do anúncio (variation_id / model_id); vazio quando não tem */
+    externoVarianteId: text("externo_variante_id").notNull().default(""),
+    link: text("link"),
+    ultimoEstoqueEnviado: integer("ultimo_estoque_enviado"),
+    ultimoPrecoEnviado: integer("ultimo_preco_enviado"),
+    erro: text("erro"),
+    sincronizadoEm: timestamp("sincronizado_em", { withTimezone: true }),
+    criadoEm: criadoEm(),
+  },
+  (t) => [
+    uniqueIndex("anuncios_canal_variante").on(t.canalId, t.varianteId),
+    uniqueIndex("anuncios_canal_externo").on(t.canalId, t.externoId, t.externoVarianteId),
+  ],
+);
+
+export type Canal = typeof canais.$inferSelect;
+export type Anuncio = typeof anuncios.$inferSelect;
 
 export const usuarios = pgTable("usuarios", {
   id: serial("id").primaryKey(),

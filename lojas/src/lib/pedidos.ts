@@ -23,7 +23,7 @@ import { opcoesDeFrete } from "./frete";
 import { hojeSP } from "./datas";
 import { soDigitos } from "./texto";
 import { ErroNegocio } from "./erros";
-import { NOMES_STATUS } from "./rotulos";
+import { NOMES_CANAL, NOMES_STATUS } from "./rotulos";
 
 export { ErroNegocio };
 
@@ -43,6 +43,10 @@ export type NovoPedido = {
   canal: CanalVenda;
   observacoes?: string | null;
   jaPago?: boolean;
+  /** número do pedido no marketplace */
+  canalPedidoId?: string;
+  /** venda que já aconteceu fora (marketplace): registra mesmo sem estoque, que pode ficar negativo */
+  permitirSemEstoque?: boolean;
 };
 
 function gerarCodigo(): string {
@@ -111,19 +115,21 @@ export async function criarPedido(p: NovoPedido): Promise<Pedido> {
       .orderBy(asc(variantes.id));
 
     const itens = [];
+    const semEstoque: string[] = [];
     let subtotal = 0;
     for (const [varianteId, { quantidade, preco }] of quantidades) {
       const l = linhas.find((x) => x.v.id === varianteId);
       if (!l || l.lojaId !== p.lojaId) throw new ErroNegocio("Um dos produtos do carrinho não existe mais.");
-      if (!l.v.ativo || (p.canal === "site" && !l.produtoAtivo)) {
+      if (!p.permitirSemEstoque && (!l.v.ativo || (p.canal === "site" && !l.produtoAtivo))) {
         throw new ErroNegocio(`${l.produtoNome} não está mais à venda.`);
       }
       // baixa atômica: só passa se ainda houver estoque
       const baixa = await tx
         .update(variantes)
         .set({ estoque: sql`${variantes.estoque} - ${quantidade}` })
-        .where(and(eq(variantes.id, varianteId), gte(variantes.estoque, quantidade)))
-        .returning({ id: variantes.id });
+        .where(p.permitirSemEstoque ? eq(variantes.id, varianteId) : and(eq(variantes.id, varianteId), gte(variantes.estoque, quantidade)))
+        .returning({ id: variantes.id, estoque: variantes.estoque });
+      if (baixa[0] && baixa[0].estoque < 0) semEstoque.push(l.produtoNome);
       if (baixa.length === 0) {
         const nome = l.v.nome === "Padrão" ? l.produtoNome : `${l.produtoNome} (${l.v.nome})`;
         throw new ErroNegocio(`Estoque insuficiente: ${nome} tem ${l.v.estoque} unidade(s).`);
@@ -202,6 +208,7 @@ export async function criarPedido(p: NovoPedido): Promise<Pedido> {
         cupomCodigo,
         entrega,
         observacoes: p.observacoes?.trim() || null,
+        canalPedidoId: p.canalPedidoId ?? null,
         pagoEm: p.jaPago ? agora : null,
       })
       .returning();
@@ -220,8 +227,20 @@ export async function criarPedido(p: NovoPedido): Promise<Pedido> {
     await tx.insert(pedidoHistorico).values({
       pedidoId: pedido.id,
       status: pedido.status,
-      nota: p.canal === "site" ? "Pedido feito no site" : "Venda registrada no painel",
+      nota:
+        p.canal === "site"
+          ? "Pedido feito no site"
+          : p.canalPedidoId
+            ? `Venda ${p.canalPedidoId} recebida do ${NOMES_CANAL[p.canal]}`
+            : "Venda registrada no painel",
     });
+    if (semEstoque.length) {
+      await tx.insert(pedidoHistorico).values({
+        pedidoId: pedido.id,
+        status: pedido.status,
+        nota: `Vendido sem estoque no sistema: ${semEstoque.join(", ")}. Confira o estoque.`,
+      });
+    }
     if (p.jaPago) await lancarReceita(tx, pedido);
     return pedido;
   });

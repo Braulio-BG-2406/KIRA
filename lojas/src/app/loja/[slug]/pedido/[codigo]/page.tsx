@@ -11,6 +11,7 @@ import { gerarPixCopiaECola } from "@/lib/pix";
 import { linkWhatsapp } from "@/lib/texto";
 import { NOMES_PAGAMENTO, NOMES_STATUS } from "@/lib/rotulos";
 import { Copiar } from "@/components/loja/Copiar";
+import { EventoCompra } from "@/components/loja/EventoCompra";
 
 export const metadata = { title: "Seu pedido", robots: { index: false } };
 
@@ -49,6 +50,7 @@ export default async function PaginaPedido({
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
+      {pedido.status !== "cancelado" && <EventoCompra codigo={pedido.codigo} valorCentavos={pedido.totalCentavos} />}
       <p className="text-sm text-stone-500">Pedido #{pedido.numero} · código {pedido.codigo}</p>
       <h1 className="mt-1 font-titulo text-4xl text-marca">
         {pedido.status === "cancelado" ? "Pedido cancelado" : aguardando ? "Pedido recebido!" : NOMES_STATUS[pedido.status]}

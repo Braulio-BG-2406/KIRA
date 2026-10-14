@@ -4,8 +4,11 @@ import { clientes, pedidos, type StatusPedido } from "@/db/schema";
 import { kiraAutorizada } from "@/lib/kira";
 import { todasAsLojas } from "@/lib/lojas";
 import { estoqueBaixo, resumoDaLoja } from "@/lib/consultas";
-import { listarVitrine } from "@/lib/catalogo";
+import { categoriasDaLoja, listarVitrine } from "@/lib/catalogo";
+import { legendaInstagram } from "@/lib/divulgacao";
+import { absoluta, urlDaLoja } from "@/lib/dominios";
 import { cancelarPedidosVencidos } from "@/lib/pedidos";
+import { manutencaoDosCanais } from "@/lib/canais/sincronizar";
 import { resumoDoMes } from "@/lib/financeiro";
 import { hojeSP } from "@/lib/datas";
 import { NOMES_STATUS } from "@/lib/rotulos";
@@ -85,6 +88,29 @@ export async function GET(req: Request, { params }: Ctx) {
     });
   }
 
+  if (acao === "divulgar") {
+    // a Kira usa para montar o post do Instagram: foto pública, link e legenda
+    const q = url.searchParams.get("q") ?? "";
+    const resultado = [];
+    for (const l of lojas) {
+      const cats = await categoriasDaLoja(l.id);
+      const lista = await listarVitrine({ lojaId: l.id, busca: q, destaque: !q, limite: 5 });
+      for (const p of lista.filter((x) => x.estoqueTotal > 0)) {
+        const link = `${urlDaLoja(l.slug)}/produto/${p.slug}`;
+        resultado.push({
+          loja: l.slug,
+          produto: p.nome,
+          precoCentavos: p.precoMin,
+          estoque: p.estoqueTotal,
+          link,
+          imagens: p.imagens.map((i) => absoluta(i)),
+          legenda: legendaInstagram(l, p, link, cats.find((c) => c.id === p.categoriaId)?.nome),
+        });
+      }
+    }
+    return Response.json({ produtos: resultado, dica: q ? undefined : "sem ?q= vêm os destaques com estoque" });
+  }
+
   if (acao === "clientes") {
     const q = (url.searchParams.get("q") ?? "").trim();
     if (!q) return Response.json({ erro: "informe ?q=" }, { status: 400 });
@@ -97,11 +123,14 @@ export async function GET(req: Request, { params }: Ctx) {
     return Response.json({ clientes: lista.map((c) => ({ ...c, loja: lojas.find((l) => l.id === c.lojaId)?.slug })) });
   }
 
-  return Response.json({ erro: "ação desconhecida", acoes: ["resumo", "pedidos", "estoque-baixo", "produtos", "clientes", "POST manutencao"] }, { status: 404 });
+  return Response.json({ erro: "ação desconhecida", acoes: ["resumo", "pedidos", "estoque-baixo", "produtos", "divulgar", "clientes", "POST manutencao"] }, { status: 404 });
 }
 
 export async function POST(req: Request, { params }: Ctx) {
   if (!kiraAutorizada(req)) return Response.json({ erro: "não autorizado" }, { status: 401 });
   if ((await params).acao !== "manutencao") return Response.json({ erro: "ação desconhecida" }, { status: 404 });
-  return Response.json({ pedidosCancelados: await cancelarPedidosVencidos() });
+  const pedidosCancelados = await cancelarPedidosVencidos();
+  // pedidos novos de Mercado Livre e Shopee que algum aviso não trouxe + estoque em dia
+  const marketplaces = await manutencaoDosCanais();
+  return Response.json({ pedidosCancelados, marketplaces });
 }

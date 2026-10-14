@@ -9,6 +9,7 @@ import { criarPreferencia, tokenMercadoPago } from "@/lib/mercadopago";
 import { urlDaLoja } from "@/lib/dominios";
 import { dentroDoLimite, ipDe } from "@/lib/limite";
 import { soDigitos } from "@/lib/texto";
+import { agendarSincronizacao } from "@/lib/canais/agendar";
 
 const texto = (max: number) => z.string().trim().min(1).max(max);
 
@@ -77,6 +78,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
     throw e;
   }
 
+  agendarSincronizacao();
   let pagarEm: string | null = null;
   if (d.pagamento === "mercadopago") {
     try {

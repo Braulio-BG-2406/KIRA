@@ -4,6 +4,7 @@ import { exigirUsuario } from "./auth";
 import { lojaDoPainel } from "./lojas";
 import { ErroNegocio } from "./erros";
 import { lerReais } from "./dinheiro";
+import { agendarSincronizacao } from "./canais/agendar";
 
 /** usuário logado + loja escolhida; use em toda página e ação do painel */
 export async function contexto() {
@@ -27,12 +28,19 @@ function violaUnico(e: unknown): boolean {
 
 /**
  * Roda a ação e volta para a página com a mensagem de sucesso ou de erro.
- * A função pode devolver outro caminho para onde ir depois.
+ * A função pode devolver outro caminho para onde ir depois (ou { destino, ok }).
  */
-export async function executar(voltar: string, fn: () => Promise<string | void>, ok = "Salvo."): Promise<never> {
+export async function executar(
+  voltar: string,
+  fn: () => Promise<string | void | { destino?: string; ok?: string }>,
+  ok = "Salvo.",
+): Promise<never> {
   let destino: string;
   try {
-    destino = comAviso((await fn()) || voltar, "ok", ok);
+    const r = await fn();
+    destino = typeof r === "object" ? comAviso(r.destino || voltar, "ok", r.ok || ok) : comAviso(r || voltar, "ok", ok);
+    // qualquer mudança no painel pode mexer em estoque ou preço: avisa os marketplaces
+    agendarSincronizacao();
   } catch (e) {
     if (e instanceof ErroNegocio) destino = comAviso(voltar, "erro", e.message);
     else if (violaUnico(e)) destino = comAviso(voltar, "erro", "Já existe um cadastro com esse nome ou código.");

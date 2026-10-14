@@ -1,0 +1,140 @@
+# Buscador de oportunidades automotivas - configuração
+# Copie para buscas.toml e ajuste:  cp buscas.exemplo.toml buscas.toml
+#
+# A análise é feita em 3 faixas, cada uma com poucas buscas:
+#   pesados   -> 1 busca por termo   (caminhão e cavalo mecânico)
+#   populares -> 1 busca por modelo  (marcas nacionais)
+#   premium   -> 1 busca por marca   (BMW, Audi, Mercedes-Benz)
+# Para desligar uma faixa: ativa = false. Para rodar só uma:
+#   python -m buscador_auto buscar --faixa premium
+
+[geral]
+saida = "saida"                    # onde ficam os relatórios HTML/CSV
+banco = "dados/buscador_auto.db"   # histórico (anúncios novos, quedas de preço)
+pausa_entre_requisicoes = 1.5      # segundos entre páginas (não sobrecarregue os sites)
+limite_por_faixa = 5               # quantos mostrar por faixa no terminal
+score_minimo_alerta = 70           # nota mínima para avisar no Telegram
+max_alertas_por_faixa = 3          # máximo de avisos por faixa a cada execução
+
+[fipe]
+versao = 1          # 1 = parallelum v1 (sem cadastro) | 2 = v2 (aceita token, limite maior)
+token = ""          # ou variável de ambiente FIPE_TOKEN
+cache = "dados/cache_fipe.db"
+
+[telegram]
+token = ""          # ou TELEGRAM_BOT_TOKEN (crie o bot com o @BotFather)
+chat_id = ""        # ou TELEGRAM_CHAT_ID
+
+[mercadolivre]
+token = ""          # ou ML_ACCESS_TOKEN (https://developers.mercadolivre.com.br)
+
+# ---------------------------------------------------------------------------
+# FAIXA 1 - Veículos pesados: caminhões e cavalos mecânicos
+# ---------------------------------------------------------------------------
+[faixas.pesados]
+ativa = true
+termos = ["cavalo mecânico", "caminhão truck", "caminhão toco"]
+preco_min = 80000
+preco_max = 650000
+ano_min = 2012
+ufs = []                          # vazio = Brasil todo
+fontes = ["olx", "mercadolivre"]  # Webmotors não tem caminhões
+paginas = 2
+
+# ---------------------------------------------------------------------------
+# FAIXA 2 - Carros populares de marcas nacionais
+# ---------------------------------------------------------------------------
+[faixas.populares]
+ativa = true
+# Uma busca por modelo ("Marca Modelo"). Poucos modelos de giro rápido = busca curta.
+modelos = ["Chevrolet Onix", "Hyundai HB20", "Volkswagen Gol", "Volkswagen Polo", "Fiat Argo",
+           "Fiat Mobi", "Fiat Strada", "Renault Kwid", "Renault Sandero", "Ford Ka"]
+# Marcas que contam como "nacionais" ao classificar planilhas importadas.
+marcas = ["Volkswagen", "Chevrolet", "Fiat", "Ford", "Renault", "Hyundai", "Toyota", "Honda",
+          "Nissan", "Peugeot", "Citroën"]
+preco_max = 90000                 # também é o teto para um carro nacional ser "popular"
+ano_min = 2016
+km_max = 130000
+ufs = ["SP"]
+fontes = ["olx", "mercadolivre", "webmotors"]
+paginas = 1
+
+# ---------------------------------------------------------------------------
+# FAIXA 3 - Carros premium
+# ---------------------------------------------------------------------------
+[faixas.premium]
+ativa = true
+marcas = ["BMW", "Audi", "Mercedes-Benz"]   # uma busca por marca
+# Opcional: restringir a alguns modelos (uma busca por modelo):
+# modelos = { BMW = ["320i", "X1"], Audi = ["A3", "Q3"], "Mercedes-Benz" = ["C 200", "GLA 200"] }
+preco_min = 80000
+preco_max = 350000
+ano_min = 2016
+km_max = 100000
+ufs = ["SP"]
+fontes = ["olx", "mercadolivre", "webmotors"]
+paginas = 2
+
+# ---------------------------------------------------------------------------
+# Custos e metas por faixa. Os valores abaixo são o padrão do programa;
+# descomente e ajuste com os SEUS números (despachante, preparação, etc.).
+# Pesados usam [custos.caminhao] ou [custos.cavalo] conforme o veículo.
+# ---------------------------------------------------------------------------
+# [custos.populares]
+# transferencia = 1200      # Detran + vistoria de transferência + despachante
+# vistoria_cautelar = 350
+# preparacao_pct = 0.02     # estética/pequenos reparos (% do preço)...
+# preparacao_min = 800      # ...com este mínimo
+# comissao_pct = 0.0        # comissão/anúncio na revenda
+# outros = 0                # frete, deslocamento, IPVA proporcional
+# fator_revenda = 0.97      # revende por 97% da FIPE (ajustada pela km)
+# km_ano = 15000            # rodagem considerada normal por ano
+# ajuste_km_10mil = 0.015   # -1,5% de valor a cada 10 mil km acima do normal
+# margem_min_pct = 0.10     # margem mínima para "BOA" revenda
+# lucro_min = 4000          # lucro mínimo em R$ para "BOA" revenda
+# desconto_uso_bom = 0.05   # 5% abaixo da FIPE já é boa compra para uso
+
+# [custos.premium]
+# transferencia = 1500
+# vistoria_cautelar = 450
+# preparacao_pct = 0.03     # pneus, freios e estética custam mais
+# preparacao_min = 2500
+# fator_revenda = 0.92      # premium usado gira devagar e negocia abaixo da FIPE
+# km_ano = 15000
+# ajuste_km_10mil = 0.02
+# margem_min_pct = 0.10
+# lucro_min = 10000
+# desconto_uso_bom = 0.08
+
+# [custos.caminhao]
+# transferencia = 2500
+# vistoria_cautelar = 800
+# preparacao_pct = 0.03
+# preparacao_min = 3000
+# fator_revenda = 0.95
+# km_ano = 70000
+# ajuste_km_10mil = 0.003
+# margem_min_pct = 0.10
+# lucro_min = 15000
+
+# [custos.cavalo]
+# transferencia = 2500
+# vistoria_cautelar = 800
+# preparacao_pct = 0.03
+# preparacao_min = 5000
+# fator_revenda = 0.95
+# km_ano = 110000
+# ajuste_km_10mil = 0.0025
+# margem_min_pct = 0.10
+# lucro_min = 20000
+
+# ---------------------------------------------------------------------------
+# Buscas avulsas (opcional), além das faixas:
+# [[buscas]]
+# nome = "Hilux diesel"
+# faixa = ""                # vazio = não força faixa
+# categoria = "carro"
+# termo = "hilux diesel"
+# preco_max = 200000
+# fontes = ["olx", "mercadolivre"]
+# ---------------------------------------------------------------------------

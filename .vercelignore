@@ -1,0 +1,8 @@
+# Só o site e as funções vão para a Vercel
+*.xlsx
+tests/
+saida/
+dados/
+.pytest_cache/
+__pycache__/
+buscas.toml

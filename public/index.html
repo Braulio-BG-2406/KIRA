@@ -1,0 +1,536 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Buscador de oportunidades automotivas</title>
+<style>
+:root {
+  --bg: #f6f7f9; --surface: #ffffff; --surface-2: #f0f2f5; --text: #15181d; --muted: #5d6673;
+  --border: #dde1e7; --accent: #1f5fd1; --on-accent: #ffffff; --good: #137a43; --good-bg: #e3f4ea; --ok: #8a6100;
+  --ok-bg: #fdf3d8; --bad: #b42318; --bad-bg: #fdebe9; --info: #475467; --info-bg: #eef0f3;
+  --shadow: 0 1px 2px rgba(16, 24, 40, .06), 0 1px 3px rgba(16, 24, 40, .08);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1115; --surface: #171a20; --surface-2: #1e222a; --text: #e8eaee; --muted: #9aa3b0;
+    --border: #2a2f39; --accent: #6ea0ff; --on-accent: #0f1115; --good: #4cc38a; --good-bg: #13291e; --ok: #e3b341;
+    --ok-bg: #2b2412; --bad: #ff7b72; --bad-bg: #331a19; --info: #aab3c0; --info-bg: #232831;
+    --shadow: none;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1115; --surface: #171a20; --surface-2: #1e222a; --text: #e8eaee; --muted: #9aa3b0;
+  --border: #2a2f39; --accent: #6ea0ff; --on-accent: #0f1115; --good: #4cc38a; --good-bg: #13291e; --ok: #e3b341;
+  --ok-bg: #2b2412; --bad: #ff7b72; --bad-bg: #331a19; --info: #aab3c0; --info-bg: #232831;
+  --shadow: none;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text);
+  font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+.wrap { max-width: 1240px; margin: 0 auto; padding: 24px 16px 48px; }
+header h1 { font-size: 1.5rem; margin: 0 0 4px; letter-spacing: -.01em; }
+header p { margin: 0; color: var(--muted); }
+.aviso { margin-top: 12px; padding: 10px 12px; border-radius: 8px; background: var(--ok-bg); color: var(--ok); }
+.aviso:empty { display: none; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin: 20px 0; }
+.kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px;
+  box-shadow: var(--shadow); text-align: left; font: inherit; color: var(--text); }
+button.kpi { cursor: pointer; }
+button.kpi:hover { border-color: var(--accent); }
+.kpi[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.kpi h2 { margin: 0 0 2px; font-size: .8rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.kpi b { display: block; font-size: 1.6rem; font-variant-numeric: tabular-nums; }
+.kpi span { color: var(--muted); font-size: .85rem; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; margin-bottom: 18px; }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--surface); }
+.seg button { border: 0; background: transparent; color: var(--text); padding: 7px 12px; font: inherit; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--border); }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
+input[type=search], select { font: inherit; color: var(--text); background: var(--surface);
+  border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; }
+input[type=search] { flex: 1 1 200px; min-width: 0; }
+label.chk { display: inline-flex; gap: 6px; align-items: center; color: var(--muted); }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
+@media (max-width: 400px) { .grid { grid-template-columns: 1fr; } }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px;
+  box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 10px; min-width: 0; container-type: inline-size; }
+.top { display: flex; gap: 10px; align-items: center; }
+.score { flex: none; width: 46px; height: 46px; border-radius: 10px; display: grid; place-items: center;
+  font-weight: 700; font-size: 1.1rem; font-variant-numeric: tabular-nums; background: var(--info-bg); color: var(--info); }
+.score.alta { background: var(--good-bg); color: var(--good); }
+.score.media { background: var(--ok-bg); color: var(--ok); }
+.score.baixa { background: var(--bad-bg); color: var(--bad); }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag { font-size: .75rem; padding: 2px 8px; border-radius: 999px; background: var(--surface-2); color: var(--muted); }
+.tag.novo { background: var(--accent); color: var(--on-accent); }
+.tag.queda { background: var(--good-bg); color: var(--good); }
+.card h3 { margin: 0; font-size: 1rem; line-height: 1.3; overflow-wrap: anywhere; }
+.card h3 a { color: var(--text); text-decoration: none; }
+.card h3 a:hover { color: var(--accent); text-decoration: underline; }
+.meta { margin: 0; color: var(--muted); font-size: .85rem; }
+.precos { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; align-items: end; }
+.lbl { display: block; font-size: .72rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.precos strong { font-size: 1.25rem; font-variant-numeric: tabular-nums; }
+.precos .ref { font-variant-numeric: tabular-nums; }
+.desc { font-weight: 700; padding: 3px 8px; border-radius: 6px; font-variant-numeric: tabular-nums; }
+.desc.pos { background: var(--good-bg); color: var(--good); }
+.desc.neg { background: var(--bad-bg); color: var(--bad); }
+.vered { display: flex; flex-wrap: wrap; gap: 6px; }
+.v { font-size: .8rem; font-weight: 600; padding: 3px 9px; border-radius: 6px; background: var(--info-bg); color: var(--info); }
+.v.bom { background: var(--good-bg); color: var(--good); }
+.v.medio { background: var(--ok-bg); color: var(--ok); }
+.v.ruim { background: var(--bad-bg); color: var(--bad); }
+.v.foco { outline: 2px solid currentColor; outline-offset: -2px; }
+dl.nums { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin: 0; padding: 10px; border-radius: 8px; background: var(--surface-2); }
+dl.nums div { min-width: 0; }
+dl.nums dt { font-size: .7rem; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; }
+dl.nums dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; font-size: .9rem; white-space: nowrap; }
+@container (min-width: 440px) { dl.nums { grid-template-columns: repeat(4, 1fr); } }
+.pos-t { color: var(--good); } .neg-t { color: var(--bad); }
+ul.alertas { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: .84rem; }
+ul.alertas li { padding: 4px 8px; border-radius: 6px; background: var(--info-bg); color: var(--info); }
+ul.alertas li.alta { background: var(--bad-bg); color: var(--bad); }
+ul.alertas li.media { background: var(--ok-bg); color: var(--ok); }
+.sinais { font-size: .82rem; color: var(--good); }
+details { font-size: .85rem; color: var(--muted); }
+details summary { cursor: pointer; color: var(--accent); }
+details table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+details td { padding: 3px 0; border-bottom: 1px solid var(--border); }
+details td:last-child { text-align: right; color: var(--text); font-variant-numeric: tabular-nums; }
+.vazio { padding: 40px; text-align: center; color: var(--muted); border: 1px dashed var(--border); border-radius: 12px; }
+footer { margin-top: 28px; color: var(--muted); font-size: .8rem; }
+[hidden] { display: none !important; }
+.card.destaque { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn { font: inherit; font-weight: 600; border: 1px solid var(--accent); background: var(--accent); color: var(--on-accent);
+  padding: 8px 14px; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.btn.sec { background: transparent; color: var(--accent); }
+.btn:disabled { opacity: .55; cursor: progress; }
+.painel { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 4px 14px 14px;
+  margin-top: 18px; box-shadow: var(--shadow); }
+.abas { display: flex; gap: 2px; border-bottom: 1px solid var(--border); margin: 0 -14px 14px; padding: 0 10px; overflow-x: auto; }
+.abas button { border: 0; background: none; font: inherit; color: var(--muted); padding: 10px 10px 8px; cursor: pointer;
+  border-bottom: 2px solid transparent; white-space: nowrap; }
+.abas button[aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
+@media (max-width: 420px) { .abas button { padding: 10px 6px 8px; font-size: .9rem; } }
+.dica { margin: 0 0 12px; color: var(--muted); font-size: .9rem; }
+.acoes { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.progresso { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 4px; font-size: .85rem; }
+.progresso:empty { display: none; }
+.progresso li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 12px; padding: 5px 9px;
+  border-radius: 6px; background: var(--surface-2); }
+.progresso .st { color: var(--muted); }
+.progresso .st.ok { color: var(--good); }
+.progresso .st.erro { color: var(--bad); }
+.progresso small { flex-basis: 100%; color: var(--muted); overflow-wrap: anywhere; }
+form.aba { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+form.aba label { display: flex; flex-direction: column; gap: 4px; font-size: .8rem; color: var(--muted); min-width: 0; }
+form.aba .largo { grid-column: 1 / -1; }
+form.aba input, form.aba select, form.aba textarea { font: inherit; color: var(--text); background: var(--bg);
+  border: 1px solid var(--border); border-radius: 8px; padding: 7px 9px; min-width: 0; width: 100%; }
+#kpis[hidden] + .toolbar { margin-top: 18px; }
+.status { font-size: .88rem; color: var(--muted); }
+.status.erro { color: var(--bad); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Buscador de oportunidades automotivas</h1>
+    <p id="sub">Gerado em  · valores de revenda, custos e margens são estimativas para triagem, não laudo.</p>
+    <div class="aviso" id="aviso"></div>
+  </header>
+
+  <section class="painel" id="painel" hidden>
+    <div class="abas" role="tablist" aria-label="O que fazer">
+      <button role="tab" aria-selected="true" data-aba="aba-buscar">Pesquisar</button>
+      <button role="tab" aria-selected="false" data-aba="aba-avaliar">Avaliar anúncio</button>
+      <button role="tab" aria-selected="false" data-aba="aba-importar">Importar planilha</button>
+    </div>
+    <div class="aba" id="aba-buscar" role="tabpanel">
+      <p class="dica">Pesquisa na OLX, no Mercado Livre e na Webmotors e compara com a FIPE. Cada faixa roda poucas buscas.</p>
+      <div class="acoes">
+        <button class="btn" data-buscar="pesados">Pesados</button>
+        <button class="btn" data-buscar="populares">Populares</button>
+        <button class="btn" data-buscar="premium">Premium</button>
+        <button class="btn sec" data-buscar="">Todas as faixas</button>
+      </div>
+      <ul class="progresso" id="progresso"></ul>
+    </div>
+    <form class="aba" id="aba-avaliar" role="tabpanel" hidden autocomplete="off">
+      <label class="largo">Veículo (marca, modelo e versão) *<input name="titulo" required placeholder="Ex.: Scania R 450 A 6x2"></label>
+      <label>Preço pedido (R$) *<input name="preco" required inputmode="decimal" placeholder="410.000"></label>
+      <label>Ano modelo<input name="ano" inputmode="numeric" placeholder="2019"></label>
+      <label>Km<input name="km" inputmode="numeric" placeholder="520.000"></label>
+      <label>FIPE (se já souber)<input name="fipe" inputmode="decimal" placeholder="opcional"></label>
+      <label>UF<input name="uf" maxlength="2" placeholder="PR"></label>
+      <label>Vendedor<select name="vendedor"><option value="particular">Particular</option><option value="loja">Loja</option><option value="leilao">Leilão</option></select></label>
+      <label class="largo">Link do anúncio<input name="url" type="url" placeholder="https://..."></label>
+      <label class="largo">Texto do anúncio (para achar alertas)<textarea name="descricao" rows="3" placeholder="Único dono, aceito proposta..."></textarea></label>
+      <div class="acoes largo"><button class="btn" type="submit">Avaliar</button><span class="status" id="status-avaliar" role="status"></span></div>
+    </form>
+    <div class="aba" id="aba-importar" role="tabpanel" hidden>
+      <p class="dica">CSV ou Excel com as colunas <b>titulo</b> e <b>preco</b> (opcionais: marca, modelo, ano, km, uf, fipe, vendedor, descricao, url). Serve para leilões, Marketplace e listas de lojistas.</p>
+      <div class="acoes">
+        <label class="btn"><input type="file" id="arquivo" accept=".csv,.xlsx,.xlsm" hidden>Escolher planilha</label>
+        <button class="btn sec" id="exemplo" type="button">Ver exemplo (dados fictícios)</button>
+        <span class="status" id="status-importar" role="status"></span>
+      </div>
+    </div>
+  </section>
+
+  <section class="kpis" id="kpis"></section>
+
+  <section class="toolbar" aria-label="Filtros">
+    <div class="seg" id="objetivo" role="group" aria-label="Objetivo">
+      <button data-v="revenda" aria-pressed="true">Revenda</button>
+      <button data-v="uso" aria-pressed="false">Uso próprio</button>
+    </div>
+    <div class="seg" id="faixa" role="group" aria-label="Faixa"></div>
+    <input type="search" id="texto" placeholder="Filtrar por modelo, cidade, fonte..." aria-label="Filtrar">
+    <select id="ordem" aria-label="Ordenar">
+      <option value="score">Maior nota</option>
+      <option value="lucro">Maior lucro</option>
+      <option value="margem">Maior margem</option>
+      <option value="desconto">Maior desconto FIPE</option>
+      <option value="preco">Menor preço</option>
+    </select>
+    <label class="chk"><input type="checkbox" id="semRisco" checked> Ocultar risco alto</label>
+    <button class="btn sec" id="baixar" type="button">Baixar CSV</button>
+  </section>
+
+  <section class="grid" id="lista" aria-live="polite"></section>
+  <footer>KIRA · buscador de oportunidades automotivas. Confira sempre a procedência, a documentação (Detran/RENAVAM) e faça vistoria cautelar antes de fechar negócio.</footer>
+</div>
+
+<script id="dados" type="application/json">[]</script>
+<script>
+const MODO = "app";
+let DADOS = JSON.parse(document.getElementById("dados").textContent);
+const estado = { objetivo: "revenda", faixa: "", texto: "", ordem: "score", semRisco: true };
+const FAIXAS = [["pesados", "Pesados"], ["populares", "Populares"], ["premium", "Premium"]];
+let destaque = "";      // anúncio recém-avaliado: aparece mesmo com filtros
+let ultimaLista = [];   // o que está na tela (para o CSV)
+let usado = false;      // já pesquisou/importou/avaliou nesta visita
+
+function atualizarFaixas() {
+  if (DADOS.some(d => d.faixa === "outros") && !FAIXAS.some(f => f[0] === "outros")) FAIXAS.push(["outros", "Outros"]);
+}
+atualizarFaixas();
+const boa = v => ["ÓTIMA", "BOA"].includes(v);
+const oportunidade = d => !riscoAlto(d) && (boa(d.revenda) || boa(d.uso));
+
+const brl = v => v == null ? "–" : (v < 0 ? "-" : "") + "R$ " + Math.round(Math.abs(v)).toLocaleString("pt-BR");
+const pct = v => v == null ? "–" : (v * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1, minimumFractionDigits: 1 }) + "%";
+const pctSinal = v => v == null ? "–" : (v > 0 ? "+" : "") + pct(v);
+const num = v => v == null ? "?" : Math.round(v).toLocaleString("pt-BR");
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const riscoAlto = d => d.alertas.some(a => a.grav === "alta");
+const classeVeredito = v => ["ÓTIMA", "BOA"].includes(v) ? "bom" : ["MARGEM BAIXA", "PREÇO JUSTO"].includes(v) ? "medio" : ["RISCO", "SEM MARGEM", "CARA"].includes(v) ? "ruim" : "";
+const urlSegura = u => /^https?:\/\//i.test(u || "") ? u : "";
+
+function kpis() {
+  const cards = FAIXAS.map(([f, nome]) => {
+    const grupo = DADOS.filter(d => d.faixa === f);
+    const n = grupo.filter(oportunidade).length;
+    const melhor = grupo.length ? Math.max(...grupo.map(d => d.score)) : null;
+    const sub = grupo.length ? `de ${grupo.length} anúncio${grupo.length > 1 ? "s" : ""} · melhor nota ${melhor}` : "nenhum anúncio";
+    return `<button class="kpi" data-faixa="${f}" aria-pressed="${estado.faixa === f}"><h2>${nome}</h2>` +
+      `<b>${n}</b><span>${n === 1 ? "oportunidade" : "oportunidades"} ${sub}</span></button>`;
+  });
+  const risco = DADOS.filter(riscoAlto).length;
+  document.getElementById("kpis").hidden = MODO === "app" && !DADOS.length;
+  cards.push(`<div class="kpi"><h2>Risco alto</h2><b>${risco}</b><span>ocultos por padrão</span></div>`);
+  document.getElementById("kpis").innerHTML = cards.join("");
+}
+
+function botoesFaixa() {
+  document.getElementById("faixa").innerHTML = [["", "Todas"], ...FAIXAS]
+    .map(([f, nome]) => `<button data-v="${f}" aria-pressed="${estado.faixa === f}">${nome}</button>`).join("");
+}
+
+function escolherFaixa(f) {
+  estado.faixa = f;
+  botoesFaixa();
+  kpis();
+  render();
+}
+
+function card(d) {
+  const nota = d.score >= 75 ? "alta" : d.score >= 55 ? "media" : d.score < 35 ? "baixa" : "";
+  const url = urlSegura(d.url);
+  const titulo = url ? `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(d.titulo)}</a>` : esc(d.titulo);
+  const local = [d.cidade, d.uf].filter(Boolean).join("/");
+  const meta = [d.ano || "ano ?", d.km != null ? num(d.km) + " km" : "km ?", local, d.vendedor].filter(Boolean).map(esc).join(" · ");
+  const ref = d.fipe_ajustada ?? d.mediana_mercado;
+  const desc = d.desconto_fipe ?? d.desconto_mercado;
+  const tags = [`<span class="tag">${esc(d.faixa_nome)}</span>`];
+  if (d.faixa === "pesados") tags.push(`<span class="tag">${esc(d.categoria_nome)}</span>`);
+  tags.push(`<span class="tag">${esc(d.fonte)}</span>`);
+  if (d.novo) tags.push(`<span class="tag novo">novo</span>`);
+  if (d.queda > 0) tags.push(`<span class="tag queda">baixou ${brl(d.queda)}</span>`);
+  const focoRev = estado.objetivo === "revenda" ? " foco" : "";
+  const focoUso = estado.objetivo === "uso" ? " foco" : "";
+  const numeros = estado.objetivo === "revenda"
+    ? [["Revenda est.", brl(d.preco_revenda)], ["Custos", brl(d.custo_total)],
+       ["Lucro", `<span class="${d.lucro > 0 ? "pos-t" : d.lucro < 0 ? "neg-t" : ""}">${brl(d.lucro)}</span>`], ["Margem", pct(d.margem)]]
+    : [["Economia", ref ? `<span class="${ref - d.preco >= 0 ? "pos-t" : "neg-t"}">${brl(ref - d.preco)}</span>` : "–"],
+       ["FIPE", brl(d.fipe)], ["Ajuste km", pctSinal(d.ajuste_km)], ["Mercado", brl(d.mediana_mercado)]];
+  const alertas = d.alertas.length ? `<ul class="alertas">${d.alertas.map(a => `<li class="${a.grav}">${esc(a.msg)}</li>`).join("")}</ul>` : "";
+  const sinais = d.sinais.length ? `<div class="sinais">✓ ${d.sinais.map(esc).join(" · ")}</div>` : "";
+  const custos = Object.entries(d.custos).filter(([, v]) => v).map(([k, v]) => `<tr><td>${esc(k)}</td><td>${brl(v)}</td></tr>`).join("");
+  const detalhes = `<details><summary>Detalhes do cálculo</summary><table>
+      <tr><td>Modelo FIPE</td><td>${esc(d.fipe_modelo || "não encontrado")}</td></tr>
+      ${d.fipe_codigo ? `<tr><td>Código / referência</td><td>${esc(d.fipe_codigo)} · ${esc(d.fipe_mes)}</td></tr>` : ""}
+      <tr><td>FIPE</td><td>${brl(d.fipe)}</td></tr>
+      <tr><td>Ajuste por km</td><td>${pctSinal(d.ajuste_km)}</td></tr>
+      <tr><td>FIPE ajustada</td><td>${brl(d.fipe_ajustada)}</td></tr>
+      <tr><td>Mediana do mercado</td><td>${d.mediana_mercado ? brl(d.mediana_mercado) + ` (${d.comparaveis} anúncios)` : `poucos comparáveis (${d.comparaveis})`}</td></tr>
+      <tr><td>Desconto s/ mercado</td><td>${pct(d.desconto_mercado)}</td></tr>
+      ${custos}
+      <tr><td>Busca</td><td>${esc(d.busca || "–")}</td></tr>
+    </table></details>`;
+  return `<article class="card${d.chave === destaque ? " destaque" : ""}" data-chave="${esc(d.chave)}">
+    <div class="top"><div class="score ${nota}" title="Nota da oportunidade (0 a 100)">${d.score}</div><div class="tags">${tags.join("")}</div></div>
+    <h3>${titulo}</h3>
+    <p class="meta">${meta}</p>
+    <div class="precos">
+      <div><span class="lbl">Preço</span><strong>${brl(d.preco)}</strong></div>
+      <div><span class="lbl">${d.fipe_ajustada ? "FIPE ajustada" : "Mercado"}</span><span class="ref">${brl(ref)}</span></div>
+      ${desc != null ? `<span class="desc ${desc >= 0 ? "pos" : "neg"}" title="Desconto em relação à referência">${desc >= 0 ? "−" : "+"}${pct(Math.abs(desc))}</span>` : ""}
+    </div>
+    <div class="vered"><span class="v ${classeVeredito(d.revenda)}${focoRev}">Revenda: ${esc(d.revenda)}</span><span class="v ${classeVeredito(d.uso)}${focoUso}">Uso: ${esc(d.uso)}</span></div>
+    <dl class="nums">${numeros.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join("")}</dl>
+    ${alertas}${sinais}${detalhes}
+  </article>`;
+}
+
+function render() {
+  const t = estado.texto.toLowerCase();
+  const chave = {
+    score: d => -d.score, lucro: d => -(d.lucro ?? -1e12), margem: d => -(d.margem ?? -1e9),
+    desconto: d => -((d.desconto_fipe ?? d.desconto_mercado) ?? -1e9), preco: d => d.preco,
+  }[estado.ordem];
+  const lista = DADOS
+    .filter(d => !estado.faixa || d.faixa === estado.faixa)
+    .filter(d => !estado.semRisco || !riscoAlto(d) || d.chave === destaque)
+    .filter(d => !t || [d.titulo, d.cidade, d.uf, d.fonte, d.busca, d.categoria_nome, d.faixa_nome].join(" ").toLowerCase().includes(t))
+    .sort((a, b) => chave(a) - chave(b));
+  ultimaLista = lista;
+  document.getElementById("baixar").disabled = !lista.length;
+  const vazio = !DADOS.length && MODO === "app" && !usado
+    ? "Escolha uma faixa em <b>Pesquisar</b>, avalie um anúncio ou importe uma planilha."
+    : "Nenhum anúncio com esses filtros.";
+  document.getElementById("lista").innerHTML = lista.length ? lista.map(card).join("") : `<div class="vazio">${vazio}</div>`;
+}
+
+function atualizar() {
+  atualizarFaixas();
+  botoesFaixa();
+  kpis();
+  render();
+}
+
+function baixarCsv() {
+  const cols = [["faixa_nome", "Faixa"], ["score", "Nota"], ["revenda", "Revenda"], ["uso", "Uso próprio"],
+    ["titulo", "Veículo"], ["preco", "Preço"], ["ano", "Ano"], ["km", "Km"], ["cidade", "Cidade"], ["uf", "UF"],
+    ["fipe", "FIPE"], ["fipe_ajustada", "FIPE ajustada"], ["mediana_mercado", "Mercado"], ["lucro", "Lucro"],
+    ["margem", "Margem %"], ["alertas", "Alertas"], ["fonte", "Fonte"], ["url", "Link"]];
+  const cel = (k, d) => {
+    let v = d[k];
+    if (k === "margem" && v != null) v = v * 100;
+    if (k === "alertas") v = v.map(a => a.msg).join(" | ");
+    if (v == null) return "";
+    if (typeof v === "number") return String(Math.round(v * 100) / 100).replace(".", ",");
+    let s = String(v);
+    if (/^[=+\-@]/.test(s)) s = "'" + s;  // evita fórmula ao abrir no Excel
+    return /[;"\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const linhas = [cols.map(c => c[1]).join(";"), ...ultimaLista.map(d => cols.map(([k]) => cel(k, d)).join(";"))];
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob(["\ufeff" + linhas.join("\r\n")], { type: "text/csv;charset=utf-8" }));
+  a.download = `oportunidades-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+
+function grupo(id, campo, aoMudar) {
+  const el = document.getElementById(id);
+  el.addEventListener("click", e => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    el.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b));
+    estado[campo] = b.dataset.v;
+    if (aoMudar) aoMudar();
+    render();
+  });
+}
+grupo("objetivo", "objetivo", () => {
+  const ordem = document.getElementById("ordem");
+  ordem.value = estado.ordem = estado.objetivo === "uso" ? "desconto" : "score";
+});
+document.getElementById("faixa").addEventListener("click", e => {
+  const b = e.target.closest("button");
+  if (b) escolherFaixa(b.dataset.v);
+});
+document.getElementById("kpis").addEventListener("click", e => {
+  const b = e.target.closest("button.kpi");
+  if (b) escolherFaixa(estado.faixa === b.dataset.faixa ? "" : b.dataset.faixa);
+});
+document.getElementById("texto").addEventListener("input", e => { estado.texto = e.target.value; render(); });
+document.getElementById("ordem").addEventListener("change", e => { estado.ordem = e.target.value; render(); });
+document.getElementById("semRisco").addEventListener("change", e => { estado.semRisco = e.target.checked; render(); });
+document.getElementById("baixar").addEventListener("click", baixarCsv);
+
+// ------------------------------------------------------------ modo app (site)
+const CHAVE_SENHA = "buscador_auto_senha";
+let senhaMemoria = "";
+function lerSenha() { try { return localStorage.getItem(CHAVE_SENHA) || ""; } catch (e) { return ""; } }
+function guardarSenha(s) { senhaMemoria = s; try { localStorage.setItem(CHAVE_SENHA, s); } catch (e) { /* sem armazenamento */ } }
+
+async function api(caminho, opcoes = {}, tentativa = 0) {
+  const headers = { ...(opcoes.headers || {}) };
+  const senha = senhaMemoria || lerSenha();
+  if (senha) headers["X-Senha"] = senha;
+  let r;
+  try { r = await fetch(caminho, { ...opcoes, headers }); } catch (e) { throw new Error("Sem conexão com o servidor."); }
+  if (r.status === 401 && tentativa < 2) {
+    const s = prompt("Senha de acesso ao buscador:");
+    if (s) { guardarSenha(s); return api(caminho, opcoes, tentativa + 1); }
+  }
+  const corpo = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(corpo.erro || (r.status === 504 ? "A busca demorou demais; tente de novo." : `Erro ${r.status}`));
+  return corpo;
+}
+
+function juntar(lista) {
+  const chaves = new Set(DADOS.map(d => d.chave));
+  for (const d of lista) if (!chaves.has(d.chave)) { DADOS.push(d); chaves.add(d.chave); }
+}
+
+function mostrarAviso(texto) { document.getElementById("aviso").textContent = texto; }
+
+async function pesquisar(faixa) {
+  const botoes = document.querySelectorAll("[data-buscar]");
+  const prog = document.getElementById("progresso");
+  botoes.forEach(b => { b.disabled = true; });
+  try {
+    const { buscas } = await api("/api/buscas");
+    const alvo = buscas.filter(b => !faixa || b.faixa === faixa);
+    prog.innerHTML = alvo.map((b, i) => `<li id="p${i}"><span>${esc(b.nome)}</span><span class="st">na fila</span></li>`).join("");
+    DADOS = DADOS.filter(d => d.fonte === "manual");
+    usado = true;
+    mostrarAviso("");
+    estado.faixa = faixa;
+    atualizar();
+    let proxima = 0;
+    const trabalhador = async () => {
+      while (proxima < alvo.length) {
+        const i = proxima++;
+        const li = document.getElementById("p" + i);
+        const st = li.querySelector(".st");
+        st.textContent = "pesquisando…";
+        try {
+          const r = await api("/api/buscar?busca=" + encodeURIComponent(alvo[i].nome));
+          juntar(r.resultados);
+          const erros = r.fontes.filter(f => f.erro);
+          st.textContent = `${r.resultados.length} anúncio(s) · ` +
+            r.fontes.map(f => f.erro ? `${f.fonte}: falhou` : `${f.fonte}: ${f.aceitos}`).join(" · ");
+          st.className = "st " + (erros.length === r.fontes.length ? "erro" : "ok");
+          if (erros.length) li.insertAdjacentHTML("beforeend", `<small>${erros.map(f => esc(`${f.fonte}: ${f.erro}`)).join("<br>")}</small>`);
+        } catch (e) {
+          st.textContent = e.message;
+          st.className = "st erro";
+        }
+        atualizar();
+      }
+    };
+    await Promise.all([trabalhador(), trabalhador(), trabalhador()]);
+  } catch (e) {
+    prog.innerHTML = `<li><span class="st erro">${esc(e.message)}</span></li>`;
+  } finally {
+    botoes.forEach(b => { b.disabled = false; });
+  }
+}
+
+function focar(chave) {
+  const el = [...document.querySelectorAll("article.card")].find(a => a.dataset.chave === chave);
+  if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+async function importar(corpo, nome, exemplo) {
+  const st = document.getElementById("status-importar");
+  st.textContent = "Avaliando a planilha…";
+  st.className = "status";
+  try {
+    const caminho = exemplo ? "/api/importar?exemplo=1" : "/api/importar";
+    const r = await api(caminho, { method: "POST", body: corpo, headers: { "X-Arquivo": encodeURIComponent(nome) } });
+    DADOS = DADOS.filter(d => d.fonte === "manual");
+    usado = true;
+    juntar(r.resultados);
+    mostrarAviso(exemplo ? "Dados de exemplo fictícios — só para mostrar o funcionamento." : "");
+    estado.faixa = "";
+    atualizar();
+    st.textContent = `${r.resultados.length} anúncio(s) avaliado(s) de ${nome}.`;
+  } catch (e) {
+    st.textContent = e.message;
+    st.className = "status erro";
+  }
+}
+
+function iniciarApp() {
+  document.getElementById("painel").hidden = false;
+  document.getElementById("sub").textContent =
+    "Pesquise por faixa, avalie um anúncio ou importe uma planilha. Revenda, custos e margens são estimativas para triagem, não laudo.";
+  const abas = document.querySelectorAll(".abas button");
+  abas.forEach(b => b.addEventListener("click", () => {
+    abas.forEach(x => {
+      x.setAttribute("aria-selected", x === b);
+      document.getElementById(x.dataset.aba).hidden = x !== b;
+    });
+  }));
+  document.querySelectorAll("[data-buscar]").forEach(b => b.addEventListener("click", () => pesquisar(b.dataset.buscar)));
+
+  const form = document.getElementById("aba-avaliar");
+  form.addEventListener("submit", async e => {
+    e.preventDefault();
+    const st = document.getElementById("status-avaliar");
+    const botao = form.querySelector("button[type=submit]");
+    st.textContent = "Avaliando…";
+    st.className = "status";
+    botao.disabled = true;
+    try {
+      const dados = Object.fromEntries(new FormData(form));
+      const { resultados } = await api("/api/avaliar", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(dados),
+      });
+      const d = resultados[0];
+      DADOS = [d, ...DADOS.filter(x => x.chave !== d.chave)];
+      destaque = d.chave;
+      estado.faixa = "";
+      atualizar();
+      focar(d.chave);
+      st.textContent = `Nota ${d.score} · Revenda: ${d.revenda} · Uso: ${d.uso} · ${d.faixa_nome}`;
+    } catch (erro) {
+      st.textContent = erro.message;
+      st.className = "status erro";
+    } finally {
+      botao.disabled = false;
+    }
+  });
+
+  document.getElementById("arquivo").addEventListener("change", async e => {
+    const arq = e.target.files[0];
+    if (arq) await importar(await arq.arrayBuffer(), arq.name, false);
+    e.target.value = "";
+  });
+  document.getElementById("exemplo").addEventListener("click", () => importar(null, "planilha de exemplo", true));
+}
+
+if (MODO === "app") iniciarApp();
+atualizar();
+</script>
+</body>
+</html>

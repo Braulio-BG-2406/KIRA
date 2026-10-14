@@ -81,6 +81,55 @@ Antes de publicar: preço conferido com a precificação (`consultar_infinite`, 
 
 Os nomes dos menus podem variar um pouco entre versões do MarketUP; se algum botão não bater, mande um print para a Kira.
 
+## Atualização automática da planilha BD INFINITE
+
+Workflow no n8n: **Kira — atualizar relatórios da BD INFINITE** (código em `atualizar-relatorios-bd-infinite.js`).
+Substitui o trabalho de baixar os relatórios do MarketUP à mão e colocar nas pastas da planilha.
+
+- **Quando:** todo dia às 6h52 (horário de São Paulo). Para rodar na hora: abrir o workflow e clicar em **Rodar agora**.
+- **O que baixa:** os mesmos 4 arquivos do botão "Exportar > Excel" do site, no mesmo formato (Excel 97-2003, aba `Plan 1`):
+
+  | Arquivo | Relatório no MarketUP | Período |
+  | --- | --- | --- |
+  | `RelatorioCarteiraClientes.xls` | Carteira de Clientes | 01/06/2024 (início da loja) até hoje |
+  | `RelatorioVendasTotais.xls` | Vendas Totais por Item | 01/06/2024 até hoje |
+  | `RelatorioVendasVendedor.xls` | Vendas por Vendedor | 01/06/2024 até hoje |
+  | `RelatorioEstoqueLocalizacaoStatus.xls` | Estoque por Localização | posição de hoje |
+
+- **Onde grava:** troca o conteúdo de cada arquivo nas pastas `JOIAS\BD INFINITE V2\<Relatorio...>` do Google Drive
+  (Computadores > Meu laptop). O Google Drive do computador baixa sozinho para
+  `C:\Users\janai\Desktop\JANAINA\JOIAS\BD INFINITE V2\...`, que é de onde a planilha `Nova BD INFINITE v3.xlsx` lê.
+  O arquivo é trocado no lugar (mesmo nome), sem criar cópias: a planilha soma **todos** os arquivos de cada pasta,
+  então cada pasta deve ter só o seu `.xls`.
+- **Segurança:** primeiro baixa e confere os 4 relatórios; se algum vier errado, para e não troca nada.
+  Se der erro, a Kira avisa no Telegram. O Drive guarda as versões anteriores de cada arquivo
+  (botão direito > Gerenciar versões) se precisar voltar.
+- **Login:** usa a mesma credencial `MarketUP (Infinite)` da ferramenta da Kira.
+
+### Para a planilha atualizar sozinha ao abrir
+
+Os arquivos chegam sozinhos na pasta, mas o Excel só lê quando a planilha é atualizada. Uma vez só, no Excel:
+
+1. Abrir `Nova BD INFINITE v3.xlsx`.
+2. **Dados > Consultas e Conexões**.
+3. Em cada uma das 4 consultas `BD INFINITE CARTEIRA DE CLIENTES`, `BD INFINITE POSIÇÃO DE ESTOQUE`,
+   `BD INFINITE TOTAL DE VENDAS` e `BD INFINITE VENDAS POR VENDEDOR`:
+   botão direito > **Propriedades** > marcar **Atualizar dados ao abrir o arquivo** > OK.
+4. Salvar.
+
+Depois disso é só abrir a planilha: ela já vem com os dados do dia.
+
+### Como o download funciona (para manutenção)
+
+- Endereço: `GET https://api-erp.marketup.com/v1/<Controller>/Export<Relatorio>?authorization=<AuthToken>&request=<pedido>`,
+  com o pedido em JSON codificado em base64 (o mesmo que o site monta em `buildExportRequest('xls')`).
+- Junto vão o cookie `authorization=<AuthToken>|<validade>|infinitejs` e o cabeçalho `x-auth-token` (domínio da conta),
+  como o navegador faz. Sem eles o MarketUP responde `401 Unauthorized`.
+- Se o MarketUP mudar as colunas, a planilha pode deixar de ler: confira as colunas esperadas nas consultas do Power Query.
+- Se as pastas mudarem de lugar, troque os IDs das pastas no passo **Baixar e conferir relatórios** e no **Ver arquivos das pastas**.
+- No arquivo deste repositório, o aviso de erro usa `SEU_ID_DO_TELEGRAM` e credenciais pelo nome; no n8n já estão o ID
+  do dono e as credenciais `Google Drive account` e `Telegram account` escolhidas.
+
 ## Ainda não faz
 
 - Cadastrar ou publicar produtos sozinha: por enquanto ela ensina e confere. Dá para automatizar depois que o login estiver ligado e der para ver um produto real pela API.

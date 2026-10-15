@@ -21,8 +21,8 @@ const LOJAS = [
   {
     slug: "bg-imports",
     nome: "BG Imports",
-    slogan: "Relógios e acessórios masculinos",
-    sobre: "Relógios e acessórios masculinos importados, com garantia, nota e envio rápido para todo o Brasil.",
+    slogan: "O tempo passa. A presença fica.",
+    sobre: "Relógios que unem elegância, qualidade e personalidade, para homens que valorizam estilo em cada detalhe. Seu estilo. Sua presença. Seu tempo.",
     corPrimaria: "#141414",
     corDestaque: "#a3844c",
     tema: "relojoaria" as const,

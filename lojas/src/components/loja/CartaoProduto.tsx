@@ -29,6 +29,8 @@ export function CartaoProduto({ p, base, condicoes, variante = "padrao" }: { p: 
           )}
           {esgotado ? (
             <span className="sobrelinha absolute left-4 top-4 text-stone-500">Esgotado</span>
+          ) : p.estoqueTotal === 1 ? (
+            <span className="sobrelinha absolute left-4 top-4 text-destaque">Última unidade</span>
           ) : promocao ? (
             <span className="sobrelinha absolute left-4 top-4 text-destaque">Oferta</span>
           ) : null}

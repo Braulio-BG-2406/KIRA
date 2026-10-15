@@ -1,0 +1,8 @@
+nome;marca;categoria;variacao;sku;codigo_barras;preco;preco_de;custo;estoque;descricao;ficha;garantia;vem_com;ativo
+BG Atlântico;BG Collection;Relógios;Padrão;BG-ATL-01;;259,99;;;1;"Presença, sofisticação e exclusividade no pulso. Acabamento em aço e mostrador azul-turquesa texturizado, para quem quer se destacar em qualquer ocasião. Peça nova, a pronta entrega.";Caixa: aço inoxidável | Pulseira: aço inoxidável | Mostrador: azul-turquesa texturizado;90 dias contra defeito de fabricação;;sim
+BG Clássico;BG Collection;Relógios;Verde Esmeralda;BG-CLA-VE;;229,90;;;;"Design sofisticado e presença marcante. Caixa e pulseira em aço maciço, mostrador sunburst e data com lente de aumento. Quatro cores de mostrador para escolher a sua.";Caixa: aço inoxidável | Pulseira: aço inoxidável maciço | Mostrador: sunburst | Data: com lente de aumento;90 dias contra defeito de fabricação;;sim
+BG Clássico;BG Collection;Relógios;Azul Celeste;BG-CLA-AC;;229,90;;;;;;;;sim
+BG Clássico;BG Collection;Relógios;Prata Champanhe;BG-CLA-PC;;229,90;;;;;;;;sim
+BG Clássico;BG Collection;Relógios;Preto Clássico;BG-CLA-PR;;229,90;;;;;;;;sim
+BG Pista Cronógrafo;BG Collection;Relógios;Padrão;BG-PIS-01;;;;;5;"Precisão e o espírito das pistas de corrida no pulso. Caixa e pulseira em aço escovado, detalhes esportivos em vermelho, bisel preto serrilhado e ponteiros que brilham no escuro.";Caixa: aço escovado | Pulseira: aço escovado | Bisel: preto serrilhado | Detalhes: vermelho | Ponteiros: luminosos;90 dias contra defeito de fabricação;;nao
+BG Lunar Cronógrafo;BG Collection;Relógios;Padrão;BG-LUN-01;;;;;1;"Cronógrafo de inspiração espacial, com subdiscos e leitura clara de dia e de noite.";Funções: cronógrafo;90 dias contra defeito de fabricação;;nao

@@ -6,6 +6,7 @@ import { produtoImagens, produtos, variantes } from "@/db/schema";
 import { contexto } from "@/lib/painel";
 import { categoriasDaLoja } from "@/lib/catalogo";
 import { formatarReais } from "@/lib/dinheiro";
+import { marcasDeTerceiros, textosDoProduto } from "@/lib/marcas";
 import { Aviso, Cabecalho, Cartao, Tabela, Vazio } from "@/components/admin/ui";
 
 export default async function Produtos({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
@@ -77,6 +78,9 @@ export default async function Produtos({ searchParams }: { searchParams: Promise
                     <td>
                       <Link href={`/admin/produtos/${p.id}`} className="font-medium hover:underline">{p.nome}</Link>
                       {p.destaque && <span className="ml-2 text-xs text-amber-600">★ destaque</span>}
+                      {marcasDeTerceiros(...textosDoProduto({ ...p, variantes: pv })).length > 0 && (
+                        <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-800">cita outra marca</span>
+                      )}
                       {pv.length > 1 && <span className="block text-xs text-stone-500">{pv.length} variações</span>}
                     </td>
                     <td className="text-stone-600">{cats.find((c) => c.id === p.categoriaId)?.nome ?? "—"}</td>

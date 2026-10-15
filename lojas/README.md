@@ -141,7 +141,18 @@ Tudo fica em Canais, com o passo a passo:
 
 ## Trazer o catálogo do MarketUP
 
-Exporte os produtos do MarketUP (ou de qualquer planilha) em CSV e use **Produtos → Importar**. As colunas aceitas são `nome, marca, categoria, variacao, sku, codigo_barras, preco, preco_de, custo, estoque, descricao, ativo`, e só `nome` e `preco` são obrigatórias. Linhas com o mesmo nome viram variações do mesmo produto, e um SKU que já existe atualiza preço e estoque. Em Relatórios, "Produtos e estoque (CSV)" sai nesse mesmo formato, então dá para editar no Excel e importar de volta.
+Exporte os produtos do MarketUP (ou de qualquer planilha) em CSV e use **Produtos → Importar**. As colunas aceitas são `nome, marca, categoria, variacao, sku, codigo_barras, preco, preco_de, custo, estoque, descricao, ficha, garantia, vem_com, ativo`, e só `nome` e `preco` são obrigatórias. Peça ainda sem preço entra com `ativo` = `nao` e fica como rascunho. A coluna `ficha` vira a ficha técnica, no formato `Caixa: aço | Vidro: mineral`. Linhas com o mesmo nome viram variações do mesmo produto, e um SKU que já existe atualiza preço e estoque. Em Relatórios, "Produtos e estoque (CSV)" sai nesse mesmo formato, então dá para editar no Excel e importar de volta.
+
+## Coleção própria (BG)
+
+A BG vende relógios com nome e linha próprios, inspirados na alta relojoaria. O sistema ajuda a manter isso dentro da lei e das regras das plataformas:
+- **Trava de marcas**: produto cujo nome, descrição, ficha ou variação cita marca ou modelo de outra empresa (Rolex, Omega, Citizen, TAG Heuer, Tiffany, Snoopy, Formula 1, Submariner, Speedmaster etc.) ou "réplica" ganha um aviso no painel, fica fora do feed do Google e do Instagram e não pode ser publicado no Mercado Livre. A lista está em `src/lib/marcas.ts`.
+- **Planilha da coleção**: `dados/colecao-bg.csv` traz BG Atlântico, BG Clássico (Verde Esmeralda, Azul Celeste, Prata Champanhe e Preto Clássico), BG Pista Cronógrafo e BG Lunar Cronógrafo. Complete preço e estoque que faltam e importe em **Produtos → Importar**. As duas últimas entram como rascunho até ganharem preço.
+
+Para a coleção própria não virar problema:
+- a peça não pode ter nome, logotipo ou coroa de outra marca no mostrador, na caixa, no fecho ou na embalagem;
+- título, descrição, cores e hashtags também não ("Azul Tiffany" vira "Azul Celeste"; nada de "inspirado no X" ou #rolex);
+- registre o nome BG no INPI para proteger a sua marca.
 
 ## Ligar na Kira (n8n)
 

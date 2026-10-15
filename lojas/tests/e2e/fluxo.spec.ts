@@ -114,7 +114,7 @@ test("cadastro de produto com foto aparece na vitrine", async ({ page }) => {
 
 test("BG Imports: abertura de relojoaria e desconto no Pix no pedido", async ({ page }) => {
   await page.goto("/loja/bg-imports");
-  await expect(page.getByRole("heading", { level: 1, name: "Relógio Automático Skeleton" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "BG Atlântico" })).toBeVisible();
   await expect(page.getByText("5% off no Pix").first()).toBeVisible();
   // menu em tela cheia com as coleções
   await page.getByRole("button", { name: "Menu" }).click();
@@ -134,8 +134,8 @@ test("BG Imports: abertura de relojoaria e desconto no Pix no pedido", async ({ 
   await expect(page.getByText("Desconto no Pix (5%)")).toBeVisible();
   await page.getByRole("button", { name: "Fechar pedido" }).click();
   await page.waitForURL(/\/pedido\/[A-Z0-9]+$/);
-  // 699,90 − 5% (35,00) = 664,90
-  await expect(page.getByText("Total: R$ 664,90")).toBeVisible();
+  // 259,99 − 5% (13,00) = 246,99
+  await expect(page.getByText("Total: R$ 246,99")).toBeVisible();
 });
 
 test("painel enxuto: canais e abas", async ({ page }) => {

@@ -33,8 +33,8 @@ export default async function Importar({ searchParams }: { searchParams: Promise
   const sp = await searchParams;
   const exemplo = [
     COLUNAS_IMPORTACAO.join(";"),
-    "Relógio Cronógrafo;BG Collection;Relógios;Pulseira aço;REL-CRO-01;7891234567895;389,90;459,90;160,00;4;Caixa 44 mm;sim",
-    "Relógio Cronógrafo;BG Collection;Relógios;Pulseira couro;REL-CRO-02;;389,90;;160,00;2;;sim",
+    "BG Pista Cronógrafo;BG Imports;Relógios;Pulseira aço;BG-PISTA-01;7891234567895;389,90;459,90;160,00;4;Cronógrafo esportivo;Caixa: 42 mm | Vidro: mineral;90 dias;Caixa e manual;sim",
+    "BG Pista Cronógrafo;BG Imports;Relógios;Pulseira couro;BG-PISTA-02;;389,90;;160,00;2;;;;;sim",
   ].join("\n");
   return (
     <>
@@ -57,10 +57,12 @@ export default async function Importar({ searchParams }: { searchParams: Promise
         <Cartao titulo="Como montar a planilha">
           <ul className="list-disc space-y-1 pl-4 text-sm text-stone-600">
             <li>Primeira linha com os nomes das colunas: <code className="text-xs">{COLUNAS_IMPORTACAO.join(", ")}</code>.</li>
-            <li>Só <b>nome</b> e <b>preco</b> são obrigatórias.</li>
+            <li>Só <b>nome</b> e <b>preco</b> são obrigatórias. Peça ainda sem preço pode entrar com <b>ativo</b> = nao: fica como rascunho até você pôr o preço.</li>
+            <li><b>ficha</b> vira a ficha técnica: <code className="text-xs">Caixa: 42 mm | Vidro: mineral</code>. <b>garantia</b> e <b>vem_com</b> aparecem na página do produto.</li>
             <li>Linhas com o mesmo nome viram variações do mesmo produto.</li>
             <li>Se o <b>SKU</b> já existir, a linha atualiza preço, custo e estoque daquela variação.</li>
             <li>Serve para trazer o catálogo exportado do MarketUP ou de outra planilha.</li>
+            <li>Use só nomes da sua marca. Produto que cita outra marca fica fora do Google, do Instagram e do Mercado Livre.</li>
           </ul>
         </Cartao>
       </div>

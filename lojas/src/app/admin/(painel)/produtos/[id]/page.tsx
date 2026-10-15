@@ -7,6 +7,7 @@ import { produtoImagens, produtos, variantes } from "@/db/schema";
 import { contexto } from "@/lib/painel";
 import { categoriasDaLoja, produtoPorSlug, todasAsMarcas } from "@/lib/catalogo";
 import { legendaInstagram } from "@/lib/divulgacao";
+import { marcasDeTerceiros, textosDoProduto } from "@/lib/marcas";
 import { Copiar } from "@/components/loja/Copiar";
 import { reaisParaCampo } from "@/lib/dinheiro";
 import { urlDaLoja } from "@/lib/dominios";
@@ -28,6 +29,7 @@ export default async function EditarProduto({ params, searchParams }: { params: 
     todasAsMarcas(loja.id),
   ]);
   const sp = await searchParams;
+  const citadas = marcasDeTerceiros(...textosDoProduto({ ...p, variantes: vs }));
   const vitrine = p.ativo ? await produtoPorSlug(loja.id, p.slug) : null;
   const legenda = vitrine
     ? legendaInstagram(loja, vitrine, `${urlDaLoja(loja.slug)}/produto/${p.slug}`, cats.find((c) => c.id === p.categoriaId)?.nome)
@@ -42,6 +44,12 @@ export default async function EditarProduto({ params, searchParams }: { params: 
         )}
       </Cabecalho>
       <Aviso ok={sp.ok} erro={sp.erro} />
+      {citadas.length > 0 && (
+        <p className="mb-5 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="alert">
+          Este produto cita outra marca: <b>{citadas.join(", ")}</b>. Para vender como coleção própria, tire esses nomes do título, da descrição,
+          da ficha e das variações. Enquanto citar, ele fica fora do feed do Google e do Instagram e não pode ser publicado no Mercado Livre.
+        </p>
+      )}
       <div className="space-y-6">
         {imgs.length > 0 && (
           <Cartao titulo="Fotos">

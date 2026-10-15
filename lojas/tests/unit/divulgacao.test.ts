@@ -6,6 +6,7 @@ import { gerarFeed, gerarSitemap, gtinValido } from "@/lib/feed";
 import { legendaInstagram } from "@/lib/divulgacao";
 import { produtoPorSlug } from "@/lib/catalogo";
 import { rastreamentoSeguro } from "@/lib/rastreamento";
+import { importarProdutos, lerFicha } from "@/lib/importacao";
 import { banco, criarLoja, criarProduto } from "./_banco";
 
 beforeEach(async () => {
@@ -82,5 +83,50 @@ describe("divulgação", () => {
       googleVerificacao: undefined,
       metaVerificacao: undefined,
     });
+  });
+});
+
+describe("coleção própria", () => {
+  it("deixa fora do feed o produto que cita outra marca", async () => {
+    const loja = await criarLoja("bg");
+    const proprio = await criarProduto(loja.id, "BG Atlântico", 25999, 1);
+    const citando = await criarProduto(loja.id, "Relógio Clássico", 22990, 2);
+    await db.update(variantes).set({ nome: "Azul Tiffany" }).where(eq(variantes.id, citando.variante.id));
+    for (const { produto } of [proprio, citando]) await db.insert(produtoImagens).values({ produtoId: produto.id, url: "/uploads/foto.jpg" });
+
+    const xml = await gerarFeed((await db.select().from(lojas).where(eq(lojas.id, loja.id)))[0]);
+    expect(xml).toContain("<g:title>BG Atlântico</g:title>");
+    expect(xml).not.toContain("Clássico");
+  });
+
+  it("importa ficha técnica, garantia e peça sem preço como rascunho", async () => {
+    expect(lerFicha("Caixa: 42 mm | Vidro: mineral | sem valor | Data:")).toEqual([
+      { nome: "Caixa", valor: "42 mm" },
+      { nome: "Vidro", valor: "mineral" },
+    ]);
+    const loja = await criarLoja("bg");
+    const csv = [
+      "nome;categoria;variacao;sku;preco;estoque;ficha;garantia;vem_com;ativo",
+      "BG Clássico;Relógios;Verde Esmeralda;CLA-VE;229,90;2;Caixa: aço | Mostrador: sunburst;90 dias;Estojo;sim",
+      "BG Clássico;Relógios;Azul Celeste;CLA-AC;229,90;1;;;;sim",
+      "BG Pista;Relógios;Padrão;PIS-01;;5;Bisel: serrilhado;;;nao",
+      "BG Lunar;Relógios;Padrão;LUN-01;;1;;;;sim",
+      "BG Clássico;Relógios;Prata;CLA-PR;;1;;;;nao",
+    ].join("\n");
+    const r = await importarProdutos(loja.id, csv);
+    expect(r.criados).toBe(3);
+    expect(r.erros).toEqual(["Linha 5: falta nome ou preço.", "Linha 6: falta o preço (o produto já está à venda)."]);
+
+    const lista = await db.select().from(produtos).where(eq(produtos.lojaId, loja.id));
+    const classico = lista.find((p) => p.nome === "BG Clássico")!;
+    expect(classico.especificacoes).toEqual([{ nome: "Caixa", valor: "aço" }, { nome: "Mostrador", valor: "sunburst" }]);
+    expect(classico.garantia).toBe("90 dias");
+    expect(classico.itensInclusos).toBe("Estojo");
+    expect(classico.ativo).toBe(true);
+    const pista = lista.find((p) => p.nome === "BG Pista")!;
+    expect(pista.ativo).toBe(false);
+    const [vPista] = await db.select().from(variantes).where(eq(variantes.produtoId, pista.id));
+    expect(vPista.precoCentavos).toBe(0);
+    expect(vPista.estoque).toBe(5);
   });
 });

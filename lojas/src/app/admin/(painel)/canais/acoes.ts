@@ -9,6 +9,7 @@ import { absoluta } from "@/lib/dominios";
 import { CONECTORES, sincronizarCanal, varrerPedidos, vincularAnuncio } from "@/lib/canais/sincronizar";
 import { ErroCanal } from "@/lib/canais/comum";
 import { mlPublicar } from "@/lib/canais/mercadolivre";
+import { marcasDeTerceiros, textosDoProduto } from "@/lib/marcas";
 
 function tipoValido(t: string): Marketplace {
   if (t !== "mercadolivre" && t !== "shopee") throw new ErroNegocio("Canal inválido.");
@@ -109,7 +110,12 @@ export async function acaoPublicarML(fd: FormData) {
       const produtoId = inteiro(fd, "produtoId");
       const [p] = await db.select().from(produtos).where(and(eq(produtos.id, produtoId), eq(produtos.lojaId, loja.id)));
       if (!p) throw new ErroNegocio("Produto não encontrado.");
+      if (!p.ativo) throw new ErroNegocio("Ative o produto (com preço) antes de publicar.");
       const vs = await db.select().from(variantes).where(and(eq(variantes.produtoId, produtoId), eq(variantes.ativo, true))).orderBy(asc(variantes.ordem));
+      const citadas = marcasDeTerceiros(...textosDoProduto({ ...p, variantes: vs }));
+      if (citadas.length) {
+        throw new ErroNegocio(`O produto cita outra marca (${citadas.join(", ")}). O Mercado Livre derruba esse anúncio; tire o nome e publique de novo.`);
+      }
       const imgs = await db.select().from(produtoImagens).where(eq(produtoImagens.produtoId, produtoId)).orderBy(asc(produtoImagens.ordem));
       const jaPublicadas = new Set(
         (await db.select({ id: anuncios.varianteId }).from(anuncios).where(and(eq(anuncios.canalId, canal.id), inArray(anuncios.varianteId, vs.map((v) => v.id).concat(0))))).map((a) => a.id),
@@ -118,7 +124,7 @@ export async function acaoPublicarML(fd: FormData) {
       let publicados = 0;
       // cada variação vira um anúncio (o título leva o nome da variação)
       for (const v of vs) {
-        if (jaPublicadas.has(v.id) || v.estoque < 1) continue;
+        if (jaPublicadas.has(v.id) || v.estoque < 1 || v.precoCentavos <= 0) continue;
         const preco = canal.config.sincronizarPreco ? Math.round(v.precoCentavos * (1 + canal.config.acrescimoPct / 100)) : v.precoCentavos;
         const r = await mlPublicar(canal, {
           titulo: vs.length > 1 ? `${p.nome} ${v.nome}` : p.nome,

@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { categorias, produtos, type Loja } from "@/db/schema";
 import { listarVitrine } from "./catalogo";
 import { absoluta, urlDaLoja } from "./dominios";
+import { marcasDeTerceiros, textosDoProduto } from "./marcas";
 
 const esc = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, "");
@@ -32,6 +33,8 @@ export async function gerarFeed(loja: Loja): Promise<string> {
   const itens: string[] = [];
   for (const p of lista) {
     if (p.imagens.length === 0) continue; // Google e Meta recusam produto sem foto
+    // produto que cita outra marca derruba a conta no Merchant Center e no Commerce Manager
+    if (marcasDeTerceiros(...textosDoProduto(p)).length) continue;
     const varias = p.variantes.length > 1;
     const categoria = cats.find((c) => c.id === p.categoriaId)?.nome;
     for (const v of p.variantes) {

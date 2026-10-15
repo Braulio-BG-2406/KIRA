@@ -7,6 +7,7 @@ import { urlDaLoja } from "@/lib/dominios";
 import { mlConfigurado } from "@/lib/canais/mercadolivre";
 import { shopeeConfigurado } from "@/lib/canais/shopee";
 import { rastreamentoSeguro } from "@/lib/rastreamento";
+import { marcasDeTerceiros, textosDoProduto } from "@/lib/marcas";
 import { formatarDataHora } from "@/lib/datas";
 import { Aviso, Cabecalho, Cartao } from "@/components/admin/ui";
 import { Enviar } from "@/components/admin/Botoes";
@@ -42,7 +43,8 @@ export default async function Canais({ searchParams }: { searchParams: Promise<{
   const sp = await searchParams;
   const base = urlDaLoja(loja.slug);
   const r = rastreamentoSeguro(loja.rastreamento);
-  const ativos = await db.select({ id: produtos.id }).from(produtos).where(and(eq(produtos.lojaId, loja.id), eq(produtos.ativo, true)));
+  const ativos = await db.select().from(produtos).where(and(eq(produtos.lojaId, loja.id), eq(produtos.ativo, true)));
+  const citamMarca = ativos.filter((p) => marcasDeTerceiros(...textosDoProduto(p)).length > 0).length;
   const comFoto = ativos.length
     ? (await db.selectDistinct({ id: produtoImagens.produtoId }).from(produtoImagens).where(inArray(produtoImagens.produtoId, ativos.map((a) => a.id)))).length
     : 0;
@@ -96,6 +98,7 @@ export default async function Canais({ searchParams }: { searchParams: Promise<{
           <div className="space-y-4">
             <p className="text-sm text-stone-600">
               {comFoto} de {ativos.length} produto(s) à venda têm foto e entram no Google. Produto sem foto fica de fora.
+              {citamMarca > 0 && <span className="mt-1 block text-amber-700">{citamMarca} produto(s) citam outra marca e ficam fora do feed até o nome sair.</span>}
             </p>
             <Endereco rotulo="Feed de produtos (Merchant Center)" url={`${base}/feed.xml`} />
             <Endereco rotulo="Mapa do site (Search Console)" url={`${base}/sitemap.xml`} />

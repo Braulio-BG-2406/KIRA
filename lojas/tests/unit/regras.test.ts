@@ -119,3 +119,22 @@ describe("preços na vitrine", () => {
     expect(parcela(39990, 1)).toBeNull();
   });
 });
+
+describe("coleção própria: marcas de terceiros", () => {
+  it("acha marcas e modelos de outras empresas, sem confundir palavras parecidas", async () => {
+    const { marcasDeTerceiros } = await import("@/lib/marcas");
+    expect(marcasDeTerceiros("Relógio estilo Rolex Land-Dweller", "Mostrador azul Tiffany")).toEqual(["rolex", "tiffany", "land-dweller"]);
+    expect(marcasDeTerceiros("Cronógrafo TAG Heuer Formula 1")).toEqual(["tag heuer", "heuer", "formula 1"]);
+    expect(marcasDeTerceiros("Omega Speedmaster Snoopy")).toEqual(["omega", "snoopy", "speedmaster"]);
+    expect(marcasDeTerceiros("BG Atlântico, mostrador turquesa, inspirado no oriente, bisel de oriscalco")).toEqual([]);
+    expect(marcasDeTerceiros("BG Pista Cronógrafo", "Azul Celeste", "Réplica perfeita")).toEqual(["replica"]);
+    expect(marcasDeTerceiros("Cinto Gucci", "Óculos Ray-Ban Aviador")).toEqual(["gucci", "ray-ban"]);
+    expect(marcasDeTerceiros("Relógio Cartier Santos")).toEqual(["cartier", "santos"]);
+  });
+
+  it("não confunde modelo de corrente com marca", async () => {
+    const { marcasDeTerceiros } = await import("@/lib/marcas");
+    expect(marcasDeTerceiros("Pingente de coração vazado em corrente cartier 45 cm.", "Choker Ômega dourada", "Pulseira elo cartier")).toEqual([]);
+    expect(marcasDeTerceiros("Fio de elo gucci com pingente Cartier")).toEqual(["cartier"]);
+  });
+});

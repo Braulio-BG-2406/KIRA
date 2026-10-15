@@ -21,7 +21,7 @@ export function MenuRelojoaria({ base, categorias, nome, whatsapp }: { base: str
 
   return (
     <>
-      <button type="button" onClick={() => setAberto(true)} className="flex items-center gap-3 text-[13px] tracking-[0.06em]" aria-expanded={aberto}>
+      <button type="button" onClick={() => setAberto(true)} className="flex items-center gap-3 text-[13px] tracking-[0.06em]" aria-expanded={aberto} aria-label="Menu">
         <span className="flex w-5 flex-col gap-[5px]" aria-hidden>
           <span className="h-px bg-current" />
           <span className="h-px bg-current" />

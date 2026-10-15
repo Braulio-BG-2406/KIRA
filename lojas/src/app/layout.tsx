@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "@fontsource-variable/jost";
-import "@fontsource-variable/cormorant-garamond";
+import "@fontsource-variable/playfair-display";
 import "./globals.css";
 
 export const metadata: Metadata = {

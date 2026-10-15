@@ -116,10 +116,15 @@ test("BG Imports: abertura de relojoaria e desconto no Pix no pedido", async ({ 
   await page.goto("/loja/bg-imports");
   await expect(page.getByRole("heading", { level: 1, name: "Relógio Automático Skeleton" })).toBeVisible();
   await expect(page.getByText("5% off no Pix").first()).toBeVisible();
-  await page.getByRole("link", { name: "Comprar", exact: true }).click();
+  // menu em tela cheia com as coleções
+  await page.getByRole("button", { name: "Menu" }).click();
+  await expect(page.getByRole("dialog", { name: "Menu" }).getByRole("link", { name: "Relógios" })).toBeVisible();
+  await page.getByRole("button", { name: "Fechar" }).click();
+  await page.getByRole("link", { name: "Descobrir", exact: true }).click();
   await expect(page.getByText("no Pix (5% de desconto)")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Ficha técnica" })).toBeVisible();
-  await page.getByRole("button", { name: "Adicionar ao carrinho" }).click();
+  await expect(page.getByText("Ficha técnica")).toBeVisible();
+  await page.getByRole("button", { name: "Adicionar à sacola" }).click();
+  await expect(page.getByText("Adicionado à sacola.")).toBeVisible();
   await page.goto("/loja/bg-imports/checkout");
   await page.getByRole("textbox", { name: "Nome completo", exact: true }).fill("Carlos Teste");
   await page.getByRole("textbox", { name: "E-mail", exact: true }).fill("carlos@teste.com");

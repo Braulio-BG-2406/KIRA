@@ -7,7 +7,13 @@ O estoque é um só para o site, o Mercado Livre e a Shopee: vendeu em um canal,
 ## O que já funciona
 
 **Vitrine (o que o cliente vê)**
-- Três estilos: **elegante** (Infinite: serifada e clara), **moderno**, e **relojoaria** (BG: escuro com dourado). O estilo relojoaria tem barra de avisos, nome centralizado, abertura com o relógio em destaque, coleções em blocos, vitrine com foto em fundo claro, seção com a ficha técnica e chamada para o Instagram.
+- Três estilos: **elegante** (Infinite: títulos em Playfair Display), **moderno**, e **relojoaria** (BG, inspirado nas grandes relojoarias):
+  - fundo areia, letra Jost fina e grande, muito espaço;
+  - cabeçalho branco com o nome centralizado e menu em tela cheia;
+  - abertura com o relógio em destaque e coleções e seleção em carrossel;
+  - faixa escura com a ficha técnica, vitrine com filtros e serviços;
+  - página de produto com seções que abrem e fecham e "você também pode gostar".
+- As fontes ficam dentro do projeto, sem depender do Google Fonts.
 - Página de produto com variações (aro, cor, pulseira…), fotos, marca, ficha técnica, garantia e "vem com"
 - Preço no Pix com desconto e parcelas sem juros (configuráveis por loja), filtro por marca e ordenação por preço
 - Carrinho e checkout com CEP automático (ViaCEP), frete por estado, frete grátis acima de um valor, retirada e cupom de desconto

@@ -64,6 +64,25 @@ Para começar sem produtos de exemplo, use `npm run db:seed` no lugar de `db:dem
 
 ## Colocar na VPS (Docker)
 
+### Instalação automática (VPS da Kira, com Caddy)
+
+Na VPS que já roda o n8n com Caddy, um comando instala tudo, como root:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Braulio-BG-2406/KIRA/refs/heads/claude/trusting-davinci-9g9zzb/lojas/scripts/instalar-vps.sh -o instalar-lojas.sh
+bash instalar-lojas.sh
+```
+
+O instalador:
+- pede o e-mail e a senha do painel (a senha não fica gravada no servidor);
+- cria 2 GB de swap, se faltar memória para montar a loja;
+- baixa o código em `/opt/kira-lojas`, gera o `.env` com senhas aleatórias e sobe banco e lojas;
+- acrescenta um bloco no Caddyfile do n8n, sem mexer no que já existe. Se o Caddy recusar, ele volta o arquivo como estava.
+
+Sem domínio próprio, as lojas ficam em endereços gratuitos com o IP da VPS, como `https://bgimports.177-153-67-118.sslip.io`. Rodar o instalador de novo atualiza o código sem perder dados.
+
+### Instalação manual
+
 Na VPS (a mesma do n8n serve):
 
 ```bash

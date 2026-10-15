@@ -1,0 +1,15 @@
+# Liga a plataforma ao Caddy que já roda na VPS (o mesmo do n8n da Kira).
+# O instalador (scripts/instalar-vps.sh) grava REDE_PROXY e COMPOSE_FILE no .env,
+# então "docker compose up -d --build" já usa este arquivo junto com o principal.
+services:
+  app:
+    networks:
+      default: {}
+      proxy:
+        # nome que o Caddy usa para chegar na plataforma: reverse_proxy lojas:3000
+        aliases: [lojas]
+
+networks:
+  proxy:
+    external: true
+    name: ${REDE_PROXY:?defina REDE_PROXY no .env}

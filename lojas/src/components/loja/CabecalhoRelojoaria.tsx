@@ -1,17 +1,9 @@
 import Link from "next/link";
 import type { Categoria } from "./tipos";
 import { IconeCarrinho } from "./IconeCarrinho";
+import { MenuRelojoaria } from "./MenuRelojoaria";
 
-function Lupa() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden>
-      <circle cx="11" cy="11" r="7" />
-      <path d="m20 20-3.5-3.5" />
-    </svg>
-  );
-}
-
-/** cabeçalho de relojoaria: avisos no topo, nome centralizado e coleções embaixo */
+/** cabeçalho de relojoaria: branco, fino, nome centralizado e menu em tela cheia */
 export function CabecalhoRelojoaria({
   slug,
   base,
@@ -19,6 +11,7 @@ export function CabecalhoRelojoaria({
   logoUrl,
   avisos,
   categorias,
+  whatsapp,
 }: {
   slug: string;
   base: string;
@@ -26,47 +19,40 @@ export function CabecalhoRelojoaria({
   logoUrl: string | null;
   avisos: string[];
   categorias: Categoria[];
+  whatsapp: string | null;
 }) {
   return (
     <>
       {avisos.length > 0 && (
-        <div className="bg-black px-4 py-2 text-center text-[11px] uppercase tracking-[0.22em] text-white/75">
+        <div className="bg-areia px-4 py-2.5 text-center text-[11px] tracking-[0.14em] text-stone-600">
           <span className="sm:hidden">{avisos[0]}</span>
-          <span className="hidden sm:inline">{avisos.join("   ·   ")}</span>
+          <span className="hidden sm:inline">{avisos.join("     ·     ")}</span>
         </div>
       )}
-      <header className="sticky top-0 z-20 border-b border-white/10 bg-marca/95 text-white backdrop-blur">
-        <div className="mx-auto grid h-16 max-w-7xl grid-cols-[1fr_auto_1fr] items-center gap-4 px-4">
-          <form action={`${base}/busca`} className="flex items-center">
-            <Link href={`${base}/busca`} className="p-2 text-white/80 hover:text-destaque sm:hidden" aria-label="Buscar">
-              <Lupa />
+      <header className="sticky top-0 z-30 border-b border-stone-200/70 bg-white/90 text-stone-900 backdrop-blur-md">
+        <div className="mx-auto grid h-[72px] max-w-[1440px] grid-cols-[1fr_auto_1fr] items-center gap-4 px-5 sm:px-10">
+          <div className="flex items-center gap-8">
+            <MenuRelojoaria base={base} categorias={categorias} nome={nome} whatsapp={whatsapp} />
+            <Link href={`${base}/busca`} className="hidden items-center gap-2.5 text-[13px] tracking-[0.06em] text-stone-700 hover:text-stone-950 sm:flex">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden>
+                <circle cx="11" cy="11" r="7" />
+                <path d="m20 20-3.5-3.5" />
+              </svg>
+              Buscar
             </Link>
-            <label className="hidden items-center gap-2 border-b border-white/25 pb-1 text-white/70 focus-within:border-destaque sm:flex">
-              <Lupa />
-              <input name="q" placeholder="Buscar" className="w-40 bg-transparent text-sm text-white placeholder:text-white/45 focus:outline-none lg:w-56" aria-label="Buscar produtos" />
-            </label>
-          </form>
-          <Link href={base || "/"} className="justify-self-center">
+          </div>
+          <Link href={base || "/"} className="justify-self-center" aria-label={nome}>
             {logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={logoUrl} alt={nome} className="h-9 w-auto" />
+              <img src={logoUrl} alt={nome} className="h-8 w-auto" />
             ) : (
-              <span className="text-lg font-semibold uppercase tracking-[0.38em] sm:text-xl">{nome}</span>
+              <span className="pl-[0.45em] text-[15px] uppercase tracking-[0.45em] sm:text-[17px]">{nome}</span>
             )}
           </Link>
           <div className="flex justify-end">
             <IconeCarrinho slug={slug} base={base} />
           </div>
         </div>
-        {categorias.length > 0 && (
-          <nav className="flex gap-7 overflow-x-auto border-t border-white/10 px-4 py-3 text-[12px] uppercase tracking-[0.18em] text-white/70 sm:justify-center">
-            {categorias.map((c) => (
-              <Link key={c.id} href={`${base}/categoria/${c.slug}`} className="whitespace-nowrap border-b border-transparent pb-0.5 hover:border-destaque hover:text-white">
-                {c.nome}
-              </Link>
-            ))}
-          </nav>
-        )}
       </header>
     </>
   );

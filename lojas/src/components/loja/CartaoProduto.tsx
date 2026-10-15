@@ -4,6 +4,7 @@ import { formatarReais } from "@/lib/dinheiro";
 import { parcela, precoNoPix } from "@/lib/precos";
 import { FotoProduto } from "./FotoProduto";
 import { Preco } from "./Preco";
+import { DesenhoRelogio } from "./DesenhoRelogio";
 
 export type CondicoesLoja = { descontoPixPct: number; parcelasSemJuros: number };
 
@@ -14,31 +15,38 @@ export function CartaoProduto({ p, base, condicoes, variante = "padrao" }: { p: 
   const promocao = p.precoDe != null;
   const parc = parcela(p.precoMin, condicoes.parcelasSemJuros);
   if (variante === "relojoaria") {
-    // vitrine de relojoaria: foto em fundo claro, texto centralizado, opções contadas
+    // vitrine de relojoaria: peça em fundo areia, texto fino e centralizado
     const opcoes = p.variantes.length;
     return (
       <Link href={`${base}/produto/${p.slug}`} className="group block text-center">
-        <div className="relative aspect-[4/5] overflow-hidden bg-[#efeeea]">
-          <FotoProduto url={p.imagens[0]} nome={p.nome} className="transition duration-500 group-hover:scale-[1.04]" />
+        <div className="relative aspect-[4/5] overflow-hidden bg-areia">
+          {p.imagens[0] ? (
+            <FotoProduto url={p.imagens[0]} nome={p.nome} className="transition duration-700 ease-out group-hover:scale-[1.03]" />
+          ) : (
+            <div role="img" aria-label={p.nome} className="flex h-full items-center justify-center">
+              <DesenhoRelogio traco={0.9} className="h-[58%] w-auto text-stone-400 transition duration-700 group-hover:text-destaque" />
+            </div>
+          )}
           {esgotado ? (
-            <span className="absolute left-3 top-3 bg-black/80 px-2 py-1 text-[10px] uppercase tracking-widest text-white">Esgotado</span>
+            <span className="sobrelinha absolute left-4 top-4 text-stone-500">Esgotado</span>
           ) : promocao ? (
-            <span className="absolute left-3 top-3 bg-destaque px-2 py-1 text-[10px] uppercase tracking-widest text-black">Oferta</span>
+            <span className="sobrelinha absolute left-4 top-4 text-destaque">Oferta</span>
           ) : null}
-          <span className="absolute inset-x-0 bottom-0 translate-y-full bg-black/85 py-2.5 text-[11px] uppercase tracking-[0.2em] text-white transition duration-300 group-hover:translate-y-0">
-            Ver detalhes
-          </span>
         </div>
-        {p.marca && <p className="mt-4 text-[10px] uppercase tracking-[0.25em] text-stone-500">{p.marca}</p>}
-        <h3 className={`${p.marca ? "mt-1" : "mt-4"} text-sm font-medium uppercase tracking-wide text-stone-900`}>{p.nome}</h3>
-        {opcoes > 1 && <p className="mt-0.5 text-xs text-stone-500">{opcoes} opções</p>}
-        <div className="mt-2 flex justify-center">
-          <Preco min={p.precoMin} max={p.precoMax} de={p.precoDe} />
+        <div className="px-2 pt-5">
+          {p.marca && <p className="sobrelinha text-[10px] text-stone-500">{p.marca}</p>}
+          <h3 className="mt-1.5 text-[15px] font-normal text-stone-900">{p.nome}</h3>
+          {opcoes > 1 && <p className="mt-0.5 text-xs font-light text-stone-500">{opcoes} opções</p>}
+          <p className="mt-2 text-sm font-light text-stone-700">
+            {p.precoDe != null && <span className="mr-2 text-stone-400 line-through">{formatarReais(p.precoDe)}</span>}
+            {p.precoMax !== p.precoMin && "a partir de "}
+            {formatarReais(p.precoMin)}
+          </p>
+          {!esgotado && condicoes.descontoPixPct > 0 && (
+            <p className="mt-0.5 text-xs font-light text-stone-500">{formatarReais(precoNoPix(p.precoMin, condicoes.descontoPixPct))} no Pix</p>
+          )}
+          {!esgotado && parc && <p className="text-xs font-light text-stone-400">ou {parc.vezes}x de {formatarReais(parc.valor)}</p>}
         </div>
-        {!esgotado && condicoes.descontoPixPct > 0 && (
-          <p className="text-xs text-green-700">{formatarReais(precoNoPix(p.precoMin, condicoes.descontoPixPct))} no Pix</p>
-        )}
-        {!esgotado && parc && <p className="text-xs text-stone-500">ou {parc.vezes}x de {formatarReais(parc.valor)}</p>}
       </Link>
     );
   }
@@ -82,9 +90,22 @@ export function GradeProdutos({
 }) {
   if (produtos.length === 0) return <p className="py-10 text-center text-stone-500">Nenhum produto por aqui ainda.</p>;
   return (
-    <div className={`grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 ${variante === "relojoaria" ? "gap-x-3 gap-y-10 sm:gap-x-6" : "gap-x-4 gap-y-8"}`}>
+    <div className={`grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 ${variante === "relojoaria" ? "gap-x-3 gap-y-14 sm:gap-x-5" : "gap-x-4 gap-y-8"}`}>
       {produtos.map((p) => (
         <CartaoProduto key={p.id} p={p} base={base} condicoes={condicoes} variante={variante} />
+      ))}
+    </div>
+  );
+}
+
+/** fileira que rola de lado, como as vitrines das relojoarias */
+export function CarrosselProdutos({ produtos, base, condicoes }: { produtos: ProdutoVitrine[]; base: string; condicoes: CondicoesLoja }) {
+  return (
+    <div className="sem-barra -mx-5 flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-px-5 px-5 pb-2 sm:-mx-10 sm:scroll-px-10 sm:px-10 lg:gap-5">
+      {produtos.map((p) => (
+        <div key={p.id} className="w-[72%] shrink-0 snap-start sm:w-[42%] lg:w-[calc(25%-15px)]">
+          <CartaoProduto p={p} base={base} condicoes={condicoes} variante="relojoaria" />
+        </div>
       ))}
     </div>
   );

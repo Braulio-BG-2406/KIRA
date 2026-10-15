@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+@theme {
+  --color-areia: #f4f1ec;
+  --color-areia-escura: #e9e4dc;
+}
+
 @theme inline {
   --color-marca: var(--cor-primaria, #1f2937);
   --color-destaque: var(--cor-destaque, #b08d57);
@@ -10,9 +15,16 @@ html {
   -webkit-text-size-adjust: 100%;
 }
 
-/* temas "moderno" e "relojoaria": títulos sem serifa, em caixa alta */
-[data-tema="moderno"],
-[data-tema="relojoaria"] {
+/* elegante (Infinite): títulos em serifa clássica */
+[data-tema="elegante"] {
+  --fonte-titulo: "Cormorant Garamond Variable", Georgia, "Times New Roman", serif;
+}
+[data-tema="elegante"] .font-titulo {
+  font-weight: 500;
+}
+
+/* moderno: títulos sem serifa, em caixa alta */
+[data-tema="moderno"] {
   --fonte-titulo: ui-sans-serif, system-ui, "Helvetica Neue", Arial, sans-serif;
 }
 [data-tema="moderno"] .font-titulo {
@@ -20,10 +32,16 @@ html {
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
+
+/* relojoaria (BG): claro, letra fina em tamanho grande e muito espaço, como as grandes relojoarias */
+[data-tema="relojoaria"] {
+  --fonte-titulo: "Jost Variable", ui-sans-serif, system-ui, sans-serif;
+  font-family: "Jost Variable", ui-sans-serif, system-ui, sans-serif;
+  color: #1a1a1a;
+}
 [data-tema="relojoaria"] .font-titulo {
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-weight: 300;
+  letter-spacing: -0.01em;
 }
 
 /* produto sem foto: letra no tema claro, desenho de relógio na relojoaria */
@@ -37,7 +55,7 @@ html {
   display: none;
 }
 [data-tema="relojoaria"] .vazio-fundo {
-  background: #efeeea;
+  background: var(--color-areia);
 }
 
 body {
@@ -65,14 +83,35 @@ body {
   @apply botao border border-red-200 bg-white text-red-700 hover:bg-red-50;
 }
 
-/* relojoaria: cantos retos e botões em caixa alta, como nas relojoarias */
-[data-tema="relojoaria"] main .rounded-md,
-[data-tema="relojoaria"] main .rounded-lg,
-[data-tema="relojoaria"] main .rounded-xl {
-  border-radius: 0;
-}
-[data-tema="relojoaria"] main button.bg-marca {
-  letter-spacing: 0.18em;
+/* peças do tema relojoaria */
+@utility sobrelinha {
+  font-size: 11px;
+  letter-spacing: 0.26em;
   text-transform: uppercase;
-  font-size: 0.8rem;
+}
+@utility pilula {
+  @apply inline-flex items-center justify-center gap-2 rounded-full px-8 py-3.5 text-[13px] tracking-[0.06em] transition duration-300 disabled:cursor-not-allowed disabled:opacity-50;
+}
+@utility pilula-escura {
+  @apply pilula bg-[#141414] text-white hover:bg-black;
+}
+@utility pilula-clara {
+  @apply pilula border border-current hover:bg-white hover:text-[#141414];
+}
+@utility link-seta {
+  @apply inline-flex items-center gap-2 border-b border-current pb-0.5 text-[13px] tracking-[0.06em] transition hover:gap-3;
+}
+@utility sem-barra {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* relojoaria: botões principais arredondados também no carrinho e no checkout */
+[data-tema="relojoaria"] main a.bg-marca,
+[data-tema="relojoaria"] main button.bg-marca {
+  border-radius: 9999px;
+  font-weight: 400;
+  letter-spacing: 0.06em;
 }

@@ -33,25 +33,52 @@ export default async function Categoria({ params, searchParams }: Props) {
     marcasDaLoja(loja.id, cat.id),
   ]);
   const aqui = `${base}/categoria/${cat.slug}`;
+  const chip = (ativo: boolean) =>
+    relojoaria
+      ? `whitespace-nowrap rounded-full border px-4 py-1.5 text-[13px] font-light transition ${ativo ? "border-stone-950 bg-stone-950 text-white" : "border-stone-300 text-stone-700 hover:border-stone-950"}`
+      : `rounded-full border px-3 py-1 ${ativo ? "border-marca bg-marca text-white" : "border-stone-300"}`;
+  const filtros = marcas.length > 1 && (
+    <div className="flex flex-wrap gap-2 text-sm">
+      <Link href={aqui} className={chip(!marca)}>
+        Todas as marcas
+      </Link>
+      {marcas.map((m) => (
+        <Link key={m} href={`${aqui}?marca=${encodeURIComponent(m)}`} className={chip(marca === m)}>
+          {m}
+        </Link>
+      ))}
+    </div>
+  );
+
+  if (relojoaria) {
+    return (
+      <>
+        <section className="bg-areia px-6 py-16 text-center sm:py-24">
+          <p className="sobrelinha text-destaque">Coleção</p>
+          <h1 className="mt-5 font-titulo text-5xl text-stone-950 sm:text-6xl">{cat.nome}</h1>
+          <p className="mt-4 font-light text-stone-600">
+            {produtos.length} {produtos.length === 1 ? "modelo" : "modelos"}
+          </p>
+        </section>
+        <div id="produtos" className="mx-auto max-w-[1440px] px-5 pb-24 sm:px-10">
+          <div className="mb-12 flex flex-wrap items-center justify-between gap-4 border-b border-stone-200 py-5">
+            {filtros || <span />}
+            <Ordenar atual={ordem} />
+          </div>
+          <GradeProdutos produtos={produtos} base={base} condicoes={loja} variante="relojoaria" />
+        </div>
+      </>
+    );
+  }
+
   return (
-    <div id="produtos" className={`mx-auto px-4 py-10 ${relojoaria ? "max-w-7xl" : "max-w-6xl"}`}>
+    <div id="produtos" className="mx-auto max-w-6xl px-4 py-10">
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-        <h1 className={`font-titulo text-marca ${relojoaria ? "text-3xl" : "text-4xl"}`}>{cat.nome}</h1>
+        <h1 className="font-titulo text-4xl text-marca">{cat.nome}</h1>
         <Ordenar atual={ordem} />
       </div>
-      {marcas.length > 1 && (
-        <div className="mb-8 flex flex-wrap gap-2 text-sm">
-          <Link href={aqui} className={`rounded-full border px-3 py-1 ${!marca ? "border-marca bg-marca text-white" : "border-stone-300"}`}>
-            Todas
-          </Link>
-          {marcas.map((m) => (
-            <Link key={m} href={`${aqui}?marca=${encodeURIComponent(m)}`} className={`rounded-full border px-3 py-1 ${marca === m ? "border-marca bg-marca text-white" : "border-stone-300"}`}>
-              {m}
-            </Link>
-          ))}
-        </div>
-      )}
-      <GradeProdutos produtos={produtos} base={base} condicoes={loja} variante={relojoaria ? "relojoaria" : "padrao"} />
+      {filtros && <div className="mb-8">{filtros}</div>}
+      <GradeProdutos produtos={produtos} base={base} condicoes={loja} />
     </div>
   );
 }

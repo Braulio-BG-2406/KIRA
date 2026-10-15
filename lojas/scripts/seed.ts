@@ -24,7 +24,7 @@ const LOJAS = [
     slogan: "Relógios e acessórios masculinos",
     sobre: "Relógios e acessórios masculinos importados, com garantia, nota e envio rápido para todo o Brasil.",
     corPrimaria: "#141414",
-    corDestaque: "#c9a45c",
+    corDestaque: "#a3844c",
     tema: "relojoaria" as const,
     instagram: "bgimports_brasil",
     categorias: ["Relógios", "Pulseiras", "Carteiras", "Cintos", "Óculos", "Correntes", "Kits presente"],

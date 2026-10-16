@@ -2055,7 +2055,7 @@ teste('power bi: a Kira tem a ferramenta, com o ambiente vindo do workflow (não
   assert.match(comando('/status').texto_resposta, /Power BI: consulto os modelos e relatórios da empresa/);
 });
 
-// Fim do Dia: resumo do fim do expediente (agenda, e-mails sem resposta, rascunhos, tarefas e pedidos atrasados).
+// Fim do Dia: resumo do fim do expediente (agenda, e-mails críticos sem resposta, tarefas e pedidos atrasados).
 const fimDoDia = JSON.parse(ler('n8n/workflows/kira-fim-do-dia.json'));
 const noFimDoDia = (nome) => {
   const n = fimDoDia.nodes.find((x) => x.name === nome);
@@ -2065,7 +2065,7 @@ const noFimDoDia = (nome) => {
 const configFimDoDia = {
   nome_dono: 'Carlos', ambiente: 'TRABALHO', ambiente_nome: 'Trabalho', fuso_horario: 'America/Sao_Paulo', max_itens: 3,
   hoje: '2026-10-02', hoje_extenso: 'sexta-feira, 02/10', proximo_dia: '2026-10-05T00:00:00-03:00', proximo_dia_rotulo: 'Segunda-feira, 05/10',
-  inicio_hoje_utc: '2026-10-02T03:00:00Z',
+  inicio_janela_utc: '2026-09-30T03:00:00Z', remetentes_criticos: 'chefe@empresa.com.br, @parceiro.com', palavras_criticas: 'auditoria',
 };
 const paraMim = [{ emailAddress: { address: 'eu@empresa.com.br' } }];
 const fimDoDiaCompleto = {
@@ -2080,19 +2080,33 @@ const fimDoDiaCompleto = {
       { subject: 'Viagem', start: { dateTime: '2026-10-01T06:00:00' }, end: { dateTime: '2026-10-09T23:30:00' } },
     ],
   },
-  'E-mails de hoje': {
+  'E-mails recebidos': {
     value: [
-      { subject: 'Prazo do pedido 123', from: { emailAddress: { name: 'Ana', address: 'ana@cliente.com' } }, toRecipients: paraMim, receivedDateTime: '2026-10-02T13:05:00Z', importance: 'normal' },
+      { subject: 'Prazo do pedido 123', bodyPreview: 'Bom dia, qual a previsão?', from: { emailAddress: { name: 'Ana', address: 'ana@cliente.com' } }, toRecipients: paraMim, receivedDateTime: '2026-10-02T13:05:00Z', importance: 'normal' },
       { subject: 'Urgente', from: { emailAddress: { name: 'Bia', address: 'bia@cliente.com' } }, toRecipients: paraMim, receivedDateTime: '2026-10-02T12:00:00Z', importance: 'high' },
-      { subject: 'Respondido', from: { emailAddress: { address: 'c@x.com' } }, toRecipients: paraMim, receivedDateTime: '2026-10-02T11:00:00Z', singleValueExtendedProperties: [{ id: 'Integer 0x1081', value: '102' }] },
-      { subject: 'Promoção', from: { emailAddress: { address: 'noreply@loja.com' } }, toRecipients: paraMim, receivedDateTime: '2026-10-02T10:00:00Z' },
-      { subject: 'Só em cópia', from: { emailAddress: { address: 'd@x.com' } }, toRecipients: [{ emailAddress: { address: 'outro@x.com' } }], receivedDateTime: '2026-10-02T09:00:00Z' },
-      { subject: 'Meu', from: { emailAddress: { address: 'eu@empresa.com.br' } }, toRecipients: paraMim, receivedDateTime: '2026-10-02T08:00:00Z' },
+      { subject: 'Café amanhã?', bodyPreview: 'Vamos?', from: { emailAddress: { name: 'Edu', address: 'edu@x.com' } }, toRecipients: paraMim, receivedDateTime: '2026-10-02T14:00:00Z', importance: 'normal' },
+      { subject: 'Números do mês', bodyPreview: 'Segue.', from: { emailAddress: { name: 'Chefe', address: 'Chefe@empresa.com.br' } }, toRecipients: paraMim, receivedDateTime: '2026-10-01T19:30:00Z' },
+      { subject: 'Contrato', bodyPreview: 'Precisamos ver a auditoria.', from: { emailAddress: { name: 'Parceiro', address: 'lu@parceiro.com' } }, toRecipients: paraMim, receivedDateTime: '2026-10-02T16:00:00Z', flag: { flagStatus: 'flagged' } },
+      // respondido pelo celular: um e-mail dele na mesma conversa, depois de receber
+      { subject: 'RE: Urgente: linha parada', conversationId: 'conv-1', from: { emailAddress: { name: 'Gil', address: 'gil@cliente.com' } }, toRecipients: paraMim, receivedDateTime: '2026-10-02T10:00:00Z', importance: 'high' },
+      // ele escreveu antes, e a resposta do cliente chegou depois: continua esperando
+      { subject: 'Reclamação', conversationId: 'conv-2', from: { emailAddress: { name: 'Hugo', address: 'hugo@cliente.com' } }, toRecipients: paraMim, receivedDateTime: '2026-10-02T17:00:00Z' },
+      { subject: 'Respondido', from: { emailAddress: { address: 'c@x.com' } }, toRecipients: paraMim, receivedDateTime: '2026-10-02T11:00:00Z', importance: 'high', singleValueExtendedProperties: [{ id: 'Integer 0x1081', value: '102' }] },
+      { subject: 'Resposta automática: Urgente', from: { emailAddress: { address: 'f@x.com' } }, toRecipients: paraMim, receivedDateTime: '2026-10-02T11:30:00Z' },
+      { '@odata.type': '#microsoft.graph.eventMessageRequest', subject: 'Reunião urgente', from: { emailAddress: { address: 'g@x.com' } }, toRecipients: paraMim, receivedDateTime: '2026-10-02T11:40:00Z' },
+      { subject: 'Promoção urgente', from: { emailAddress: { address: 'noreply@loja.com' } }, toRecipients: paraMim, receivedDateTime: '2026-10-02T10:00:00Z' },
+      { subject: 'Urgente: só em cópia', from: { emailAddress: { address: 'd@x.com' } }, toRecipients: [{ emailAddress: { address: 'outro@x.com' } }], receivedDateTime: '2026-10-02T09:00:00Z' },
+      { subject: 'Meu urgente', from: { emailAddress: { address: 'eu@empresa.com.br' } }, toRecipients: paraMim, receivedDateTime: '2026-10-02T08:00:00Z' },
       { subject: 'Aprovação pendente', from: { emailAddress: { address: 'sender@notificacoes.sistema.com' } }, toRecipients: paraMim, receivedDateTime: '2026-10-02T15:00:00Z' },
-      { subject: 'Oferta', from: { emailAddress: { address: 'contato@loja.com' } }, toRecipients: paraMim, receivedDateTime: '2026-10-02T15:30:00Z', inferenceClassification: 'other' },
+      { subject: 'Oferta urgente', from: { emailAddress: { address: 'contato@loja.com' } }, toRecipients: paraMim, receivedDateTime: '2026-10-02T15:30:00Z', inferenceClassification: 'other' },
     ],
   },
-  Rascunhos: { value: [{ lastModifiedDateTime: '2026-10-02T14:00:00Z' }, { lastModifiedDateTime: '2026-10-01T14:00:00Z' }] },
+  'E-mails enviados': {
+    value: [
+      { conversationId: 'conv-1', sentDateTime: '2026-10-02T10:20:00Z' },
+      { conversationId: 'conv-2', sentDateTime: '2026-10-02T16:30:00Z' },
+    ],
+  },
   'Tarefas abertas': [
     { titulo: 'Ligar para fornecedor', prazo: '2026-10-01' },
     { titulo: 'Enviar proposta', prazo: '2026-10-02' },
@@ -2105,36 +2119,76 @@ const fimDoDiaCompleto = {
   },
 };
 const rodarFimDoDia = (nos) => executar(noFimDoDia('Montar mensagem').parameters.jsCode, { nosAnteriores: nos })[0];
-teste('fim do dia: agenda do próximo dia útil, e-mails sem resposta, rascunhos, tarefas e pedidos atrasados', () => {
+teste('fim do dia: agenda do próximo dia útil, e-mails críticos sem resposta, tarefas e pedidos atrasados (sem rascunhos)', () => {
   const r = rodarFimDoDia(fimDoDiaCompleto);
   assert.equal(htmlValidoParaTelegram(r.html), true);
-  assert.deepEqual(r.contagens, { eventos: 3, emails_sem_resposta: 2, rascunhos_hoje: 1, tarefas: 4, pedidos_atrasados: 12 });
+  assert.deepEqual(r.contagens, { eventos: 3, emails_criticos: 5, emails_sem_resposta: 6, tarefas: 4, pedidos_atrasados: 12 });
   assert.deepEqual(r.avisos, []);
   assert.match(r.html, /Fim do dia, Carlos!<\/b> sexta-feira, 02\/10/);
   assert.match(r.html, /Segunda-feira, 05\/10<\/b>\n• 09:00–10:00 Reunião &lt;comercial&gt; &amp; metas \(Sala 2\)\n• dia todo Feriado\n• dia todo \(até 09\/10\) Viagem/);
-  // respondidos, automáticos (pelo endereço ou pelo domínio), os que o Outlook separou em "Outros", os que ele só recebeu
-  // em cópia e os que ele mesmo mandou ficam de fora; os importantes vêm primeiro
-  assert.match(r.html, /sem resposta: 2<\/b>\n• 09:00 Bia: Urgente ❗\n• 10:05 Ana: Prazo do pedido 123/);
-  assert.match(r.html, /Rascunhos para revisar:<\/b> 1 de hoje, 2 na pasta/);
+  // respondidos (pela marca do Outlook ou por um e-mail dele depois, na mesma conversa), automáticos (endereço, domínio
+  // ou resposta automática), convites, os que o Outlook separou em "Outros", os em cópia e os dele ficam de fora; os
+  // com mais sinais vêm primeiro e, no empate, quem espera há mais tempo; o que não é crítico só entra na contagem
+  assert.match(
+    r.html,
+    /críticos sem resposta: 5<\/b>\n• 13:00 Parceiro: Contrato <i>\(sinalizado, remetente importante, palavra-chave\)<\/i>\n• 09:00 Bia: Urgente <i>\(alta prioridade, urgente\)<\/i>\n• 01\/10 16:30 Chefe: Números do mês <i>\(remetente importante\)<\/i>\n…e mais 2\n<i>Outros 1 sem resposta não parecem críticos\.<\/i>/,
+  );
+  assert.doesNotMatch(r.html, /ascunho/);
   assert.match(r.html, /Tarefas abertas \(Trabalho\): 4<\/b>\n• Ligar para fornecedor ⚠️ atrasada \(01\/10\)\n• Enviar proposta \(vence hoje\)\n• Planejar visita \(até 09\/10\)\n…e mais 1/);
   assert.match(r.html, /Pedidos atrasados: 12 itens<\/b> em 7 pedidos\nUnidade A: 8 · Unidade B: 4\n<i>Base de 02\/10\/2026 às 09:17<\/i>/);
   assert.doesNotMatch(r.texto_simples, /<\/?b>/);
+  const todos = rodarFimDoDia({ ...fimDoDiaCompleto, 'Configuração do fim do dia': { ...configFimDoDia, max_itens: 10 } });
+  assert.match(todos.html, /• 10:05 Ana: Prazo do pedido 123 <i>\(pedido\)<\/i>\n• 14:00 Hugo: Reclamação <i>\(problema\)<\/i>/);
+  const nenhum = rodarFimDoDia({ ...fimDoDiaCompleto, 'E-mails recebidos': { value: [] } });
+  assert.match(nenhum.html, /críticos sem resposta: 0<\/b>\nNenhum e-mail crítico esperando você\./);
+});
+teste('fim do dia: sem a pasta Enviados, vale só a marca de respondido do Outlook', () => {
+  const r = rodarFimDoDia({ ...fimDoDiaCompleto, 'E-mails enviados': { error: { message: '403' } } });
+  assert.equal(r.contagens.emails_criticos, 6);
+  assert.match(r.html, /Não consegui ler: e-mails enviados \(403\)\./);
+});
+teste('fim do dia: a janela dos e-mails volta 2 dias úteis (na segunda, até a quinta)', () => {
+  const janela = noFimDoDia('Configuração do fim do dia').parameters.assignments.assignments.find((a) => a.name === 'inicio_janela_utc').value;
+  // Um "agora" mínimo, no lugar do Luxon do n8n: só os dias (o Brasil fica em UTC-3, sem horário de verão).
+  const dia = (iso) => {
+    const d = new Date(`${iso}T12:00:00Z`);
+    return {
+      weekday: d.getUTCDay() || 7,
+      setZone: () => dia(iso),
+      startOf: () => dia(iso),
+      minus: ({ days }) => dia(new Date(d.getTime() - days * 86400000).toISOString().slice(0, 10)),
+      toUTC: () => ({ toISO: () => `${iso}T03:00:00Z` }),
+    };
+  };
+  const calcular = (hoje) => new Function('$now', `return (${janela.slice(3, -2)})`)(dia(hoje));
+  assert.equal(calcular('2026-10-02'), '2026-09-30T03:00:00Z'); // sexta → quarta
+  assert.equal(calcular('2026-10-05'), '2026-10-01T03:00:00Z'); // segunda → quinta
+  const recebidos = noFimDoDia('E-mails recebidos').parameters.queryParameters.parameters;
+  assert.match(recebidos[0].value, /receivedDateTime ge .*inicio_janela_utc/);
+  assert.match(recebidos.find((q) => q.name === '$select').value, /bodyPreview.*flag,conversationId/);
+  const enviados = noFimDoDia('E-mails enviados').parameters;
+  assert.match(enviados.url, /mailFolders\/sentitems\/messages$/);
+  assert.match(enviados.queryParameters.parameters[0].value, /sentDateTime ge .*inicio_janela_utc/);
+  const cfg = Object.fromEntries(noFimDoDia('Configuração do fim do dia').parameters.assignments.assignments.map((a) => [a.name, a.value]));
+  assert.equal(cfg.remetentes_criticos, '', 'repositório sem e-mails de pessoas');
+  assert.equal(cfg.palavras_criticas, '');
 });
 teste('fim do dia: uma parte que falha vira aviso e o resto segue', () => {
-  const nos = { ...fimDoDiaCompleto, 'E-mails de hoje': { error: { message: '401 - token expirado' } }, 'Agenda do próximo dia útil': { error: { message: 'timeout' } } };
+  const nos = { ...fimDoDiaCompleto, 'E-mails recebidos': { error: { message: '401 - token expirado' } }, 'Agenda do próximo dia útil': { error: { message: 'timeout' } } };
   delete nos['Pedidos atrasados'];
   const r = rodarFimDoDia(nos);
   assert.equal(htmlValidoParaTelegram(r.html), true);
+  assert.equal(r.contagens.emails_criticos, null);
   assert.equal(r.contagens.emails_sem_resposta, null);
   assert.equal(r.contagens.pedidos_atrasados, null);
   assert.match(r.html, /Não consegui ler a agenda\./);
-  assert.match(r.html, /sem resposta: \?<\/b>/);
+  assert.match(r.html, /críticos sem resposta: \?<\/b>/);
   assert.match(r.html, /Não consegui ler: agenda \(timeout\); e-mails \(401 - token expirado\); pedidos \(não rodou\)\./);
   assert.match(r.html, /Tarefas abertas \(Trabalho\): 4/);
   const semPedidos = rodarFimDoDia({ ...fimDoDiaCompleto, 'Pedidos atrasados': { resumo: { itens: 0, pedidos: 0 } } });
   assert.match(semPedidos.html, /Pedidos atrasados:<\/b> nenhum/);
 });
-teste('fim do dia: só lê, só o ambiente de trabalho, de segunda a sexta às 18h', () => {
+teste('fim do dia: só lê (nem cria rascunho), só o ambiente de trabalho, de segunda a sexta às 18h', () => {
   assert.equal(noFimDoDia('Seg a sex às 18h').parameters.rule.interval[0].expression, '0 18 * * 1-5');
   const http = fimDoDia.nodes.filter((n) => n.type === 'n8n-nodes-base.httpRequest');
   assert.equal(http.length, 4);
@@ -2142,6 +2196,7 @@ teste('fim do dia: só lê, só o ambiente de trabalho, de segunda a sexta às 1
     assert.ok(!n.parameters.method || n.parameters.method === 'GET', `${n.name}: só leitura`);
     assert.match(n.parameters.url, /^https:\/\/graph\.microsoft\.com\/v1\.0\/me/, `${n.name}: só o Microsoft Graph`);
     assert.equal(n.onError, 'continueRegularOutput', `${n.name}: uma falha não derruba o resumo`);
+    assert.doesNotMatch(n.parameters.url, /drafts|createReply|\/send/, `${n.name}: nada de rascunho ou envio`);
   }
   const condicoes = noFimDoDia('Tarefas abertas').parameters.filters.conditions;
   assert.deepEqual(condicoes.map((c) => c.keyName), ['user_id', 'contexto', 'status']);

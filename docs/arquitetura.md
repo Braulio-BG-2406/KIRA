@@ -23,7 +23,7 @@ A Kira é um **agente central** que roda no n8n e conversa pelo Telegram, por te
    📱 Telegram ──► n8n ──► Gemini ──► Kira ──► 📱 Telegram
    🎙️ voz ou 💬 texto                    🔊 voz ou 💬 texto
 
-   Em paralelo: ☀️ resumo das 7h · 📝 avisos de e-mails sobre pedidos (rascunho com /rascunho N)
+   Em paralelo: ☀️ resumo das 7h · 📝 avisos de e-mails sobre pedidos (desligado; rascunho com /rascunho N)
                 · 📦 sincronização da base oficial de pedidos (seg a sáb, 4x ao dia)
                 · 🌙 fim do dia (seg a sex, 18h) · 🩺 saúde (avisos de falha e resumo de segunda)
                 · 💾 backup das tabelas no Google Drive (domingo, 3h)
@@ -93,7 +93,10 @@ Os nomes em **negrito** são os nós do workflow [`n8n/workflows/kira-1.0.json`]
 
 **Montar base** junta as linhas de todas as voltas e guarda os textos repetidos (cliente, material, situação…) num dicionário por coluna: numa planilha com centenas de milhares de linhas, a base fica com dezenas de milhares de itens e poucos MB.
 
-### Avisos e rascunhos de e-mails sobre pedidos (workflow separado)
+### Avisos e rascunhos de e-mails sobre pedidos (workflow separado, desligado)
+
+Fica desativado: os e-mails críticos sem resposta vão só no resumo do fim do dia.
+
 
 **Kira — rascunhos automáticos (Outlook)** tem dois gatilhos, que passam por **Configuração** → **Quem sou eu** (seu endereço, para reconhecer e-mails seus e remetentes de fora) → **Pedido de rascunho?**:
 
@@ -102,7 +105,7 @@ Os nomes em **negrito** são os nós do workflow [`n8n/workflows/kira-1.0.json`]
 
 ### Fim do dia (workflow separado)
 
-**Kira — Fim do Dia (18h)**, de segunda a sexta às 18h: **Configuração do fim do dia** (o dono, o ambiente de trabalho, hoje e o próximo dia útil, que na sexta é a segunda) → **Quem sou eu** → **E-mails de hoje** (com a marca de "já respondido" e a classificação Destaques/Outros) → **Rascunhos** → **Agenda do próximo dia útil** (no fuso do Brasil) → **Tarefas abertas** (`kira_tarefas`, só do ambiente de trabalho) → **Pedidos atrasados** (o sub-workflow de pedidos, tipo `atrasados`) → **Montar mensagem** → **Enviar fim do dia** (se o HTML falhar, **Enviar sem formatação**) → **Conferência (só números)**. Cada leitura segue mesmo com erro; o que falhou vira uma linha "Não consegui ler".
+**Kira — Fim do Dia (18h)**, de segunda a sexta às 18h: **Configuração do fim do dia** (o dono, o ambiente de trabalho, hoje, o começo da janela dos e-mails, 2 dias úteis atrás, e o próximo dia útil, que na sexta é a segunda) → **Quem sou eu** → **E-mails recebidos** (Caixa de Entrada desde o começo da janela, com a marca de "já respondido", a sinalização, a conversa e a classificação Destaques/Outros) → **E-mails enviados** (as conversas em que você escreveu depois, de qualquer aparelho) → **Agenda do próximo dia útil** (no fuso do Brasil) → **Tarefas abertas** (`kira_tarefas`, só do ambiente de trabalho) → **Pedidos atrasados** (o sub-workflow de pedidos, tipo `atrasados`) → **Montar mensagem** (separa, sem IA, os e-mails críticos sem resposta: alta prioridade, sinalizados, remetentes e palavras de `remetentes_criticos` e `palavras_criticas`, ou que falam de urgência, prazo, problema, retorno esperado ou pedido) → **Enviar fim do dia** (se o HTML falhar, **Enviar sem formatação**) → **Conferência (só números)**. Cada leitura segue mesmo com erro; o que falhou vira uma linha "Não consegui ler".
 
 ### Saúde da Kira (workflow separado)
 

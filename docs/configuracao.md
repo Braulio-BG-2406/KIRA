@@ -225,6 +225,8 @@ As memórias antigas, sem ambiente, são distribuídas pela categoria (`pessoal`
 
 ## 15. E-mails sobre pedidos: aviso e rascunho sob pedido
 
+> **Desligado por enquanto.** Os e-mails importantes agora aparecem só no resumo do **Fim do dia** (passo 20), sem avisos de 30 em 30 minutos e sem rascunhos. Deixe este workflow **desativado** no n8n. Enquanto ele estiver desligado, o `/rascunho N` não tem avisos para usar; para uma resposta, peça na conversa ("Kira, prepare a resposta para o e-mail de ...").
+
 Workflow separado: **Kira — rascunhos automáticos (Outlook)** ([`kira-rascunhos-automaticos.json`](../n8n/workflows/kira-rascunhos-automaticos.json)). De segunda a sexta, das 7h às 19h30, a cada 30 minutos, ele lê os e-mails novos da Caixa de Entrada e separa os que parecem perguntar de pedidos (pedido, TRF, cotação, compra, solicitação, produção, prazo, NF). Pula e-mails automáticos, os que você mesmo mandou e os que você já respondeu. Depois **só avisa** no Telegram, numa mensagem só, cada e-mail com um número (#N), quem mandou, o assunto e o começo do texto. **A IA não é chamada nessa hora**, então não há gasto com o Gemini.
 
 Quando você quer a resposta de um deles, manda **`/rascunho N`** para a Kira. Aí:
@@ -330,8 +332,12 @@ Teste no modo Trabalho: "Kira, quais relatórios do Power BI você vê?" e depoi
 Workflow separado: **Kira — Fim do Dia (18h)** ([`kira-fim-do-dia.json`](../n8n/workflows/kira-fim-do-dia.json)). De segunda a sexta, às 18h, a Kira manda no Telegram o resumo do expediente. Só lê: não envia e-mail nem muda nada.
 
 - 📅 **Agenda do próximo dia útil** (na sexta, a de segunda). Compromissos de vários dias, como férias e viagens, aparecem como "dia todo (até dd/mm)".
-- 📬 **E-mails de hoje ainda sem resposta**, os importantes primeiro. Ficam de fora os que você já respondeu ou encaminhou, os automáticos (como "não responda" e avisos de sistemas), os que o Outlook separou em **Outros** e os em que você está só em cópia.
-- 📝 **Rascunhos para revisar**: os de hoje e o total da pasta.
+- 🚨 **E-mails críticos que você ainda não respondeu**, de hoje e dos 2 dias úteis anteriores (assim, o que ficou de ontem continua aparecendo até você responder). Cada um vem com o motivo entre parênteses. Sem IA e sem custo, conta como crítico o e-mail que:
+  - tem **alta prioridade** ou está **sinalizado** (bandeirinha) no Outlook;
+  - vem de um **remetente importante** (`remetentes_criticos`) ou tem uma das suas **palavras-chave** (`palavras_criticas`);
+  - fala de **urgência** (urgente, imediato, o quanto antes), **prazo** (atrasado, vencido, até hoje), **problema** (reclamação, multa, cancelamento, parado), **retorno esperado** (aguardo seu retorno, favor responder) ou **pedido** (pedido, cotação, OC, NF, previsão de entrega).
+
+  Os com mais motivos vêm primeiro e, no empate, quem espera há mais tempo. Os outros sem resposta aparecem só como um número. Ficam de fora os que você já respondeu ou encaminhou (pela marca do Outlook ou por um e-mail seu na mesma conversa, mesmo pelo celular), os automáticos (como "não responda", avisos de sistemas e respostas automáticas), os convites de reunião, os que o Outlook separou em **Outros** e os em que você está só em cópia.
 - ✅ **Tarefas abertas do ambiente de trabalho** (`kira_tarefas`), com as atrasadas marcadas. Só desse ambiente: nada dos outros aparece.
 - 📦 **Pedidos atrasados** da base oficial (passo 13), em números e por unidade.
 
@@ -339,6 +345,8 @@ Se uma parte não responder, a mensagem sai mesmo assim, com uma linha dizendo o
 
 1. Importe o workflow e selecione as credenciais: *Microsoft Outlook* (nos 4 nós HTTP) e *Telegram* (nos 2 envios).
 2. No nó **Configuração do fim do dia**, preencha `nome_dono`, `chat_id` e `user_id` (o seu ID do Telegram, o mesmo da Kira). Se quiser, troque o ambiente (`ambiente` e `ambiente_nome`; padrão Trabalho) e `max_itens` (quantos itens por lista; padrão 8).
+   - `remetentes_criticos`: endereços ou domínios que sempre contam como críticos, separados por vírgula (por exemplo, `chefe@empresa.com.br, @clienteimportante.com`). Vazio = nenhum.
+   - `palavras_criticas`: palavras ou frases suas que tornam o e-mail crítico, separadas por vírgula (por exemplo, `auditoria, contrato`). Vazio = só as regras acima.
 3. No nó **Pedidos atrasados**, selecione o sub-workflow de pedidos e, nele, em **Settings → This workflow can be called by**, libere também este workflow. Publique.
 
 ## 21. Saúde da Kira (avisos de falha e resumo de segunda)

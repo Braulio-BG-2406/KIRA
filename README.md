@@ -29,7 +29,7 @@ Meu bot particular: a **Kira** é uma assistente pessoal de IA que roda no **n8n
 
    ☀️ 7h: notícias (RSS) + cotações ─► resumo do Gemini ─► Telegram (texto + áudio da Kira)
    📦 seg a sáb, 9h/12h/15h/18h: planilha oficial de pedidos (SharePoint, centenas de MB) ─► lida em etapas ─► base compacta no OneDrive
-   🌙 seg a sex, 18h: agenda do próximo dia útil, e-mails sem resposta, rascunhos, tarefas e pedidos atrasados ─► Telegram
+   🌙 seg a sex, 18h: agenda do próximo dia útil, e-mails críticos sem resposta, tarefas e pedidos atrasados ─► Telegram
    🩺 se algo falhar: aviso no Telegram (um por dia por automação) · seg 8h: resumo da saúde da Kira
    💾 domingo, 3h: tabelas da Kira ─► arquivo JSON na pasta "Kira - backups" do Google Drive (guarda os 8 últimos)
 ```
@@ -59,9 +59,9 @@ Meu bot particular: a **Kira** é uma assistente pessoal de IA que roda no **n8n
 | 💎 Planilha do negócio | No modo **Negócios**, lê a planilha do negócio no Google Drive (.xlsx com as bases do sistema de vendas, a precificação e os painéis): resumo dos painéis, vendas por categoria e produto, vendedoras e acertos do consignado, clientes em atraso e para reativar, estoque por local, reposição e simulação de preço. Fora do modo Negócios, recusa. |
 | 📊 Power BI | No modo **Trabalho**, consulta o Power BI da empresa pela API oficial, só leitura: lista os modelos e relatórios, vê as tabelas e medidas e roda consultas DAX para trazer totais, indicadores e comparações, citando a hora da última atualização. |
 | 🌐 Internet | Pesquisa no Google quando a resposta depende de informação atualizada (notícias, cotações, preços, clima, leis, empresas) e lê a página quando você manda um link. Responde com a data da informação e as fontes. |
-| 📝 E-mails sobre pedidos | De segunda a sexta, a cada 30 minutos, olha os e-mails novos, separa os que perguntam de pedidos e avisa no Telegram, cada um com um número (sem IA, sem custo). Com `/rascunho N`, consulta a base de pedidos e deixa a resposta como **rascunho** no Outlook, com a sua assinatura (nunca envia). |
+| 📝 E-mails sobre pedidos | **Desligado**: os e-mails importantes agora vêm só no Fim do dia. Quando ligado: de segunda a sexta, a cada 30 minutos, olha os e-mails novos, separa os que perguntam de pedidos e avisa no Telegram, cada um com um número (sem IA, sem custo). Com `/rascunho N`, consulta a base de pedidos e deixa a resposta como **rascunho** no Outlook, com a sua assinatura (nunca envia). |
 | ☀️ Resumo da manhã | Todo dia às 7h: Brasil, Mundo, Mercado financeiro, Mineração/petróleo/siderurgia/florestal, Política e Tecnologia, com links das fontes, cotações do dia e **áudio na voz da Kira**. |
-| 🌙 Fim do dia | De segunda a sexta, às 18h: a agenda do próximo dia útil, os e-mails de hoje ainda sem resposta, os rascunhos para revisar, as tarefas abertas do trabalho e os pedidos atrasados. Só lê. |
+| 🌙 Fim do dia | De segunda a sexta, às 18h: a agenda do próximo dia útil, os **e-mails críticos que você ainda não respondeu** (de hoje e dos 2 dias úteis anteriores, com o motivo de cada um), as tarefas abertas do trabalho e os pedidos atrasados. Só lê: não cria rascunho nem envia nada. |
 | 🩺 Saúde da Kira | Avisa no Telegram quando a Kira ou uma automação dela falha (no máximo uma vez por dia cada uma, com uma dica do que fazer) e, toda segunda às 8h, manda o resumo: conexões, falhas da semana, base de pedidos, último backup e quando reconectar o LinkedIn. |
 | 💾 Backup | Todo domingo às 3h, copia as tabelas da Kira (memórias, tarefas, contatos, histórico…) para um arquivo no seu Google Drive e guarda os 8 mais recentes. |
 

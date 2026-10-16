@@ -81,6 +81,12 @@ O instalador:
 
 Sem domínio próprio, as lojas ficam em endereços gratuitos com o IP da VPS, como `https://bgimports.177-153-67-118.sslip.io`. Rodar o instalador de novo atualiza o código sem perder dados.
 
+Depois de instalado, dois comandos ajudam no dia a dia (também como root, na VPS):
+- `bash scripts/vps-dominio.sh bgimports.com.br bg-imports` liga um domínio próprio a uma loja (ou `painel.seudominio.com.br painel` para o painel). Confere o DNS, acrescenta os nomes no Caddy e reinicia só as lojas.
+- `bash scripts/vps-senha-painel.sh` troca a senha de quem esqueceu ou cria um acesso ao painel para outra pessoa.
+
+Os dois estão em `/opt/kira-lojas/lojas/scripts/` depois da próxima atualização, ou podem ser baixados direto do GitHub (veja o começo de cada arquivo).
+
 ### Instalação manual
 
 Na VPS (a mesma do n8n serve):

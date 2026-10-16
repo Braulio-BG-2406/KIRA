@@ -10,3 +10,4 @@ docker-compose*.yml
 README.md
 dados
 scripts/instalar-vps.sh
+scripts/vps-*.sh

@@ -15,12 +15,25 @@ services:
       interval: 5s
       retries: 20
 
-  # roda as migrações e cria as lojas/usuário (se ainda não existirem) a cada subida
+  # roda as migrações e cria as lojas/usuário (se ainda não existirem) a cada subida.
+  # Com a VPS ocupada (logo depois de montar a imagem) o banco pode demorar a responder:
+  # tenta até 6 vezes antes de desistir.
   migrar:
     build:
       context: .
       target: builder
-    command: sh -c "npx tsx scripts/migrate.ts && npx tsx scripts/seed.ts"
+    command:
+      - sh
+      - -c
+      - |
+        n=1
+        until npx tsx scripts/migrate.ts; do
+          [ "$$n" -ge 6 ] && exit 1
+          echo "O banco ainda não respondeu; tentando de novo ($$n de 5)..."
+          n=$$((n + 1))
+          sleep 10
+        done
+        npx tsx scripts/seed.ts
     environment:
       DATABASE_URL: postgres://lojas:${DB_SENHA}@db:5432/lojas
       ADMIN_EMAIL: ${ADMIN_EMAIL:-}

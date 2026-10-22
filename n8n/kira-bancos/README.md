@@ -1,6 +1,6 @@
 # Kira — bancos
 
-Ferramenta da Kira (n8n) que lê as contas do **Inter, Bradesco, Banco do Brasil e Nubank** pelo Open Finance, via
+Ferramenta da Kira (n8n) que lê as contas do **Inter e do Nubank** pelo Open Finance, via
 [Meu Pluggy](https://meu.pluggy.ai) (grátis para as próprias contas, até 5 conexões).
 
 - **Só leitura:** o código só faz `GET` na API da Pluggy (o único `POST` é o login). Nada move dinheiro: sem Pix,
@@ -20,22 +20,29 @@ Ferramenta da Kira (n8n) que lê as contas do **Inter, Bradesco, Banco do Brasil
 Os arquivos `.js` desta pasta são o código dos nós Code do sub-workflow (`Preparar consulta`, `Consultar bancos` e
 `Explicar falha`), guardados aqui como cópia e histórico. Ao mudar um deles, cole o mesmo código no nó.
 
-## Como ligar (uma vez)
+## Como está ligado
 
-1. Em **meu.pluggy.ai**, crie a conta e conecte os 4 bancos pelo Open Finance (cada banco pede a autorização no
-   app dele).
-2. No **Dashboard da Pluggy**, abra a aplicação e copie o **Client ID** e o **Client Secret**.
-3. No n8n, abra o workflow `Kira — bancos (ferramenta)`, clique no nó **Entrar na Pluggy** e crie a credencial
-   **Pluggy (bancos)** (tipo *Custom Auth*) com:
-   ```json
-   {"body": {"clientId": "COLE_AQUI", "clientSecret": "COLE_AQUI"}}
-   ```
-   Salve o workflow e publique de novo.
-4. Ainda no Dashboard: **Demo > Conectar conta > MeuPluggy**, entre com a conta do Meu Pluggy e escolha um banco.
-   No menu de três pontos da conexão, **Copiar Item ID**. Repita para cada banco (um Item ID por banco).
-5. Na tabela **kira_bancos**, crie uma linha por banco: `item_id` = o Item ID, `banco` = Inter, Bradesco,
-   Banco do Brasil ou Nubank, `ativo` = true.
-6. No Telegram: `modo pessoal` e depois, por exemplo, "quanto tenho nos bancos?".
+Ligado em outubro de 2026 com o **Inter** e o **Nubank**. Para refazer ou acrescentar um banco:
+
+1. Em **meu.pluggy.ai**, conecte o banco pelo Open Finance (cada banco pede a autorização no app dele).
+2. No **Dashboard da Pluggy**, entre em **Demo > Conectar Conta** e escolha **MeuPluggy** (não o banco direto: a
+   conta de desenvolvedor só conecta bancos pelo MeuPluggy). Autorize logo o banco na tela do Meu Pluggy; se a
+   página ficar parada, a conexão vem com `USER INPUT TIMEOUT` e precisa ser refeita.
+3. Na conexão criada, use os três pontinhos > **Copiar Item ID** (um Item ID por banco).
+4. Na tabela **kira_bancos**, crie a linha: `item_id` = o Item ID, `banco` = nome do banco, `ativo` = true.
+
+A credencial **Pluggy (bancos)** (tipo *Custom Auth*) usa o **Client ID** e o **Client Secret** da mesma aplicação
+do Dashboard (menu **Aplicações**), no formato:
+
+```json
+{"body": {"clientId": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx", "clientSecret": "..."}}
+```
+
+Se a Pluggy responder `clientId must be a UUID`, o Client ID na credencial não é o da aplicação (ou ficou o texto de
+exemplo). O trial do Dashboard pode acabar sem afetar a leitura das contas já conectadas, mas há relatos de que
+depois dele não dá para conectar bancos novos.
+
+No Telegram: `modo pessoal` e depois, por exemplo, "quanto tenho nos bancos?".
 
 ## O que dá para pedir
 
@@ -52,6 +59,15 @@ Transferências entre contas próprias, pagamento de fatura e aplicação/resgat
 (senão o mesmo dinheiro contaria duas vezes); a resposta mostra esse total à parte em `fora_da_conta`.
 
 Os valores são os da última sincronização do banco com a Pluggy, não em tempo real; toda resposta traz `dados_de`.
+
+### Particularidades vistas nos dados reais
+
+- O saldo "aplicado automaticamente" (`automaticallyInvestedBalance`) já está dentro do saldo da conta: não somar.
+- O vencimento do cartão (`balanceDueDate`) é o da última fatura fechada; quando já passou, a ferramenta mostra o
+  próximo como `vencimento_previsto` e omite o pagamento mínimo (que é da fatura fechada).
+- O pagamento da fatura aparece no cartão como crédito "PAGAMENTO ON LINE" (categoria qualquer) e a aplicação na
+  conta como "Débito Renda Fixa - Lig Liquidez" (às vezes com categoria "Groceries"): os dois ficam fora dos gastos.
+- Compras no cartão às vezes vêm com categoria de transferência ou investimento: viram "Compras no cartão".
 
 ## Teste local
 

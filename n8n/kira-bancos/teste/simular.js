@@ -22,11 +22,12 @@ const ITEMS = {
 };
 const ACCOUNTS = {
   'item-nu': [
-    { id: 'acc-nu-cc', itemId: 'item-nu', type: 'BANK', subtype: 'CHECKING_ACCOUNT', name: 'Conta', balance: 1520.37, currencyCode: 'BRL', bankData: { transferNumber: '0260/0001/1234567-8', automaticallyInvestedBalance: 300 } },
-    { id: 'acc-nu-cc2', itemId: 'item-nu', type: 'CREDIT', subtype: 'CREDIT_CARD', name: 'Nubank Ultravioleta', number: '5162********4321', balance: 2350.1, currencyCode: 'BRL', creditData: { balanceCloseDate: due(-2), balanceDueDate: due(5), minimumPayment: 352.5, creditLimit: 10000, availableCreditLimit: 7649.9 } },
+    { id: 'acc-nu-cc', itemId: 'item-nu', type: 'BANK', subtype: 'CHECKING_ACCOUNT', name: 'Conta', balance: 1520.37, currencyCode: 'BRL', bankData: { transferNumber: '0260/0001/1234567-8', automaticallyInvestedBalance: 1520.37 } },
+    { id: 'acc-nu-cc2', itemId: 'item-nu', type: 'CREDIT', subtype: 'CREDIT_CARD', name: 'Nubank Ultravioleta', number: '5162********4321', balance: 2350.1, currencyCode: 'BRL', creditData: { balanceDueDate: due(5), minimumPayment: 352.5, creditLimit: 10000, availableCreditLimit: 7649.9 } },
   ],
   'item-inter': [
     { id: 'acc-inter-cc', itemId: 'item-inter', type: 'BANK', subtype: 'CHECKING_ACCOUNT', name: 'Conta Corrente', balance: -45.2, currencyCode: 'BRL', bankData: { transferNumber: '077/0001/99999-1' } },
+    { id: 'acc-inter-black', itemId: 'item-inter', type: 'CREDIT', subtype: 'CREDIT_CARD', name: 'BLACK', number: '2613', balance: 500, currencyCode: 'BRL', creditData: { balanceDueDate: due(-15), minimumPayment: 99, creditLimit: 1000, availableCreditLimit: 500 } },
   ],
 };
 const TX = {
@@ -44,12 +45,21 @@ const TX = {
     { id: 't8', description: 'AMAZON', amount: 120, amountInAccountCurrency: 650.4, currencyCode: 'USD', type: 'DEBIT', category: 'Online shopping', date: d(5), creditCardMetadata: { installmentNumber: 2, totalInstallments: 10 }, status: 'PENDING' },
     { id: 't10', description: 'Estorno Loja X', amount: -50, type: 'CREDIT', category: 'Reversal', date: d(5) },
   ],
-  'acc-inter-cc': [{ id: 't11', description: 'Tarifa', amount: -45.2, type: 'DEBIT', category: 'Account fees', date: d(9) }],
+  'acc-inter-cc': [
+    { id: 't11', description: 'Tarifa', amount: -45.2, type: 'DEBIT', category: 'Account fees', date: d(9) },
+    { id: 't12', description: 'Débito Renda Fixa - Lig Liquidez', amount: -3000, type: 'DEBIT', category: 'Groceries', date: d(2) },
+  ],
+  'acc-inter-black': [
+    { id: 't13', description: 'PAGAMENTO ON LINE', amount: -2279.11, type: 'CREDIT', category: 'Shopping', date: d(8) },
+    { id: 't14', description: 'MERCADOLIVRE MERCADOL OSASCO BRA', amount: 19.9, type: 'DEBIT', category: 'Investments', date: d(3) },
+    { id: 't15', description: 'ANTHROPIC SAN FRANCISCO CA', amount: 20, type: 'DEBIT', category: 'Transfers', date: d(2) },
+  ],
 };
 const BILLS = { 'acc-nu-cc2': [{ id: 'b1', dueDate: due(-25), totalAmount: 1800, minimumPaymentAmount: 270 }, { id: 'b2', dueDate: due(-55), totalAmount: 2100 }] };
 const INV = { 'item-nu': [{ id: 'i1', name: 'RDB Nubank', type: 'FIXED_INCOME', subtype: 'CDB', balance: 15000, status: 'ACTIVE', rate: 100, rateType: 'CDI' }, { id: 'i2', name: 'Fundo X', type: 'MUTUAL_FUND', balance: 5000.5 }], 'item-inter': [] };
 
 const calls = [];
+const r2 = (v) => Math.round(v * 100) / 100;
 function mockHttp({ fail = {}, v1gone = false } = {}) {
   return async (opts) => {
     if (opts.method !== 'GET') throw new Error('método proibido ' + opts.method);
@@ -102,6 +112,19 @@ function mockHttp({ fail = {}, v1gone = false } = {}) {
     const out = await runCode('consultar-bancos.js', { input: [{ apiKey: 'KEY' }], nodes: { 'Preparar consulta': prep }, httpRequest: mockHttp() });
     console.log(JSON.stringify(out[0].json, null, 1));
   }
+  console.log('\n=== conferências');
+  const conferir = (cond, msg) => { if (!cond) { console.error('FALHOU: ' + msg); process.exitCode = 1; } else console.log('ok: ' + msg); };
+  const rodar = async (o) => (await runCode('consultar-bancos.js', { input: [{ apiKey: 'KEY' }], nodes: { 'Preparar consulta': (await runCode('preparar-consulta.js', { input: conexoes, nodes: { 'Quando a Kira consultar os bancos': trig(o) } }))[0].json }, httpRequest: mockHttp() }))[0].json;
+  const resumo = await rodar({ tipo: 'resumo' });
+  conferir(resumo.total_em_conta === r2(1520.37 - 45.2), 'saldo em conta sem contar o aplicado automaticamente de novo');
+  const black = resumo.cartoes.find((c) => c.cartao.includes('2613'));
+  conferir(black.vencimento_previsto === true && black.vence_em_dias >= 0 && black.pagamento_minimo === undefined, 'vencimento já passado vira o próximo (previsto), sem o mínimo da fatura fechada');
+  const gastos = await rodar({ tipo: 'gastos', desde: hoje.minus({ days: 40 }).toFormat('yyyy-MM-dd') });
+  conferir(!gastos.maiores_gastos.some((g) => /renda fixa/i.test(g.descricao)), 'aplicação em renda fixa não conta como gasto');
+  conferir(gastos.maiores_gastos.some((g) => /mercadolivre/i.test(g.descricao) && g.categoria === 'Compras no cartão'), 'compra no cartão classificada como investimento conta como gasto');
+  conferir(!gastos.por_categoria.some((c) => c.categoria === 'Transferências'), 'compra no cartão não aparece como transferência');
+  conferir(gastos.estornos_no_cartao === 50, 'PAGAMENTO ON LINE no cartão é pagamento de fatura, não estorno');
+
   console.log('\n=== v2 fallback');
   const prep = (await runCode('preparar-consulta.js', { input: conexoes, nodes: { 'Quando a Kira consultar os bancos': trig({ tipo: 'transacoes', desde: '2000-01-01' }) } }))[0].json;
   const out = await runCode('consultar-bancos.js', { input: [{ apiKey: 'KEY' }], nodes: { 'Preparar consulta': prep }, httpRequest: mockHttp({ v1gone: true }) });

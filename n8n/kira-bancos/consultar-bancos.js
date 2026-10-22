@@ -159,15 +159,31 @@ const CATEGORIAS = {
   'health insurance': 'Plano de saúde', 'vehicle insurance': 'Seguro do carro', 'home insurance': 'Seguro residencial',
   'leisure': 'Lazer', 'other': 'Outros',
 };
-const categoria = (tx) => {
-  const c = String(tx.category ?? '').trim();
-  return CATEGORIAS[c.toLowerCase()] || c || 'Sem categoria';
-};
 // Transferência entre contas próprias, pagamento de fatura e aplicação/resgate não são gasto nem receita:
 // o dinheiro só muda de lugar (e o gasto do cartão já aparece nas compras).
 const INTERNA_CATEGORIA = /^(same person transfer|credit card payment|investments|automatic investment|fixed income|mutual funds|variable income|pension)\b/i;
-const INTERNA_DESCRICAO = /pagamento (de |da )?fatura|pgto\.? fatura|pag fatura|pagamento recebido|aplica[cç][aã]o|resgate|mesma titularidade|transf(\.|er[eê]ncia)? entre contas/i;
-const interna = (tx) => INTERNA_CATEGORIA.test(String(tx.category ?? '')) || INTERNA_DESCRICAO.test(String(tx.description ?? ''));
+const APLICACAO = /renda fixa|liquidez|tesouro direto|\bcdb\b|\blci\b|\blca\b|aplica[cç][aã]o|resgate/i;
+const INTERNA_DESCRICAO = /pagamento (de |da )?fatura|pgto\.? fatura|pag fatura|mesma titularidade|transf(\.|er[eê]ncia)? entre contas/i;
+// No cartão, só o pagamento da fatura (crédito com "pagamento" na descrição, ex.: "PAGAMENTO ON LINE") é entre
+// contas: uma compra nunca é aplicação, mesmo quando a Pluggy a classifica como investimento.
+const PAGAMENTO_NO_CARTAO = /pagamento|pagto/i;
+const interna = (tx, conta) => {
+  const desc = String(tx.description ?? '');
+  if (conta?.type === 'CREDIT') return tx.type === 'CREDIT' && (/^credit card payment\b/i.test(String(tx.category ?? '')) || PAGAMENTO_NO_CARTAO.test(desc));
+  return INTERNA_CATEGORIA.test(String(tx.category ?? '')) || APLICACAO.test(desc) || INTERNA_DESCRICAO.test(desc);
+};
+const categoria = (tx, conta) => {
+  const c = String(tx.category ?? '').trim();
+  const desc = String(tx.description ?? '');
+  if (conta?.type === 'CREDIT') {
+    if (tx.type === 'CREDIT' && interna(tx, conta)) return 'Pagamento de fatura';
+    // Compra no cartão não é transferência nem investimento (a Pluggy às vezes classifica assim serviços do exterior).
+    if (tx.type !== 'CREDIT' && /^(transfer|third party transfer|same person transfer|investments|automatic investment|fixed income|mutual funds)/i.test(c)) return 'Compras no cartão';
+  } else if (APLICACAO.test(desc)) {
+    return 'Aplicação ou resgate';
+  }
+  return CATEGORIAS[c.toLowerCase()] || c || 'Sem categoria';
+};
 const valorTx = (tx) => Math.abs(Number(tx.amountInAccountCurrency ?? tx.amount) || 0);
 const nomeConta = (c) => {
   if (c.type === 'CREDIT') return `cartão ${c.marketingName || c.name || ''}${final4(c.number) ? ` final ${final4(c.number)}` : ''}`.replace(/\s+/g, ' ').trim();
@@ -246,21 +262,36 @@ const contaBancaria = (c, banco) =>
     banco,
     conta: nomeConta(c),
     saldo: r2(c.balance),
-    aplicado_automaticamente: temValor(c.bankData?.automaticallyInvestedBalance) && Number(c.bankData.automaticallyInvestedBalance) ? r2(c.bankData.automaticallyInvestedBalance) : undefined,
     moeda: c.currencyCode && c.currencyCode !== 'BRL' ? c.currencyCode : undefined,
   });
-const cartao = (c, banco) =>
-  semVazios({
+// O banco informa o vencimento da última fatura fechada; se ele já passou, a fatura atual vence no mesmo dia de um
+// mês seguinte (previsto).
+const proximoVencimento = (iso) => {
+  const t = diaIso(iso);
+  if (!t) return {};
+  const base = DateTime.fromISO(t, { zone: fuso });
+  for (let i = 0; i <= 24; i += 1) {
+    const d = base.plus({ months: i });
+    if (d >= hoje) return { data: d, previsto: i > 0 };
+  }
+  return {};
+};
+const cartao = (c, banco) => {
+  const venc = proximoVencimento(c.creditData?.balanceDueDate);
+  return semVazios({
     banco,
     cartao: nomeConta(c),
     fatura_atual: r2(c.balance),
-    fechamento: dia(c.creditData?.balanceCloseDate),
-    vencimento: dia(c.creditData?.balanceDueDate),
-    vence_em_dias: diasAte(c.creditData?.balanceDueDate),
-    pagamento_minimo: temValor(c.creditData?.minimumPayment) ? r2(c.creditData.minimumPayment) : undefined,
+    fechamento: venc.previsto ? undefined : dia(c.creditData?.balanceCloseDate),
+    vencimento: venc.data?.toFormat('dd/MM/yyyy'),
+    vencimento_previsto: venc.previsto ? true : undefined,
+    vence_em_dias: venc.data ? Math.round(venc.data.diff(hoje, 'days').days) : undefined,
+    // O pagamento mínimo informado é o da fatura fechada: não vale para a atual quando o vencimento já passou.
+    pagamento_minimo: !venc.previsto && temValor(c.creditData?.minimumPayment) ? r2(c.creditData.minimumPayment) : undefined,
     limite: temValor(c.creditData?.creditLimit) ? r2(c.creditData.creditLimit) : undefined,
     limite_disponivel: temValor(c.creditData?.availableCreditLimit) ? r2(c.creditData.availableCreditLimit) : undefined,
   });
+};
 
 // --- investimentos --------------------------------------------------------------------------------------
 const TIPOS_INVESTIMENTO = {
@@ -321,22 +352,22 @@ const resumoTx = ({ tx, conta, banco }) =>
     estabelecimento: tx.merchant?.businessName || tx.merchant?.name,
     valor: r2(valorTx(tx)),
     sentido: tx.type === 'CREDIT' ? 'entrada' : 'saída',
-    categoria: categoria(tx),
+    categoria: categoria(tx, conta),
     banco,
     conta: nomeConta(conta),
     parcela: tx.creditCardMetadata?.totalInstallments > 1 ? `${tx.creditCardMetadata.installmentNumber}/${tx.creditCardMetadata.totalInstallments}` : undefined,
     pendente: tx.status === 'PENDING' ? true : undefined,
-    entre_suas_contas: interna(tx) ? true : undefined,
+    entre_suas_contas: interna(tx, conta) ? true : undefined,
     moeda_original: tx.currencyCode && tx.currencyCode !== (conta.currencyCode || 'BRL') ? `${tx.currencyCode} ${r2(Math.abs(tx.amount))}` : undefined,
   });
 // Busca: texto (descrição, estabelecimento ou categoria) ou "entradas" / "saídas".
 const filtrarBusca = (lista) => {
   const b = semAcento(pedido.busca);
   if (!b) return lista;
-  if (/^(entradas?|receitas?|recebimentos?|creditos?)$/.test(b)) return lista.filter(({ tx }) => tx.type === 'CREDIT' && !interna(tx));
-  if (/^(saidas?|gastos?|despesas?|debitos?|compras?)$/.test(b)) return lista.filter(({ tx }) => tx.type !== 'CREDIT' && !interna(tx));
+  if (/^(entradas?|receitas?|recebimentos?|creditos?)$/.test(b)) return lista.filter(({ tx, conta }) => tx.type === 'CREDIT' && !interna(tx, conta));
+  if (/^(saidas?|gastos?|despesas?|debitos?|compras?)$/.test(b)) return lista.filter(({ tx, conta }) => tx.type !== 'CREDIT' && !interna(tx, conta));
   return lista.filter(({ tx, conta }) =>
-    semAcento([tx.description, tx.merchant?.businessName, tx.merchant?.name, tx.category, categoria(tx), nomeConta(conta)].join(' ')).includes(b),
+    semAcento([tx.description, tx.merchant?.businessName, tx.merchant?.name, tx.category, categoria(tx, conta), nomeConta(conta)].join(' ')).includes(b),
   );
 };
 const ordenarPorData = (lista) => lista.sort((a, b) => String(b.tx.date ?? '').localeCompare(String(a.tx.date ?? '')));
@@ -356,13 +387,13 @@ if (tipo === 'resumo') {
     for (const conta of c.contas) (conta.type === 'CREDIT' ? cartoes : contas).push(conta.type === 'CREDIT' ? cartao(conta, c.banco) : contaBancaria(conta, c.banco));
   }
   const investimentos = await lerInvestimentos(usadas);
-  const emConta = r2(contas.filter((c) => !c.moeda).reduce((s, c) => s + c.saldo + (c.aplicado_automaticamente || 0), 0));
+  const emConta = r2(contas.filter((c) => !c.moeda).reduce((s, c) => s + c.saldo, 0));
   const faturas = r2(cartoes.reduce((s, c) => s + Math.max(c.fatura_atual, 0), 0));
   const investido = r2(investimentos.reduce((s, i) => s + i.saldo, 0));
   const alertas = alertasConexao();
   for (const c of cartoes) {
     if (c.vence_em_dias !== undefined && c.vence_em_dias >= 0 && c.vence_em_dias <= 7 && c.fatura_atual > 0) {
-      alertas.push(`Fatura do ${c.cartao} (${c.banco}) vence em ${c.vence_em_dias} dia(s), dia ${c.vencimento}`);
+      alertas.push(`Fatura do ${c.cartao} (${c.banco}) vence em ${c.vence_em_dias} dia(s), dia ${c.vencimento}${c.vencimento_previsto ? ' (previsto)' : ''}`);
     }
   }
   for (const c of contas) if (c.saldo < 0) alertas.push(`${c.banco}: ${c.conta} está negativa (cheque especial)`);
@@ -445,15 +476,15 @@ const filtradas = filtrarBusca(todas);
 const comFalhas = falhas.length ? { bancos_com_falha: falhas.map((f) => `${f.banco}: ${f.erro.slice(0, 160)}`) } : {};
 
 if (tipo === 'gastos') {
-  const saidas = filtradas.filter(({ tx }) => tx.type !== 'CREDIT' && !interna(tx));
-  const entradas = filtradas.filter(({ tx, conta }) => tx.type === 'CREDIT' && !interna(tx) && conta.type !== 'CREDIT');
-  const estornos = filtradas.filter(({ tx, conta }) => tx.type === 'CREDIT' && !interna(tx) && conta.type === 'CREDIT');
-  const internas = filtradas.filter(({ tx }) => interna(tx));
+  const saidas = filtradas.filter(({ tx, conta }) => tx.type !== 'CREDIT' && !interna(tx, conta));
+  const entradas = filtradas.filter(({ tx, conta }) => tx.type === 'CREDIT' && !interna(tx, conta) && conta.type !== 'CREDIT');
+  const estornos = filtradas.filter(({ tx, conta }) => tx.type === 'CREDIT' && !interna(tx, conta) && conta.type === 'CREDIT');
+  const internas = filtradas.filter(({ tx, conta }) => interna(tx, conta));
   const soma = (lista) => r2(lista.reduce((s, x) => s + valorTx(x.tx), 0));
   const totalGastos = soma(saidas);
   const porCategoria = {};
   for (const x of saidas) {
-    const k = categoria(x.tx);
+    const k = categoria(x.tx, x.conta);
     porCategoria[k] ??= { categoria: k, total: 0, transacoes: 0 };
     porCategoria[k].total += valorTx(x.tx);
     porCategoria[k].transacoes += 1;
@@ -504,7 +535,7 @@ if (tipo === 'gastos') {
 // tipo === 'transacoes'
 const ordenadas = ordenarPorData(filtradas);
 const lista = ordenadas.slice(0, pedido.limite).map(resumoTx);
-const externas = filtradas.filter(({ tx }) => !interna(tx));
+const externas = filtradas.filter(({ tx, conta }) => !interna(tx, conta));
 return [{
   json: {
     ...base,

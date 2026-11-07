@@ -71,7 +71,7 @@ catálogo de exemplo. Este levantamento já deixa pronto:
 | `catalogo/infinite-catalogo.csv` | as 469 peças no formato do importador (Produtos → Importar): nome, categoria, opção, código, preço, estoque |
 | `catalogo/fotos.json` | quais fotos pertencem a cada peça |
 | `catalogo/catalogo.json` | tudo que foi lido do site, em bruto |
-| `fotos/` | as fotos das peças em tamanho grande |
+| `fotos/` | as 424 fotos das 372 peças que têm foto (WebP) |
 | `identidade/` | logotipos, banners do início, ícones do app |
 | `textos/` | quem somos, onde comprar, contato, entregas, trocas, disposições legais, termos, privacidade, seja revendedora |
 | `telas/` | prints do site atual (referência de visual) |

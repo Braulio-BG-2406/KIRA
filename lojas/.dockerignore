@@ -1,0 +1,13 @@
+node_modules
+.next
+.env
+uploads
+test-results
+playwright-report
+*.tsbuildinfo
+# arquivos que não entram na imagem: mudar só eles não obriga a remontar as lojas na VPS
+docker-compose*.yml
+README.md
+dados
+scripts/instalar-vps.sh
+scripts/vps-*.sh

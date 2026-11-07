@@ -1,6 +1,9 @@
 # KIRA
 Meu Bot particular
 
+- [`lojas/`](lojas/README.md): site de vendas + ERP da Infinite Semijoias e da BG Imports
+- [`migracao-infinite/`](migracao-infinite/README.md): material trazido do site antigo da Infinite (catálogo, fotos, textos, identidade)
+
 ## Buscador de oportunidades automotivas
 
 Procura anúncios de **carro, caminhão e cavalo mecânico**, compara cada um com a

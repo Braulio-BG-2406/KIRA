@@ -3,7 +3,7 @@ import { lerDominios } from "@/lib/dominios";
 
 const dominios = lerDominios();
 // caminhos que nunca são da vitrine
-const SISTEMA = /^\/(admin|api|uploads|loja|_next)(\/|$)|^\/(favicon\.ico|robots\.txt)$/;
+const SISTEMA = /^\/(admin|api|uploads|loja|lojas|_next)(\/|$)|^\/(favicon\.ico|robots\.txt|sw\.js)$/;
 
 export function middleware(req: NextRequest) {
   // o cabeçalho é só nosso: descarta o que vier de fora

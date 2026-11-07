@@ -13,14 +13,15 @@ async function entrarNoPainel(page: Page) {
 let codigoPedido = "";
 
 test("cliente compra no site e recebe o Pix", async ({ page }) => {
+  // Infinite no tema joalheria: abertura do site antigo, novidades e sacola
   await page.goto("/loja/infinite");
-  await expect(page.getByRole("heading", { name: "Semijoias que acompanham você" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Um detalhe\.\s*Outra presença\./ })).toBeVisible();
   await page.getByRole("link", { name: /Anel Solitário/ }).first().click();
   await page.getByRole("button", { name: "Aro 18" }).click();
-  await page.getByRole("button", { name: "Aumentar" }).click();
-  await page.getByRole("button", { name: "Adicionar ao carrinho" }).click();
+  await page.getByRole("button", { name: "Aumentar quantidade" }).click();
+  await page.getByRole("button", { name: "Adicionar à sacola" }).click();
   await expect(page.getByRole("status")).toContainText("Adicionado");
-  await page.getByRole("link", { name: "Ver carrinho" }).click();
+  await page.getByRole("link", { name: "Ver sacola" }).click();
   await expect(page.getByText("Aro 18")).toBeVisible();
   await page.getByRole("link", { name: "Finalizar compra" }).click();
 
@@ -48,6 +49,22 @@ test("cliente compra no site e recebe o Pix", async ({ page }) => {
   await expect(page.getByText("Total: R$ 158,72")).toBeVisible();
   await expect(page.getByAltText("QR Code do Pix")).toBeVisible();
   await expect(page.locator("p.font-mono")).toContainText("br.gov.bcb.pix");
+});
+
+test("Infinite: catálogo em páginas, páginas institucionais, endereços antigos e app", async ({ page }) => {
+  await page.goto("/loja/infinite/catalogo");
+  await expect(page.getByRole("heading", { name: "Todas as peças" })).toBeVisible();
+  await page.getByRole("link", { name: "Brincos", exact: true }).first().click();
+  await expect(page.getByRole("heading", { name: "Brincos" })).toBeVisible();
+  // endereço antigo de coleção leva à coleção nova
+  await page.goto("/loja/infinite/catalogo/colares");
+  await expect(page).toHaveURL(/\/loja\/infinite\/categoria\/colares$/);
+  await page.goto("/loja/infinite/troca-e-devolucao");
+  await expect(page.getByRole("heading", { name: "Compra e troca", level: 1 })).toBeVisible();
+  await expect(page.getByText("CNPJ 53.930.694/0001-22").first()).toBeVisible();
+  const manifesto = await (await page.request.get("/loja/infinite/manifest.webmanifest")).json();
+  expect(manifesto.short_name).toBe("Infinite");
+  expect((await page.request.get(manifesto.icons[0].src)).status()).toBe(200);
 });
 
 test("loja confirma o pagamento, envia e o cliente acompanha", async ({ page }) => {

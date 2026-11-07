@@ -20,6 +20,7 @@ export function Ordenar({ atual }: { atual?: string }) {
         value={atual ?? ""}
         onChange={(e) => {
           const q = new URLSearchParams(params);
+          q.delete("pagina");
           if (e.target.value) q.set("ordem", e.target.value);
           else q.delete("ordem");
           router.push(`${caminho}${q.size ? `?${q}` : ""}#produtos`, { scroll: false });

@@ -52,10 +52,11 @@ export type Entrega = {
 const criadoEm = () => timestamp("criado_em", { withTimezone: true }).notNull().defaultNow();
 
 /**
- * visual da vitrine: "elegante" (serifada, clara), "moderno" (sem serifa, cabeçalho escuro)
- * ou "relojoaria" (escuro com dourado, abertura com relógio em destaque)
+ * visual da vitrine: "elegante" (serifada, clara), "moderno" (sem serifa, cabeçalho escuro),
+ * "relojoaria" (claro, letra fina, abertura com relógio em destaque) ou
+ * "joalheria" (escuro com dourado, banners e páginas de src/lib/visual.ts e src/lib/paginas.ts)
  */
-export type TemaLoja = "elegante" | "moderno" | "relojoaria";
+export type TemaLoja = "elegante" | "moderno" | "relojoaria" | "joalheria";
 
 export type Especificacao = { nome: string; valor: string };
 

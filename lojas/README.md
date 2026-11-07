@@ -7,12 +7,14 @@ O estoque é um só para o site, o Mercado Livre e a Shopee: vendeu em um canal,
 ## O que já funciona
 
 **Vitrine (o que o cliente vê)**
-- Três estilos: **elegante** (Infinite: títulos em Playfair Display), **moderno**, e **relojoaria** (BG, inspirado nas grandes relojoarias):
-  - fundo areia, letra Jost fina e grande, muito espaço;
-  - cabeçalho branco com o nome centralizado e menu em tela cheia;
-  - abertura com o relógio em destaque e coleções e seleção em carrossel;
-  - faixa escura com a ficha técnica, vitrine com filtros e serviços;
-  - página de produto com seções que abrem e fecham e "você também pode gostar".
+- Quatro estilos: **joalheria** (Infinite), **elegante**, **moderno** e **relojoaria** (BG, inspirado nas grandes relojoarias):
+  - **joalheria** (Infinite, trazida do site antigo infinitesemijoias.store): fundo quase preto, dourado e marfim, Cormorant Garamond e DM Sans;
+    abertura "Um detalhe. Outra presença.", coleções em painéis com foto, novidades, linha masculina, catálogo em páginas de 36 peças,
+    página de produto com "Adicionar à sacola" e "Comprar agora", páginas institucionais (quem somos, onde comprar, contato,
+    seja revendedora, entregas, compra e troca, disposições legais, termos, privacidade) e app para instalar na tela inicial.
+    Banners, logos e dados da empresa ficam em `src/lib/visual.ts` e `public/lojas/<slug>/`; os textos das páginas, em `src/lib/paginas.ts`.
+    Os endereços do site antigo continuam funcionando (`/catalogo/brincos`, `/produto/...`, `/conta`, `/catalogo?q=`);
+  - **relojoaria** (BG):
 - As fontes ficam dentro do projeto, sem depender do Google Fonts.
 - Página de produto com variações (aro, cor, pulseira…), fotos, marca, ficha técnica, garantia e "vem com"
 - Preço no Pix com desconto e parcelas sem juros (configuráveis por loja), filtro por marca e ordenação por preço
@@ -43,6 +45,18 @@ O estoque é um só para o site, o Mercado Livre e a Shopee: vendeu em um canal,
 - **Instagram e Facebook**: o mesmo feed vira o catálogo do Commerce Manager (para marcar produtos nos posts), além do Pixel da Meta e da verificação de domínio. A Kira posta no Instagram com foto, link e legenda da loja.
 
 **Para a Kira**: uma API só de leitura (veja abaixo) para ela responder "quanto vendi hoje?", "tem pedido para enviar?" ou "o que está acabando?", e para montar posts.
+
+## Catálogo trazido do site antigo da Infinite
+
+A pasta `migracao-infinite/` (na raiz do repositório) tem as 469 peças do site antigo, com opções, códigos, preços,
+estoque e 424 fotos. Para colocar na loja:
+
+```bash
+npx tsx scripts/importar-catalogo.ts infinite ../migracao-infinite          # no computador
+bash scripts/vps-importar-catalogo.sh                                      # na VPS (depois do instalador)
+```
+
+Pode rodar de novo: peça que já existe é pulada (com `--atualizar`, recebe preço e estoque do arquivo).
 
 ## Rodar no computador
 

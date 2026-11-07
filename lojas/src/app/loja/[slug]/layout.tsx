@@ -7,6 +7,11 @@ import { corValida, linkWhatsapp } from "@/lib/texto";
 import { IconeCarrinho } from "@/components/loja/IconeCarrinho";
 import { CabecalhoRelojoaria } from "@/components/loja/CabecalhoRelojoaria";
 import { RodapeRelojoaria } from "@/components/loja/RodapeRelojoaria";
+import { CabecalhoJoalheria } from "@/components/loja/CabecalhoJoalheria";
+import { RodapeJoalheria } from "@/components/loja/RodapeJoalheria";
+import { visualDaLoja } from "@/lib/visual";
+import { paginasDaLoja } from "@/lib/paginas";
+import { RegistrarApp } from "@/components/loja/RegistrarApp";
 import { formatarReais } from "@/lib/dinheiro";
 import { Rastreamento } from "@/components/loja/Rastreamento";
 import { rastreamentoSeguro } from "@/lib/rastreamento";
@@ -17,7 +22,14 @@ export async function generateMetadata({ params }: Omit<Props, "children">): Pro
   const loja = await buscarLoja((await params).slug);
   if (!loja) return {};
   const r = rastreamentoSeguro(loja.rastreamento);
+  const app = visualDaLoja(loja.slug).app;
+  const base = await baseDaLoja(loja.slug);
   return {
+    ...(app && {
+      manifest: `${base}/manifest.webmanifest`,
+      icons: { icon: [{ url: app.favicon, sizes: "32x32", type: "image/png" }, { url: app.icone512, sizes: "512x512", type: "image/png" }], apple: app.apple },
+      appleWebApp: { capable: true, title: app.nomeCurto, statusBarStyle: "black-translucent" },
+    }),
     title: { default: loja.slogan ? `${loja.nome} | ${loja.slogan}` : loja.nome, template: `%s | ${loja.nome}` },
     description: loja.sobre ?? loja.slogan ?? undefined,
     openGraph: { siteName: loja.nome, locale: "pt_BR", type: "website" },
@@ -40,6 +52,10 @@ export default async function LayoutLoja({ children, params }: Props) {
   const instagram = loja.instagram?.replace(/^@/, "");
   const moderno = loja.tema === "moderno";
   const relojoaria = loja.tema === "relojoaria";
+  const joalheria = loja.tema === "joalheria";
+  const visual = visualDaLoja(slug);
+  const paginas = paginasDaLoja(slug);
+  const linksPaginas = (grupo: "institucional" | "ajuda") => paginas.filter((p) => p.grupo === grupo).map((p) => ({ nome: p.titulo, href: `/${p.slug}` }));
   const gratis = loja.frete.entrega.ativo ? loja.frete.entrega.gratisAcimaCentavos : null;
   const avisos = [
     gratis != null ? `Frete grátis acima de ${formatarReais(gratis)}` : "Enviamos para todo o Brasil",
@@ -51,7 +67,20 @@ export default async function LayoutLoja({ children, params }: Props) {
   return (
     <div style={estilo} data-tema={loja.tema} className="flex min-h-screen flex-col">
       <Rastreamento r={rastreamentoSeguro(loja.rastreamento)} />
-      {relojoaria ? (
+      {visual.app && <RegistrarApp />}
+      {joalheria ? (
+        <CabecalhoJoalheria
+          slug={slug}
+          base={base}
+          nome={loja.nome}
+          logo={visual.logoCabecalho ?? loja.logoUrl}
+          categorias={cats}
+          menu={visual.menu ?? []}
+          paginas={paginas.map((p) => ({ nome: p.titulo, href: `/${p.slug}` }))}
+          whatsapp={loja.whatsapp ? linkWhatsapp(loja.whatsapp) : null}
+          instagram={instagram ?? null}
+        />
+      ) : relojoaria ? (
         <CabecalhoRelojoaria slug={slug} base={base} nome={loja.nome} logoUrl={loja.logoUrl} avisos={avisos} categorias={cats} whatsapp={loja.whatsapp ? linkWhatsapp(loja.whatsapp) : null} />
       ) : (
         <header className={`sticky top-0 z-20 border-b backdrop-blur ${moderno ? "border-white/10 bg-marca text-white" : "border-stone-200 bg-white/95"}`}>
@@ -86,9 +115,23 @@ export default async function LayoutLoja({ children, params }: Props) {
         </header>
       )}
 
-      <main className="flex-1">{children}</main>
+      <main className={joalheria ? "flex-1 pb-4" : "flex-1"}>{children}</main>
 
-      {relojoaria ? (
+      {joalheria ? (
+        <RodapeJoalheria
+          nome={loja.nome}
+          slogan={loja.slogan}
+          logo={visual.logoRodape ?? loja.logoUrl}
+          base={base}
+          categorias={cats}
+          institucional={linksPaginas("institucional")}
+          ajuda={linksPaginas("ajuda")}
+          whatsapp={loja.whatsapp ? linkWhatsapp(loja.whatsapp) : null}
+          instagram={instagram ?? null}
+          email={loja.email}
+          empresa={visual.empresa}
+        />
+      ) : relojoaria ? (
         <RodapeRelojoaria
           nome={loja.nome}
           sobre={loja.sobre}
@@ -139,7 +182,7 @@ export default async function LayoutLoja({ children, params }: Props) {
           target="_blank"
           rel="noopener"
           aria-label="Falar no WhatsApp"
-          className={`fixed bottom-5 right-5 z-30 flex items-center justify-center rounded-full text-white shadow-lg ${relojoaria ? "h-12 w-12 bg-[#141414] hover:bg-black" : "h-13 w-13 bg-[#25d366] hover:brightness-95"}`}
+          className={`fixed bottom-5 right-5 z-30 flex items-center justify-center rounded-full shadow-lg ${joalheria ? "h-12 w-12 border border-[#b89a67]/40 bg-[#141414] text-[#c5a978] hover:bg-[#1c1c1c]" : relojoaria ? "h-12 w-12 bg-[#141414] text-white hover:bg-black" : "h-13 w-13 bg-[#25d366] text-white hover:brightness-95"}`}
         >
           <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
             <path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.3-.4.7-1.4.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.8 11.9 11.9 0 0 0 4.6 4c1.7.7 2.3.8 3.2.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.1-1.2l-.5-.3Z" />
@@ -148,4 +191,9 @@ export default async function LayoutLoja({ children, params }: Props) {
       )}
     </div>
   );
+}
+
+export async function generateViewport({ params }: { params: Promise<{ slug: string }> }) {
+  const app = visualDaLoja((await params).slug).app;
+  return app ? { themeColor: app.cor } : {};
 }

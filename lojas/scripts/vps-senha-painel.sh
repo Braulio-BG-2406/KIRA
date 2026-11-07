@@ -5,7 +5,7 @@
 #   bash vps-senha-painel.sh
 #
 # Direto do GitHub:
-#   curl -fsSL https://raw.githubusercontent.com/Braulio-BG-2406/KIRA/refs/heads/claude/trusting-davinci-9g9zzb/lojas/scripts/vps-senha-painel.sh -o vps-senha-painel.sh && bash vps-senha-painel.sh
+#   curl -fsSL https://raw.githubusercontent.com/Braulio-BG-2406/KIRA/refs/heads/claude/infinitesemijoias-migration-uty47t/lojas/scripts/vps-senha-painel.sh -o vps-senha-painel.sh && bash vps-senha-painel.sh
 set -euo pipefail
 
 PASTA=${PASTA:-/opt/kira-lojas/lojas}

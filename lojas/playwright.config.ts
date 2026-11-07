@@ -9,7 +9,10 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   timeout: 60_000,
-  use: { baseURL: `http://localhost:${PORTA}`, locale: "pt-BR", timezoneId: "America/Sao_Paulo", screenshot: "only-on-failure" },
+  use: { baseURL: `http://localhost:${PORTA}`, locale: "pt-BR", timezoneId: "America/Sao_Paulo", screenshot: "only-on-failure",
+    // navegador já instalado em outro lugar (ex.: PW_CHROMIUM=/opt/pw-browsers/chromium)
+    launchOptions: process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {},
+  },
   webServer: {
     // roda o build de produção (rode "npm run build" antes)
     command: `npx next start -p ${PORTA}`,

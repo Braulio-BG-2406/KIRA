@@ -10,13 +10,15 @@ const LOJAS = [
   {
     slug: "infinite",
     nome: "Infinite Semijoias",
-    slogan: "Semijoias que acompanham você",
-    sobre: "Semijoias banhadas a ouro 18k e ródio, com garantia e acabamento feito para durar.",
-    corPrimaria: "#2b2320",
-    corDestaque: "#b08d57",
-    tema: "elegante" as const,
-    instagram: undefined as string | undefined,
-    categorias: ["Brincos", "Colares", "Anéis", "Pulseiras", "Conjuntos"],
+    slogan: "Semijoias para todos os seus momentos.",
+    sobre: "Sofisticação, exclusividade e estilo: semijoias com banho de ouro 18k, coleções limitadas e garantia em cada peça.",
+    corPrimaria: "#0b0b0c",
+    corDestaque: "#b89a67",
+    tema: "joalheria" as "elegante" | "moderno" | "relojoaria" | "joalheria",
+    instagram: "infinitesemijoiasoficial" as string | undefined,
+    whatsapp: "5531975001789" as string | undefined,
+    email: "infinitesemijoiasoficial@gmail.com" as string | undefined,
+    categorias: ["Brincos", "Colares", "Linha Masculina", "Conjuntos", "Anéis", "Pulseiras", "Acessórios de Luxo", "Tornozeleiras", "Piercings"],
   },
   {
     slug: "bg-imports",
@@ -112,7 +114,9 @@ const DEMO: Record<string, Demo[]> = {
 async function garantirLoja({ categorias: cats, ...dados }: (typeof LOJAS)[number]): Promise<Loja> {
   const [existente] = await db.select().from(lojas).where(eq(lojas.slug, dados.slug));
   if (existente) return existente;
-  const [nova] = await db.insert(lojas).values({ ...dados, frete: FRETE_PADRAO }).returning();
+  // Infinite: frete grátis a partir de R$ 300 em peças, como no site antigo
+  const frete = dados.slug === "infinite" ? { ...FRETE_PADRAO, entrega: { ...FRETE_PADRAO.entrega, gratisAcimaCentavos: 30000 } } : FRETE_PADRAO;
+  const [nova] = await db.insert(lojas).values({ ...dados, frete }).returning();
   await db.insert(categorias).values(cats.map((nome, ordem) => ({ lojaId: nova.id, nome, slug: criarSlug(nome), ordem })));
   console.log(`Loja criada: ${nova.nome} (/loja/${nova.slug})`);
   return nova;

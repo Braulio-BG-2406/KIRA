@@ -32,7 +32,7 @@ Confira com a verificação (fluxo 1) antes de agir: pode ter mudado.
 | Configuração | `/opt/kira-lojas/lojas/.env`: DB_SENHA, APP_URL, LOJA_DOMINIOS, ADMIN_EMAIL, KIRA_API_TOKEN, REDE_PROXY, COMPOSE_FILE. A senha do painel não fica gravada. |
 | Caddy | bloco das lojas no fim do Caddyfile, começando em `# lojas-kira`; cópias `.antes-das-lojas` e `.antes-do-dominio` ao lado |
 | Segurança | fail2ban no sshd: 5 erros em 10 min = 1 h de bloqueio (`/etc/fail2ban/jail.d/sshd-kira.local`, ação nftables porque o firewalld está desligado) |
-| Código no ar | branch `claude/trusting-davinci-9g9zzb` (variável `RAMO` do instalador). Se for incorporada à main, use `RAMO=main`. |
+| Código no ar | branch `claude/infinitesemijoias-migration-uty47t` (padrão do `RAMO` no instalador desde 07/11/2026; antes era `claude/trusting-davinci-9g9zzb`). Se for incorporada à main, use `RAMO=main`. |
 
 Nunca peça print do `.env` inteiro, de senhas ou do token da Kira.
 
@@ -70,7 +70,7 @@ cd /opt/kira-lojas/lojas && docker compose logs --no-color --tail 30 migrar app;
 ### 2. Instalar ou atualizar
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Braulio-BG-2406/KIRA/refs/heads/claude/trusting-davinci-9g9zzb/lojas/scripts/instalar-vps.sh -o instalar-lojas.sh && bash instalar-lojas.sh
+curl -fsSL https://raw.githubusercontent.com/Braulio-BG-2406/KIRA/refs/heads/claude/infinitesemijoias-migration-uty47t/lojas/scripts/instalar-vps.sh -o instalar-lojas.sh && bash instalar-lojas.sh
 ```
 
 Da segunda vez em diante o arquivo já está em `/root`: `cd ~ && bash instalar-lojas.sh`.
@@ -109,7 +109,7 @@ Antes, o usuário compra o domínio (registro.br, cerca de R$ 40 por ano) e cria
 A para `dominio` e `www.dominio` apontando para `177.153.67.118`. Depois:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Braulio-BG-2406/KIRA/refs/heads/claude/trusting-davinci-9g9zzb/lojas/scripts/vps-dominio.sh | bash -s -- bgimports.com.br bg-imports
+curl -fsSL https://raw.githubusercontent.com/Braulio-BG-2406/KIRA/refs/heads/claude/infinitesemijoias-migration-uty47t/lojas/scripts/vps-dominio.sh | bash -s -- bgimports.com.br bg-imports
 ```
 
 - O segundo valor é o código (slug) da loja; se errar, o script lista os que existem.
@@ -127,7 +127,7 @@ curl -fsSL https://raw.githubusercontent.com/Braulio-BG-2406/KIRA/refs/heads/cla
 ### 5. Senha do painel esquecida ou acesso para outra pessoa
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Braulio-BG-2406/KIRA/refs/heads/claude/trusting-davinci-9g9zzb/lojas/scripts/vps-senha-painel.sh -o vps-senha-painel.sh && bash vps-senha-painel.sh
+curl -fsSL https://raw.githubusercontent.com/Braulio-BG-2406/KIRA/refs/heads/claude/infinitesemijoias-migration-uty47t/lojas/scripts/vps-senha-painel.sh -o vps-senha-painel.sh && bash vps-senha-painel.sh
 ```
 
 Lista quem entra hoje, pede o e-mail e a senha nova (duas vezes). E-mail que já existe
@@ -144,6 +144,23 @@ mkdir -p /root/backups && cd /opt/kira-lojas/lojas && docker compose exec -T db 
 As fotos ficam no volume `lojas_fotos`. Restaurar um backup apaga os dados atuais: só
 com pedido claro do usuário. O workflow "Kira — Backup semanal" do n8n pode passar a
 incluir esse arquivo (ver skill equipe-de-agentes).
+
+### 6b. Infinite: tema novo e catálogo do site antigo
+
+A Infinite foi refeita com o visual do site antigo (infinitesemijoias.store, feito por terceiro): tema
+`joalheria`, 469 peças com 424 fotos (pasta `migracao-infinite/`), páginas institucionais e app.
+Para levar à VPS, dois comandos, um depois do outro:
+
+1. Instalador da branch nova (monta tudo de novo, 5 a 15 min; a migração `0003` troca o tema, as
+   cores, o WhatsApp, o Instagram e o e-mail da Infinite e ordena as coleções):
+   `curl -fsSL https://raw.githubusercontent.com/Braulio-BG-2406/KIRA/refs/heads/claude/infinitesemijoias-migration-uty47t/lojas/scripts/instalar-vps.sh -o instalar-lojas.sh && RAMO=claude/infinitesemijoias-migration-uty47t bash instalar-lojas.sh`
+2. Catálogo com fotos (segundos; pode repetir):
+   `cd /opt/kira-lojas/lojas && bash scripts/vps-importar-catalogo.sh`
+
+No fim aparece `Infinite Semijoias: 469 peças criadas, 424 fotos...` e o endereço para conferir.
+Depois, para o domínio antigo apontar para a VPS: registros A de `infinitesemijoias.store` e
+`www.infinitesemijoias.store` para `177.153.67.118` (no painel de quem registrou o domínio) e o fluxo 4
+com `infinitesemijoias.store infinite`.
 
 ### 7. Segurança do SSH
 
@@ -162,6 +179,8 @@ Locaweb e roda `fail2ban-client set sshd unbanip <IP dele>`.
 | `a porta 3000 da VPS já está em uso` | Outro programa na porta | `ss -ltnp \| grep :3000` para ver qual |
 | Conector do n8n pede login de novo | O acesso do Claude ao n8n expirou | O usuário reconecta nas configurações de conectores do claude.ai |
 | `client_loop: send disconnect: Connection reset` | Conexão SSH caiu | Reconectar e repetir o último comando |
+| Fotos dos produtos não aparecem (404 em `/uploads/...`) | O `.gitignore` tinha `uploads/`, que também ignorava `src/app/uploads/` (a rota que serve as fotos); ela nunca foi para o GitHub | Corrigido em 07/11/2026 (`/uploads/` no `.gitignore` e a rota de volta). Atualizar com o instalador |
+| Build de teste: `additional privileges requested: pass "--allow=network.host"` | O compose novo não deixa o build usar a rede do host | Na VPS simulada, montar as imagens com `docker buildx build --network host --allow network.host -t lojas-app .` (e `--target builder -t lojas-migrar`) e subir com `docker compose up -d --no-build` |
 
 ## Testar antes de mandar
 

@@ -5,8 +5,9 @@ import { baseDaLoja, buscarLoja } from "@/lib/lojas";
 import { categoriasDaLoja, listarVitrine, marcasDaLoja, type Ordem } from "@/lib/catalogo";
 import { Ordenar } from "@/components/loja/Ordenar";
 import { GradeProdutos } from "@/components/loja/CartaoProduto";
+import { CatalogoJoalheria } from "@/components/loja/CatalogoJoalheria";
 
-type Props = { params: Promise<{ slug: string; categoria: string }>; searchParams: Promise<{ marca?: string; ordem?: string }> };
+type Props = { params: Promise<{ slug: string; categoria: string }>; searchParams: Promise<{ marca?: string; ordem?: string; pagina?: string }> };
 
 async function carregar(params: Props["params"]) {
   const { slug, categoria } = await params;
@@ -24,8 +25,25 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function Categoria({ params, searchParams }: Props) {
   const { loja, cat, slug } = await carregar(params);
-  const { marca, ordem: o } = await searchParams;
+  const { marca, ordem: o, pagina } = await searchParams;
   const ordem = ["novidades", "menor", "maior"].includes(o ?? "") ? (o as Ordem) : undefined;
+  if (loja.tema === "joalheria") {
+    const [base, cats, produtos] = await Promise.all([baseDaLoja(slug), categoriasDaLoja(loja.id), listarVitrine({ lojaId: loja.id, categoriaId: cat.id, ordem, limite: 5000 })]);
+    return (
+      <CatalogoJoalheria
+        loja={loja}
+        base={base}
+        titulo={cat.nome}
+        sobrelinha="Coleção"
+        categorias={cats}
+        atual={cat.slug}
+        produtos={produtos}
+        pagina={Number(pagina) || 1}
+        ordem={ordem}
+        caminho={`/categoria/${cat.slug}`}
+      />
+    );
+  }
   const relojoaria = loja.tema === "relojoaria";
   const [base, produtos, marcas] = await Promise.all([
     baseDaLoja(slug),

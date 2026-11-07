@@ -1,5 +1,5 @@
 """catalogo.json (raspado) -> planilha de importação da plataforma lojas/ + mapa de fotos."""
-import csv, json, sys
+import csv, json, re, sys, unicodedata
 src, dest_csv, dest_fotos = sys.argv[1:4]
 cat = json.load(open(src, encoding="utf-8"))
 COL = ["nome", "marca", "categoria", "variacao", "sku", "codigo_barras", "preco", "preco_de", "custo",
@@ -20,7 +20,10 @@ for p in cat:
     for v in vs:
         sku = v.get("sku") or ""
         # mesmo código em duas opções: diferencia pela opção para não sobrescrever na importação
-        if sku and sku in vistos: sku = f"{sku}-{v['nome']}"
+        # igual ao importador da plataforma (lojas/scripts/importar-catalogo.ts): 148381-RODIO
+        if sku and sku in vistos:
+            opc = unicodedata.normalize("NFD", v["nome"]).encode("ascii", "ignore").decode()
+            sku = f"{sku}-{re.sub(r'[^a-z0-9]+', '-', opc.lower()).strip('-').upper()}"
         vistos.add(sku)
         linhas.append({"nome": nome, "marca": "", "categoria": p.get("categoria") or "", "variacao": v["nome"],
                        "sku": sku, "codigo_barras": "", "preco": reais(v.get("preco")), "preco_de": reais(v.get("preco_de")),

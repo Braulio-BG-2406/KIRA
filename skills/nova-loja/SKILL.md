@@ -1,6 +1,6 @@
 ---
 name: nova-loja
-description: Cria uma loja nova, ou muda visual, textos e catálogo de uma loja existente, na plataforma de vendas + ERP do repositório Braulio-BG-2406/KIRA (pasta lojas/ - Next.js e PostgreSQL, várias lojas num sistema só, painel enxuto inspirado no MarketUP), a mesma da BG Imports (tema relojoaria) e da Infinite Semijoias (tema elegante). Cobre cadastro da loja, tema e cores a partir de referências (Instagram, sites de grandes marcas), categorias, catálogo por planilha, Pix, frete, cupons, canais (Mercado Livre, Shopee, Google, Instagram), testes e a entrega para a prévia e a publicação. Use sempre que o usuário pedir site de vendas, loja virtual, e-commerce ou ERP para uma marca ou negócio, quiser mudar layout, tema, cores ou textos de uma das lojas, criar categorias ou catálogo, ou ligar uma loja a marketplaces, mesmo sem falar em plataforma.
+description: Cria uma loja nova, ou muda visual, textos e catálogo de uma loja existente, na plataforma de vendas + ERP do repositório Braulio-BG-2406/KIRA (pasta lojas/ - Next.js e PostgreSQL, várias lojas num sistema só, painel enxuto inspirado no MarketUP), a mesma da BG Imports (tema relojoaria) e da Infinite Semijoias (tema joalheria). Cobre cadastro da loja, tema e cores a partir de referências (Instagram, sites de grandes marcas), categorias, catálogo por planilha, Pix, frete, cupons, canais (Mercado Livre, Shopee, Google, Instagram), testes e a entrega para a prévia e a publicação. Use sempre que o usuário pedir site de vendas, loja virtual, e-commerce ou ERP para uma marca ou negócio, quiser mudar layout, tema, cores ou textos de uma das lojas, criar categorias ou catálogo, ou ligar uma loja a marketplaces, mesmo sem falar em plataforma.
 ---
 
 # Nova loja (ou novo visual) na plataforma
@@ -21,7 +21,10 @@ Shopee, feed para Google e Meta, sitemap, Pixel/GA4 e uma API só de leitura par
 | Tabelas | `src/db/schema.ts` (migrações em `drizzle/`, geradas com `npm run db:generate`) |
 | Lojas e catálogo de exemplo | `scripts/seed.ts` (`LOJAS`, `DEMO`) |
 | Vitrine | `src/app/loja/[slug]/` (layout, início, categoria, produto, busca, carrinho, checkout, pedido) |
-| Componentes da vitrine | `src/components/loja/` (modelo de tema completo: `*Relojoaria.tsx`) |
+| Componentes da vitrine | `src/components/loja/` (temas completos: `*Relojoaria.tsx` e `*Joalheria.tsx`) |
+| Banners, logos, dados da empresa e app | `src/lib/visual.ts` e `public/lojas/<slug>/` |
+| Páginas institucionais | `src/lib/paginas.ts` (rota `src/app/loja/[slug]/[pagina]/`) |
+| Importar catálogo de outro site | `scripts/importar-catalogo.ts` (+ `scripts/vps-importar-catalogo.sh`; exemplo em `migracao-infinite/`) |
 | Temas | `src/app/globals.css` (`[data-tema="..."]`, `@theme`, `@utility`) |
 | Painel | `src/app/admin/(painel)/` e `src/components/admin/` |
 | Regras de negócio | `src/lib/` (pedidos, estoque, compras, financeiro, pix, frete, cupom, importacao, catalogo, feed, canais/, marcas) |
@@ -64,7 +67,7 @@ Aprendido nas conversas. Siga sem precisar perguntar.
    não existir e nunca altera uma existente: para mudar uma loja que já está no ar, use o
    painel (Configurações) ou uma migração. O `DEMO` é catálogo inventado para testes e
    prévia; em produção o seed roda sem `--demo`.
-3. **Tema.** Se `elegante`, `moderno` ou `relojoaria` servem, basta escolher (painel →
+3. **Tema.** Se `elegante`, `moderno`, `relojoaria` ou `joalheria` (escuro com dourado, da Infinite) servem, basta escolher (painel →
    Configurações → Tema). Tema novo:
    - acrescente o nome em `TemaLoja` (`src/db/schema.ts`; a coluna é texto, não precisa
      de migração) e na lista do select de Configurações;
@@ -100,6 +103,14 @@ Aprendido nas conversas. Siga sem precisar perguntar.
 8. Commit e push na branch que a VPS usa (ver publicar-lojas-vps).
 
 ## Armadilhas já resolvidas
+
+- `.gitignore` com `uploads/` ignorava também `src/app/uploads/` (a rota das fotos). Use `/uploads/`
+  (só a pasta da raiz) e confira com `git status` que pastas novas de `src/` entram no commit.
+- Tema escuro (joalheria): sacola, checkout e pedido usam as classes claras padrão; o `globals.css`
+  troca as cores dentro de `[data-tema="joalheria"] main`. Componente novo nessas páginas: confira no escuro.
+- Catálogo grande: `listarVitrine` limita a 60 por padrão. Nos temas com muitas peças, passe `limite`
+  alto e pagine na página (`CatalogoJoalheria`, 36 por página).
+- Playwright do projeto (1.56) não acha o navegador do ambiente: `PW_CHROMIUM=/opt/pw-browsers/chromium npx playwright test`.
 
 - Dependências: `npm install --legacy-peer-deps` (o `.npmrc` já tem a opção).
 - Tailwind v4: classes próprias com `@utility`, não `@apply` de classe desconhecida.

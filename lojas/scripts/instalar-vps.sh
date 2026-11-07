@@ -3,7 +3,7 @@
 # como a VPS da Kira (n8n + Caddy). Não mexe no n8n: só acrescenta um bloco no Caddyfile.
 #
 # Uso, como root:
-#   curl -fsSL https://raw.githubusercontent.com/Braulio-BG-2406/KIRA/refs/heads/claude/trusting-davinci-9g9zzb/lojas/scripts/instalar-vps.sh -o instalar-lojas.sh
+#   curl -fsSL https://raw.githubusercontent.com/Braulio-BG-2406/KIRA/refs/heads/claude/infinitesemijoias-migration-uty47t/lojas/scripts/instalar-vps.sh -o instalar-lojas.sh
 #   bash instalar-lojas.sh
 #
 # Rodar de novo atualiza o código e reinicia as lojas, sem perder dados.
@@ -12,7 +12,7 @@
 set -euo pipefail
 
 REPO=${REPO:-https://github.com/Braulio-BG-2406/KIRA.git}
-RAMO=${RAMO:-claude/trusting-davinci-9g9zzb}
+RAMO=${RAMO:-claude/infinitesemijoias-migration-uty47t}
 PASTA=${PASTA:-/opt/kira-lojas}
 MARCA="# lojas-kira"
 

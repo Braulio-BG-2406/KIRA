@@ -44,6 +44,71 @@ html {
   letter-spacing: -0.01em;
 }
 
+/* joalheria (Infinite): fundo quase preto, dourado e marfim, Cormorant Garamond nos títulos e DM Sans no texto */
+[data-tema="joalheria"] {
+  --fonte-titulo: "Cormorant Garamond Variable", Georgia, "Times New Roman", serif;
+  --j-fundo: #0b0b0c;
+  --j-superficie: #141414;
+  --j-superficie-2: #1c1c1c;
+  --j-texto: #f3efe6;
+  --j-suave: #c2bdb4;
+  --j-apagado: #8a857c;
+  --j-linha: #30302d;
+  --j-ouro: #b89a67;
+  --j-ouro-claro: #c5a978;
+  font-family: "DM Sans Variable", ui-sans-serif, system-ui, sans-serif;
+  background: var(--j-fundo);
+  color: var(--j-texto);
+  color-scheme: dark;
+}
+[data-tema="joalheria"] .font-titulo {
+  font-weight: 400;
+  letter-spacing: -0.005em;
+}
+body:has([data-tema="joalheria"]) {
+  background: #0b0b0c;
+}
+/* sacola, checkout, pedido e busca usam as classes claras do tema padrão: aqui elas viram escuras */
+[data-tema="joalheria"] main :is(.bg-white, .bg-stone-50, .bg-stone-100, .bg-green-50, .bg-amber-50) {
+  background-color: var(--j-superficie);
+}
+[data-tema="joalheria"] main :is(.text-stone-900, .text-stone-800, .text-stone-950, .text-marca, .text-stone-700) {
+  color: var(--j-texto);
+}
+[data-tema="joalheria"] main :is(.text-stone-600, .text-stone-500, .text-stone-400) {
+  color: var(--j-suave);
+}
+[data-tema="joalheria"] main :is(.text-green-700, .text-green-800) {
+  color: #9bc59d;
+}
+[data-tema="joalheria"] main :is(.border-stone-100, .border-stone-200, .border-stone-300, .border-green-200, .divide-stone-200 > *) {
+  border-color: var(--j-linha);
+}
+[data-tema="joalheria"] main :is(a.bg-marca, button.bg-marca, .botao-primario) {
+  background: var(--j-ouro);
+  color: #16130e;
+  border-radius: 10px;
+}
+[data-tema="joalheria"] main :is(a.bg-marca, button.bg-marca, .botao-primario):hover {
+  background: var(--j-ouro-claro);
+}
+[data-tema="joalheria"] main .has-checked\:border-marca:has(:checked) {
+  border-color: var(--j-ouro);
+}
+[data-tema="joalheria"] .campo {
+  background: var(--j-fundo);
+  border-color: var(--j-linha);
+  color: var(--j-texto);
+  border-radius: 10px;
+}
+[data-tema="joalheria"] .campo:focus {
+  border-color: var(--j-ouro);
+  --tw-ring-color: rgb(184 154 103 / 0.25);
+}
+[data-tema="joalheria"] .rotulo {
+  color: var(--j-suave);
+}
+
 /* produto sem foto: letra no tema claro, desenho de relógio na relojoaria */
 .vazio-relogio {
   display: none;
@@ -53,6 +118,9 @@ html {
 }
 [data-tema="relojoaria"] .vazio-letra {
   display: none;
+}
+[data-tema="joalheria"] .vazio-fundo {
+  background: radial-gradient(circle at 50% 40%, #232220, #141414 70%);
 }
 [data-tema="relojoaria"] .vazio-fundo {
   background: var(--color-areia);
@@ -114,4 +182,23 @@ body {
   border-radius: 9999px;
   font-weight: 400;
   letter-spacing: 0.06em;
+}
+
+/* peças do tema joalheria */
+@utility painel-j {
+  border: 1px solid #f3efe61a;
+  border-radius: 16px;
+  background: #141414;
+}
+@utility botao-ouro {
+  @apply inline-flex items-center justify-center gap-2 rounded-[10px] bg-[#b89a67] px-5 py-3 text-sm font-medium text-[#16130e] transition hover:bg-[#c5a978] active:bg-[#a98a58] disabled:cursor-not-allowed disabled:opacity-50;
+}
+@utility botao-contorno {
+  @apply inline-flex items-center justify-center gap-2 rounded-[10px] border border-[#30302d] px-5 py-3 text-sm font-medium text-[#f3efe6] transition hover:border-[#f3efe6]/60 hover:bg-[#141414] disabled:cursor-not-allowed disabled:opacity-50;
+}
+@utility sobrelinha-j {
+  font-size: 11px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: #c2bdb4;
 }

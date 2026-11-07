@@ -4,6 +4,8 @@ import { baseDaLoja, buscarLoja } from "@/lib/lojas";
 import { categoriasDaLoja, listarVitrine, type Ordem } from "@/lib/catalogo";
 import { GradeProdutos } from "@/components/loja/CartaoProduto";
 import { InicioRelojoaria } from "@/components/loja/InicioRelojoaria";
+import { InicioJoalheria } from "@/components/loja/InicioJoalheria";
+import { visualDaLoja } from "@/lib/visual";
 
 const ORDENS = ["novidades", "menor", "maior"];
 
@@ -19,6 +21,25 @@ export default async function VitrineInicio({ params, searchParams }: { params: 
     listarVitrine({ lojaId: loja.id, destaque: true, limite: 8 }),
     listarVitrine({ lojaId: loja.id, limite: 48, ordem }),
   ]);
+
+  if (loja.tema === "joalheria") {
+    // o catálogo inteiro (centenas de peças) fica em /catalogo; aqui só capas, novidades e seleção
+    const tudo = await listarVitrine({ lojaId: loja.id, limite: 5000 });
+    const colecoes = cats
+      .map((c) => {
+        const daCategoria = tudo.filter((p) => p.categoriaId === c.id);
+        return { ...c, total: daCategoria.length, capa: daCategoria.find((p) => p.imagens.length && p.estoqueTotal > 0)?.imagens[0] };
+      })
+      .filter((c) => c.total > 0);
+    const recentes = (l: typeof tudo) => [...l].sort((a, b) => b.criadoEm.getTime() - a.criadoEm.getTime());
+    const disponiveis = tudo.filter((p) => p.estoqueTotal > 0);
+    const comFoto = disponiveis.filter((p) => p.imagens.length);
+    // peças com foto primeiro; sem foto só completam a vitrine
+    const novidades = [...recentes(comFoto), ...recentes(disponiveis.filter((p) => !p.imagens.length))].slice(0, 8);
+    const selecao = (destaques.filter((p) => p.imagens.length).length >= 4 ? destaques.filter((p) => p.imagens.length) : comFoto.filter((p) => !novidades.includes(p)).sort((a, b) => b.precoMin - a.precoMin))
+      .slice(0, 10);
+    return <InicioJoalheria loja={loja} base={base} visual={visualDaLoja(slug)} categorias={colecoes} novidades={novidades} destaques={selecao} totalPecas={tudo.length} />;
+  }
 
   if (loja.tema === "relojoaria") {
     // capa e quantidade de cada coleção, a partir dos produtos à venda

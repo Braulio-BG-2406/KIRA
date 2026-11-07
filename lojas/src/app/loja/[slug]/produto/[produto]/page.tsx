@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { baseDaLoja, buscarLoja } from "@/lib/lojas";
 import { categoriasDaLoja, listarVitrine, produtoPorSlug } from "@/lib/catalogo";
 import { ProdutoRelojoaria } from "@/components/loja/ProdutoRelojoaria";
+import { ProdutoJoalheria } from "@/components/loja/ProdutoJoalheria";
 import { linkWhatsapp } from "@/lib/texto";
 import { absoluta, urlDaLoja } from "@/lib/dominios";
 import { Comprar } from "@/components/loja/Comprar";
@@ -57,6 +58,18 @@ export default async function PaginaProduto(props: Props) {
   const dadosEstruturados = (
     <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
   );
+  if (loja.tema === "joalheria") {
+    const parecidos = (await listarVitrine({ lojaId: loja.id, categoriaId: p.categoriaId ?? undefined, limite: 40 }))
+      .filter((x) => x.id !== p.id && x.estoqueTotal > 0)
+      .sort((a, b) => Number(b.imagens.length > 0) - Number(a.imagens.length > 0))
+      .slice(0, 8);
+    return (
+      <>
+        {dadosEstruturados}
+        <ProdutoJoalheria loja={loja} p={p} base={base} categoria={cat} parecidos={parecidos} />
+      </>
+    );
+  }
   if (loja.tema === "relojoaria") {
     const parecidos = (await listarVitrine({ lojaId: loja.id, categoriaId: p.categoriaId ?? undefined, limite: 12 })).filter((x) => x.id !== p.id).slice(0, 8);
     return (

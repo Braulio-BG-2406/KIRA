@@ -9,7 +9,7 @@
 #   bash vps-dominio.sh painel.bgimports.com.br painel     # endereço do painel
 #
 # Direto do GitHub:
-#   curl -fsSL https://raw.githubusercontent.com/Braulio-BG-2406/KIRA/refs/heads/claude/trusting-davinci-9g9zzb/lojas/scripts/vps-dominio.sh | bash -s -- bgimports.com.br bg-imports
+#   curl -fsSL https://raw.githubusercontent.com/Braulio-BG-2406/KIRA/refs/heads/claude/infinitesemijoias-migration-uty47t/lojas/scripts/vps-dominio.sh | bash -s -- bgimports.com.br bg-imports
 #
 # Os endereços antigos (sslip.io) continuam funcionando.
 set -euo pipefail

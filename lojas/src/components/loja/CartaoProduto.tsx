@@ -8,12 +8,41 @@ import { DesenhoRelogio } from "./DesenhoRelogio";
 
 export type CondicoesLoja = { descontoPixPct: number; parcelasSemJuros: number };
 
-export type VarianteCartao = "padrao" | "relojoaria";
+export type VarianteCartao = "padrao" | "relojoaria" | "joalheria";
 
 export function CartaoProduto({ p, base, condicoes, variante = "padrao" }: { p: ProdutoVitrine; base: string; condicoes: CondicoesLoja; variante?: VarianteCartao }) {
   const esgotado = p.estoqueTotal <= 0;
   const promocao = p.precoDe != null;
   const parc = parcela(p.precoMin, condicoes.parcelasSemJuros);
+  if (variante === "joalheria") {
+    // vitrine escura: foto em painel arredondado, selo de últimas unidades e preço em marfim
+    return (
+      <Link href={`${base}/produto/${p.slug}`} className="group block">
+        <div className="painel-j relative aspect-square overflow-hidden">
+          <FotoProduto url={p.imagens[0]} nome={p.nome} className="transition duration-700 ease-out group-hover:scale-[1.04]" />
+          {esgotado ? (
+            <span className="absolute left-3 top-3 rounded-full border border-[#30302d] bg-[#0b0b0c]/80 px-3 py-1 text-[11px] text-[#c2bdb4]">Esgotado</span>
+          ) : p.estoqueTotal <= 3 ? (
+            <span className="absolute left-3 top-3 rounded-full border border-[#b89a67]/50 bg-[#0b0b0c]/80 px-3 py-1 text-[11px] text-[#c5a978]">Últimas unidades</span>
+          ) : promocao ? (
+            <span className="absolute left-3 top-3 rounded-full bg-[#b89a67] px-3 py-1 text-[11px] font-medium text-[#16130e]">Oferta</span>
+          ) : null}
+        </div>
+        <div className="px-1 pt-3.5">
+          <h3 className="text-[13px] font-medium uppercase leading-snug tracking-[0.04em] text-[#f3efe6] group-hover:text-[#c5a978]">{p.nome}</h3>
+          <p className="mt-1.5 text-[15px] text-[#f3efe6]">
+            {p.precoDe != null && <span className="mr-2 text-[13px] text-[#8a857c] line-through">{formatarReais(p.precoDe)}</span>}
+            {p.precoMax !== p.precoMin && <span className="text-[13px] text-[#c2bdb4]">a partir de </span>}
+            {formatarReais(p.precoMin)}
+          </p>
+          {!esgotado && condicoes.descontoPixPct > 0 && (
+            <p className="text-[12px] text-[#c2bdb4]">{formatarReais(precoNoPix(p.precoMin, condicoes.descontoPixPct))} no Pix</p>
+          )}
+          {!esgotado && parc && <p className="text-[12px] text-[#8a857c]">ou {parc.vezes}x de {formatarReais(parc.valor)} sem juros</p>}
+        </div>
+      </Link>
+    );
+  }
   if (variante === "relojoaria") {
     // vitrine de relojoaria: peça em fundo areia, texto fino e centralizado
     const opcoes = p.variantes.length;
@@ -91,8 +120,9 @@ export function GradeProdutos({
   variante?: VarianteCartao;
 }) {
   if (produtos.length === 0) return <p className="py-10 text-center text-stone-500">Nenhum produto por aqui ainda.</p>;
+  const espaco = variante === "relojoaria" ? "gap-x-3 gap-y-14 sm:gap-x-5" : variante === "joalheria" ? "gap-x-3 gap-y-8 sm:gap-x-5 sm:gap-y-10" : "gap-x-4 gap-y-8";
   return (
-    <div className={`grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 ${variante === "relojoaria" ? "gap-x-3 gap-y-14 sm:gap-x-5" : "gap-x-4 gap-y-8"}`}>
+    <div className={`grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 ${espaco}`}>
       {produtos.map((p) => (
         <CartaoProduto key={p.id} p={p} base={base} condicoes={condicoes} variante={variante} />
       ))}
@@ -101,12 +131,22 @@ export function GradeProdutos({
 }
 
 /** fileira que rola de lado, como as vitrines das relojoarias */
-export function CarrosselProdutos({ produtos, base, condicoes }: { produtos: ProdutoVitrine[]; base: string; condicoes: CondicoesLoja }) {
+export function CarrosselProdutos({
+  produtos,
+  base,
+  condicoes,
+  variante = "relojoaria",
+}: {
+  produtos: ProdutoVitrine[];
+  base: string;
+  condicoes: CondicoesLoja;
+  variante?: VarianteCartao;
+}) {
   return (
     <div className="sem-barra -mx-5 flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-px-5 px-5 pb-2 sm:-mx-10 sm:scroll-px-10 sm:px-10 lg:gap-5">
       {produtos.map((p) => (
         <div key={p.id} className="w-[72%] shrink-0 snap-start sm:w-[42%] lg:w-[calc(25%-15px)]">
-          <CartaoProduto p={p} base={base} condicoes={condicoes} variante="relojoaria" />
+          <CartaoProduto p={p} base={base} condicoes={condicoes} variante={variante} />
         </div>
       ))}
     </div>

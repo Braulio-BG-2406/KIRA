@@ -61,7 +61,11 @@ Texto pronto para mandar ao terceiro:
 > onde o domínio infinitesemijoias.store está registrado, já no nome e e-mail da
 > Janaina. Se tiver um passo a passo de como você publica, ajuda muito. Obrigada!
 
-### B. Levar a Infinite para a nossa plataforma (`lojas/`, já pronta)
+### B. Levar a Infinite para a nossa plataforma (`lojas/`): FEITO em 07/11/2026
+
+A loja `infinite` da plataforma ganhou o tema **joalheria** (o visual do site antigo), as páginas
+institucionais, os endereços antigos, o app para instalar e o importador do catálogo com fotos.
+Para publicar na VPS, veja a skill publicar-lojas-vps (fluxo "Infinite: tema novo e catálogo").
 
 A plataforma da BG Imports já tem a loja `infinite` cadastrada (tema "elegante") com
 catálogo de exemplo. Este levantamento já deixa pronto:

@@ -162,6 +162,10 @@ Depois, para o domínio antigo apontar para a VPS: registros A de `infinitesemij
 `www.infinitesemijoias.store` para `177.153.67.118` (no painel de quem registrou o domínio) e o fluxo 4
 com `infinitesemijoias.store infinite`.
 
+Mudanças posteriores nas duas lojas (ex.: catálogo em páginas, páginas de ajuda e app da
+BG, 08/11/2026) chegam ao ar só com o comando 1 de novo; o catálogo da Infinite não precisa
+ser importado outra vez.
+
 ### 7. Segurança do SSH
 
 `fail2ban-client status sshd` mostra quem está bloqueado. Se o próprio usuário for

@@ -106,6 +106,10 @@ corrigir o rumo, registre na skill certa com o porquê:
 
 Nunca guarde em skill senha, token, e-mail ou dado de cliente.
 
+Skills do time no repositório: equipe-de-agentes, nova-loja, previa-loja,
+publicar-lojas-vps e migrar-site-de-terceiro (trazer para a VPS um site feito por outra
+pessoa, como a Infinite em 07/11/2026).
+
 ## Regras do time
 
 - Nenhum agente faz ação para fora (push em outra branch, apagar, publicar, mexer na VPS,

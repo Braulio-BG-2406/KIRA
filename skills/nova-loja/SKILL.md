@@ -54,6 +54,17 @@ Aprendido nas conversas. Siga sem precisar perguntar.
   corrente de semijoia, não marca, e são aceitos.
 - **Ver antes de publicar.** Depois de mudar o visual, mostre a prévia (skill
   previa-loja) antes de instalar.
+- **Infinite = visual do site antigo** (tema `joalheria`: preto, dourado, Cormorant +
+  DM Sans, logo do infinito com borboletas). Veio da migração do site do terceiro
+  (skill migrar-site-de-terceiro); mudanças nela partem desse visual.
+- **BG: identidade de jogo de mundo aberto.** Em 08/11/2026 ele recusou um monograma
+  elegante e pediu logo "no estilo GTA", mandando o logo dele (letreiro "BG IMPORTS"
+  com pôr do sol roxo, palmeiras e prédios). Os ícones do app saem desse logo
+  (`lojas/identidade/bg-imports/gerar-icones.py`), recortando só o letreiro: o logo
+  original tem "Vice City" e a maçã da Apple, que não podem ir para o site, o feed ou
+  os marketplaces. O site da BG continua no tema claro `relojoaria` até ele pedir outro
+  visual. Novos itens no logo dele: smartphones, colares e pulseiras; slogan
+  "Estilo. Qualidade. Presença."
 
 ## Fluxo para uma loja nova
 

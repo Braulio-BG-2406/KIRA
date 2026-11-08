@@ -44,6 +44,57 @@ html {
   letter-spacing: -0.01em;
 }
 
+/* cores das peças comuns a vários temas (catálogo em páginas e páginas institucionais).
+   Padrão claro; cada tema troca o que precisar. */
+:root {
+  --v-fundo: #ffffff;
+  --v-superficie: #f5f5f4;
+  --v-texto: #1c1917;
+  --v-suave: #57534e;
+  --v-apagado: #8a8580;
+  --v-linha: #e7e5e4;
+  --v-borda-painel: transparent;
+  --v-acento: var(--cor-primaria, #1f2937);
+  --v-acento-hover: #000000;
+  --v-acento-texto: #ffffff;
+  --v-chip-ativo-borda: var(--cor-primaria, #1f2937);
+  --v-chip-ativo-fundo: var(--cor-primaria, #1f2937);
+  --v-chip-ativo-texto: #ffffff;
+  --v-raio: 12px;
+  --v-raio-botao: 8px;
+}
+[data-tema="relojoaria"] {
+  --v-fundo: #ffffff;
+  --v-superficie: #f4f1ec;
+  --v-texto: #1a1a1a;
+  --v-suave: #57534e;
+  --v-apagado: #8a8580;
+  --v-linha: #e7e2da;
+  --v-acento: #141414;
+  --v-acento-hover: #000000;
+  --v-chip-ativo-borda: #141414;
+  --v-chip-ativo-fundo: #141414;
+  --v-raio: 0px;
+  --v-raio-botao: 9999px;
+}
+[data-tema="joalheria"] {
+  --v-fundo: #0b0b0c;
+  --v-superficie: #141414;
+  --v-texto: #f3efe6;
+  --v-suave: #c2bdb4;
+  --v-apagado: #8a857c;
+  --v-linha: #30302d;
+  --v-borda-painel: #f3efe61a;
+  --v-acento: #b89a67;
+  --v-acento-hover: #c5a978;
+  --v-acento-texto: #16130e;
+  --v-chip-ativo-borda: #b89a67;
+  --v-chip-ativo-fundo: rgb(184 154 103 / 0.12);
+  --v-chip-ativo-texto: #f3efe6;
+  --v-raio: 16px;
+  --v-raio-botao: 10px;
+}
+
 /* joalheria (Infinite): fundo quase preto, dourado e marfim, Cormorant Garamond nos títulos e DM Sans no texto */
 [data-tema="joalheria"] {
   --fonte-titulo: "Cormorant Garamond Variable", Georgia, "Times New Roman", serif;
@@ -201,4 +252,53 @@ body {
   letter-spacing: 0.24em;
   text-transform: uppercase;
   color: #c2bdb4;
+}
+
+/* peças comuns (usam as cores --v-* do tema) */
+@utility cartao-v {
+  border: 1px solid var(--v-borda-painel);
+  border-radius: var(--v-raio);
+  background: var(--v-superficie);
+}
+@utility chip-v {
+  white-space: nowrap;
+  border-radius: 9999px;
+  border: 1px solid var(--v-linha);
+  padding: 6px 16px;
+  font-size: 13px;
+  color: var(--v-suave);
+  transition: color 0.2s, border-color 0.2s, background-color 0.2s;
+  &:hover {
+    color: var(--v-texto);
+    border-color: var(--v-apagado);
+  }
+  &[data-ativo="true"] {
+    border-color: var(--v-chip-ativo-borda);
+    background: var(--v-chip-ativo-fundo);
+    color: var(--v-chip-ativo-texto);
+  }
+}
+@utility botao-v {
+  @apply inline-flex items-center justify-center gap-2 px-6 py-3 text-sm font-medium transition;
+  border-radius: var(--v-raio-botao);
+  background: var(--v-acento);
+  color: var(--v-acento-texto);
+  &:hover {
+    background: var(--v-acento-hover);
+  }
+}
+@utility botao-v-contorno {
+  @apply inline-flex items-center justify-center gap-2 px-6 py-3 text-sm font-medium transition;
+  border-radius: var(--v-raio-botao);
+  border: 1px solid var(--v-linha);
+  color: var(--v-texto);
+  &:hover {
+    border-color: var(--v-texto);
+  }
+}
+@utility sobrelinha-v {
+  font-size: 11px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--v-apagado);
 }

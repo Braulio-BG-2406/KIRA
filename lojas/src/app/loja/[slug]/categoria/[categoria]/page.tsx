@@ -5,7 +5,7 @@ import { baseDaLoja, buscarLoja } from "@/lib/lojas";
 import { categoriasDaLoja, listarVitrine, marcasDaLoja, type Ordem } from "@/lib/catalogo";
 import { Ordenar } from "@/components/loja/Ordenar";
 import { GradeProdutos } from "@/components/loja/CartaoProduto";
-import { CatalogoJoalheria } from "@/components/loja/CatalogoJoalheria";
+import { CatalogoPaginado, Paginacao, ordenarParaVitrine, paginar } from "@/components/loja/CatalogoPaginado";
 
 type Props = { params: Promise<{ slug: string; categoria: string }>; searchParams: Promise<{ marca?: string; ordem?: string; pagina?: string }> };
 
@@ -30,7 +30,7 @@ export default async function Categoria({ params, searchParams }: Props) {
   if (loja.tema === "joalheria") {
     const [base, cats, produtos] = await Promise.all([baseDaLoja(slug), categoriasDaLoja(loja.id), listarVitrine({ lojaId: loja.id, categoriaId: cat.id, ordem, limite: 5000 })]);
     return (
-      <CatalogoJoalheria
+      <CatalogoPaginado
         loja={loja}
         base={base}
         titulo={cat.nome}
@@ -47,7 +47,7 @@ export default async function Categoria({ params, searchParams }: Props) {
   const relojoaria = loja.tema === "relojoaria";
   const [base, produtos, marcas] = await Promise.all([
     baseDaLoja(slug),
-    listarVitrine({ lojaId: loja.id, categoriaId: cat.id, marca, ordem }),
+    listarVitrine({ lojaId: loja.id, categoriaId: cat.id, marca, ordem, limite: relojoaria ? 5000 : undefined }),
     marcasDaLoja(loja.id, cat.id),
   ]);
   const aqui = `${base}/categoria/${cat.slug}`;
@@ -69,6 +69,8 @@ export default async function Categoria({ params, searchParams }: Props) {
   );
 
   if (relojoaria) {
+    // coleções grandes em páginas de 36, como na Infinite
+    const pag = paginar(ordenarParaVitrine(produtos, ordem), Number(pagina) || 1, base, `/categoria/${cat.slug}`, { marca, ordem });
     return (
       <>
         <section className="bg-areia px-6 py-16 text-center sm:py-24">
@@ -83,7 +85,8 @@ export default async function Categoria({ params, searchParams }: Props) {
             {filtros || <span />}
             <Ordenar atual={ordem} />
           </div>
-          <GradeProdutos produtos={produtos} base={base} condicoes={loja} variante="relojoaria" />
+          <GradeProdutos produtos={pag.visiveis} base={base} condicoes={loja} variante="relojoaria" />
+          <Paginacao pagina={pag.pagina} paginas={pag.paginas} link={pag.link} />
         </div>
       </>
     );

@@ -12,6 +12,7 @@ export function CabecalhoRelojoaria({
   avisos,
   categorias,
   whatsapp,
+  paginas = [],
 }: {
   slug: string;
   base: string;
@@ -20,6 +21,7 @@ export function CabecalhoRelojoaria({
   avisos: string[];
   categorias: Categoria[];
   whatsapp: string | null;
+  paginas?: { nome: string; href: string }[];
 }) {
   return (
     <>
@@ -32,7 +34,7 @@ export function CabecalhoRelojoaria({
       <header className="sticky top-0 z-30 border-b border-stone-200/70 bg-white/90 text-stone-900 backdrop-blur-md">
         <div className="mx-auto grid h-[72px] max-w-[1440px] grid-cols-[1fr_auto_1fr] items-center gap-4 px-5 sm:px-10">
           <div className="flex items-center gap-8">
-            <MenuRelojoaria base={base} categorias={categorias} nome={nome} whatsapp={whatsapp} />
+            <MenuRelojoaria base={base} categorias={categorias} nome={nome} whatsapp={whatsapp} paginas={paginas} />
             <Link href={`${base}/busca`} className="hidden items-center gap-2.5 text-[13px] tracking-[0.06em] text-stone-700 hover:text-stone-950 sm:flex">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden>
                 <circle cx="11" cy="11" r="7" />

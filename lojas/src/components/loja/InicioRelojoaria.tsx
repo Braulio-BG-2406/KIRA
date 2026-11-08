@@ -203,6 +203,13 @@ export function InicioRelojoaria({ loja, base, categorias, destaques, todos, ord
           <Ordenar atual={ordem} />
         </div>
         <GradeProdutos produtos={todos} base={base} condicoes={loja} variante="relojoaria" />
+        {todos.length > 0 && (
+          <div className="mt-14 text-center">
+            <Link href={`${base}/catalogo`} className="link-seta text-stone-800">
+              Ver o catálogo completo <span aria-hidden>→</span>
+            </Link>
+          </div>
+        )}
       </section>
 
       {/* serviços */}

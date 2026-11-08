@@ -1,13 +1,16 @@
 import { notFound, redirect } from "next/navigation";
 import { baseDaLoja, buscarLoja } from "@/lib/lojas";
 import { categoriasDaLoja, listarVitrine, type Ordem } from "@/lib/catalogo";
-import { CatalogoJoalheria } from "@/components/loja/CatalogoJoalheria";
+import { CatalogoPaginado, palavrasDoTema } from "@/components/loja/CatalogoPaginado";
+
+// temas com catálogo próprio em páginas; nos outros, o catálogo é a página inicial
+const COM_CATALOGO = ["joalheria", "relojoaria"];
 
 export const metadata = { title: "Catálogo" };
 
 type Props = { params: Promise<{ slug: string }>; searchParams: Promise<{ ordem?: string; pagina?: string; q?: string }> };
 
-/** todas as peças, em páginas (no tema joalheria); nos outros temas o catálogo é a página inicial */
+/** todas as peças, em páginas */
 export default async function Catalogo({ params, searchParams }: Props) {
   const { slug } = await params;
   const loja = await buscarLoja(slug);
@@ -16,14 +19,16 @@ export default async function Catalogo({ params, searchParams }: Props) {
   const base = await baseDaLoja(slug);
   // endereço antigo de busca do site da Infinite (/catalogo?q=)
   if (q) redirect(`${base}/busca?q=${encodeURIComponent(q)}`);
-  if (loja.tema !== "joalheria") redirect(`${base || "/"}#produtos`);
+  if (!COM_CATALOGO.includes(loja.tema)) redirect(`${base || "/"}#produtos`);
+  const { palavra, todas } = palavrasDoTema(loja.tema);
   const ordem = ["novidades", "menor", "maior"].includes(o ?? "") ? (o as Ordem) : undefined;
   const [cats, produtos] = await Promise.all([categoriasDaLoja(loja.id), listarVitrine({ lojaId: loja.id, ordem, limite: 5000 })]);
   return (
-    <CatalogoJoalheria
+    <CatalogoPaginado
       loja={loja}
       base={base}
-      titulo="Todas as peças"
+      titulo={todas}
+      palavra={palavra}
       sobrelinha="Catálogo"
       categorias={cats}
       produtos={produtos}

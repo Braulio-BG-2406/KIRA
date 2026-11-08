@@ -55,7 +55,22 @@ const INFINITE: VisualLoja = {
   ],
 };
 
-const VISUAIS: Record<string, VisualLoja> = { infinite: INFINITE };
+// BG Imports: o visual é o do tema relojoaria; aqui só o app (monograma provisório até chegar o logo)
+// e, quando o dono mandar, os dados da empresa (empresa: { razao, cnpj, endereco }).
+const BG: VisualLoja = {
+  app: {
+    nomeCurto: "BG Imports",
+    descricao: "BG Imports: relógios e acessórios, coleções e seus pedidos na tela inicial.",
+    cor: "#141414",
+    favicon: "/lojas/bg-imports/favicon-32.png",
+    apple: "/lojas/bg-imports/apple-touch-icon.png",
+    icone192: "/lojas/bg-imports/icon-192.png",
+    icone512: "/lojas/bg-imports/icon-512.png",
+    mascaravel: "/lojas/bg-imports/icon-maskable-512.png",
+  },
+};
+
+const VISUAIS: Record<string, VisualLoja> = { infinite: INFINITE, "bg-imports": BG };
 
 export function visualDaLoja(slug: string): VisualLoja {
   return VISUAIS[slug] ?? {};

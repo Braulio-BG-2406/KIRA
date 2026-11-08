@@ -11,6 +11,7 @@ export function RodapeRelojoaria({
   instagram,
   email,
   parcelas,
+  paginas = [],
 }: {
   nome: string;
   sobre: string | null;
@@ -20,6 +21,8 @@ export function RodapeRelojoaria({
   instagram: string | null;
   email: string | null;
   parcelas: number;
+  /** páginas institucionais (quem somos, entregas, trocas, termos, privacidade) */
+  paginas?: { nome: string; href: string }[];
 }) {
   const titulo = "sobrelinha mb-5 text-white/45";
   const link = "block py-1 text-[15px] font-light text-white/75 transition hover:text-white";
@@ -30,9 +33,12 @@ export function RodapeRelojoaria({
           <p className="pl-[0.45em] text-lg uppercase tracking-[0.45em]">{nome}</p>
           {sobre && <p className="mx-auto mt-4 max-w-xl text-[15px] font-light leading-relaxed text-white/55">{sobre}</p>}
         </div>
-        <div className="grid gap-10 py-12 sm:grid-cols-2 lg:grid-cols-4">
+        <div className={`grid gap-10 py-12 sm:grid-cols-2 ${paginas.length ? "lg:grid-cols-5" : "lg:grid-cols-4"}`}>
           <div>
             <p className={titulo}>Coleções</p>
+            <Link href={`${base}/catalogo`} className={link}>
+              Todos os modelos
+            </Link>
             {categorias.slice(0, 8).map((c) => (
               <Link key={c.id} href={`${base}/categoria/${c.slug}`} className={link}>
                 {c.nome}
@@ -67,6 +73,16 @@ export function RodapeRelojoaria({
             </Link>
             <p className="py-1 text-[15px] font-light text-white/75">Devolução em até 7 dias</p>
           </div>
+          {paginas.length > 0 && (
+            <div>
+              <p className={titulo}>Ajuda</p>
+              {paginas.map((p) => (
+                <Link key={p.href} href={`${base}${p.href}`} className={link}>
+                  {p.nome}
+                </Link>
+              ))}
+            </div>
+          )}
           <div>
             <p className={titulo}>Pagamento</p>
             <p className="py-1 text-[15px] font-light text-white/75">Pix</p>

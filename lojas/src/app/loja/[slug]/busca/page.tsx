@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { baseDaLoja, buscarLoja } from "@/lib/lojas";
 import { listarVitrine } from "@/lib/catalogo";
 import { GradeProdutos } from "@/components/loja/CartaoProduto";
-import { CatalogoJoalheria } from "@/components/loja/CatalogoJoalheria";
+import { CatalogoPaginado, palavrasDoTema } from "@/components/loja/CatalogoPaginado";
 import { categoriasDaLoja } from "@/lib/catalogo";
 
 export const metadata = { title: "Busca" };
@@ -12,13 +12,14 @@ export default async function Busca({ params, searchParams }: { params: Promise<
   const q = ((await searchParams).q ?? "").slice(0, 100);
   const loja = await buscarLoja(slug);
   if (!loja) notFound();
-  if (loja.tema === "joalheria") {
+  if (loja.tema === "joalheria" || loja.tema === "relojoaria") {
     const [base, cats, produtos] = await Promise.all([baseDaLoja(slug), categoriasDaLoja(loja.id), q ? listarVitrine({ lojaId: loja.id, busca: q, limite: 5000 }) : Promise.resolve([])]);
     return (
-      <CatalogoJoalheria
+      <CatalogoPaginado
         loja={loja}
         base={base}
-        titulo={q ? `“${q}”` : "Buscar peças"}
+        palavra={palavrasDoTema(loja.tema).palavra}
+        titulo={q ? `“${q}”` : "Buscar"}
         sobrelinha="Busca"
         categorias={cats}
         produtos={produtos}
@@ -37,7 +38,7 @@ export default async function Busca({ params, searchParams }: { params: Promise<
         <button className="botao-primario">Buscar</button>
       </form>
       {q && <p className="mb-8 text-sm text-stone-500">{produtos.length} resultado(s) para &quot;{q}&quot;</p>}
-      {q && <GradeProdutos produtos={produtos} base={base} condicoes={loja} variante={loja.tema === "relojoaria" ? "relojoaria" : "padrao"} />}
+      {q && <GradeProdutos produtos={produtos} base={base} condicoes={loja} variante="padrao" />}
     </div>
   );
 }

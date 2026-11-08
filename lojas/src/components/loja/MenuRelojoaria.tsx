@@ -6,7 +6,20 @@ import { createPortal } from "react-dom";
 import type { Categoria } from "./tipos";
 
 /** menu em tela cheia, com as coleções em letra grande */
-export function MenuRelojoaria({ base, categorias, nome, whatsapp }: { base: string; categorias: Categoria[]; nome: string; whatsapp: string | null }) {
+export function MenuRelojoaria({
+  base,
+  categorias,
+  nome,
+  whatsapp,
+  paginas = [],
+}: {
+  base: string;
+  categorias: Categoria[];
+  nome: string;
+  whatsapp: string | null;
+  /** páginas institucionais (quem somos, entregas, trocas...) */
+  paginas?: { nome: string; href: string }[];
+}) {
   const [aberto, setAberto] = useState(false);
 
   useEffect(() => {
@@ -58,7 +71,7 @@ export function MenuRelojoaria({ base, categorias, nome, whatsapp }: { base: str
             </div>
             <div className="space-y-4 text-[15px] text-stone-700 md:border-l md:border-stone-200 md:pl-12">
               <p className="sobrelinha mb-6 text-stone-500">Sua compra</p>
-              <Link href={base ? `${base}#produtos` : "/#produtos"} onClick={() => setAberto(false)} className="block hover:text-stone-950">Todos os modelos</Link>
+              <Link href={`${base}/catalogo`} onClick={() => setAberto(false)} className="block hover:text-stone-950">Todos os modelos</Link>
               <Link href={`${base}/busca`} onClick={() => setAberto(false)} className="block hover:text-stone-950">Buscar</Link>
               <Link href={`${base}/carrinho`} onClick={() => setAberto(false)} className="block hover:text-stone-950">Sacola</Link>
               <Link href={`${base}/pedido`} onClick={() => setAberto(false)} className="block hover:text-stone-950">Acompanhar pedido</Link>
@@ -66,6 +79,16 @@ export function MenuRelojoaria({ base, categorias, nome, whatsapp }: { base: str
                 <a href={whatsapp} target="_blank" rel="noopener" className="block hover:text-stone-950">
                   Atendimento no WhatsApp
                 </a>
+              )}
+              {paginas.length > 0 && (
+                <>
+                  <p className="sobrelinha mb-6 pt-8 text-stone-500">Ajuda</p>
+                  {paginas.map((p) => (
+                    <Link key={p.href} href={`${base}${p.href}`} onClick={() => setAberto(false)} className="block hover:text-stone-950">
+                      {p.nome}
+                    </Link>
+                  ))}
+                </>
               )}
             </div>
           </nav>

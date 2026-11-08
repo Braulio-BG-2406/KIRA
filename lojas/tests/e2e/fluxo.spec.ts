@@ -67,6 +67,20 @@ test("Infinite: catálogo em páginas, páginas institucionais, endereços antig
   expect((await page.request.get(manifesto.icons[0].src)).status()).toBe(200);
 });
 
+test("BG Imports: catálogo em páginas, páginas de ajuda e app", async ({ page }) => {
+  await page.goto("/loja/bg-imports/catalogo");
+  await expect(page.getByRole("heading", { name: "Todos os modelos" })).toBeVisible();
+  await expect(page.getByText(/\d+ modelos/)).toBeVisible();
+  await page.goto("/loja/bg-imports/troca-e-devolucao");
+  await expect(page.getByRole("heading", { name: "Troca, devolução e garantia", level: 1 })).toBeVisible();
+  // sem CNPJ cadastrado, a linha some em vez de aparecer pela metade
+  await expect(page.getByText("CNPJ")).toHaveCount(0);
+  // página só da Infinite não existe na BG
+  expect((await page.request.get("/loja/bg-imports/seja-revendedora")).status()).toBe(404);
+  const manifesto = await (await page.request.get("/loja/bg-imports/manifest.webmanifest")).json();
+  expect(manifesto.short_name).toBe("BG Imports");
+});
+
 test("loja confirma o pagamento, envia e o cliente acompanha", async ({ page }) => {
   await entrarNoPainel(page);
   await page.goto("/admin/pedidos");

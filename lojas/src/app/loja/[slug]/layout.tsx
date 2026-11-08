@@ -81,7 +81,16 @@ export default async function LayoutLoja({ children, params }: Props) {
           instagram={instagram ?? null}
         />
       ) : relojoaria ? (
-        <CabecalhoRelojoaria slug={slug} base={base} nome={loja.nome} logoUrl={loja.logoUrl} avisos={avisos} categorias={cats} whatsapp={loja.whatsapp ? linkWhatsapp(loja.whatsapp) : null} />
+        <CabecalhoRelojoaria
+          slug={slug}
+          base={base}
+          nome={loja.nome}
+          logoUrl={loja.logoUrl}
+          avisos={avisos}
+          categorias={cats}
+          whatsapp={loja.whatsapp ? linkWhatsapp(loja.whatsapp) : null}
+          paginas={paginas.map((p) => ({ nome: p.titulo, href: `/${p.slug}` }))}
+        />
       ) : (
         <header className={`sticky top-0 z-20 border-b backdrop-blur ${moderno ? "border-white/10 bg-marca text-white" : "border-stone-200 bg-white/95"}`}>
           <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-3">
@@ -141,6 +150,7 @@ export default async function LayoutLoja({ children, params }: Props) {
           instagram={instagram ?? null}
           email={loja.email}
           parcelas={loja.parcelasSemJuros}
+          paginas={paginas.map((p) => ({ nome: p.titulo, href: `/${p.slug}` }))}
         />
       ) : (
         <footer className="mt-16 bg-marca text-white/80">
